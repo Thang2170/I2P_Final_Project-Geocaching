@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Geocaching Treasure Hunt</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    const treasure = {{ treasure | tojson }};
+
+    const map = L.map("map").setView([treasure.lat, treasure.lon], 17);
+
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    L.marker([treasure.lat, treasure.lon]).addTo(map)
+      .bindPopup(treasure.name).openPopup();
+
+    // Everything that happens once we know where the user is
+    async function showPosition(lat, lon) {
+      L.circleMarker([lat, lon], { radius: 8 }).addTo(map).bindPopup("You are here");
+      map.setView([lat, lon], 17);
+      try {
+        const res = await fetch(`/api/distance?lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "The distance request failed.");
+        alert(`You are ${Math.round(data.meters)} m from ${data.treasure}`);
+      } catch (error) {
+        alert(`Could not calculate your distance: ${error.message}`);
+      }
+    }
+
+    const fake = new URLSearchParams(window.location.search).get("fake");
+
+    if (fake) {
+      // Development mode: http://127.0.0.1:5000/?fake=24.7960,120.9950
+      const [lat, lon] = fake.split(",").map(Number);
+      showPosition(lat, lon);
+    } else if (!navigator.geolocation) {
+      alert("Location is not supported by this browser.");
+    } else {
+      navigator.geolocation.getCurrentPosition(
+        pos => showPosition(pos.coords.latitude, pos.coords.longitude),
+        error => {
+          const messages = {
+            1: "Location permission was denied. Allow it for this site and reload.",
+            2: "Your location could not be determined.",
+            3: "Finding your location timed out."
+          };
+          alert((messages[error.code] || "Unknown location error.") + "\n\nDetails: " + error.message);
+        },
+        { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 }
+      );
+    }
+  </script>
+</body>
+</html>
