@@ -1,16 +1,32 @@
 from flask import Flask, jsonify, render_template, request
 
 from location import haversine_m
+from models import Treasure, db, seed_demo_data
 
 app = Flask(__name__)
 
-# Fake treasure for now. B will move this into the database later.
-TREASURE = {"name": "National Tsing Hua University", "lat": 24.795324, "lon": 120.994796}
+# SQLite database file. Flask puts it in a folder called "instance".
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///geohunt.db"
+db.init_app(app)
+
+# Create the tables (if missing) and save the demo treasure on the first run.
+with app.app_context():
+    db.create_all()
+    seed_demo_data()
+
+
+def get_current_treasure():
+    """Return the treasure the map shows: the first one in the database."""
+    query = db.select(Treasure).order_by(Treasure.id)
+    return db.session.execute(query).scalars().first()
 
 
 @app.route("/")
 def home():
-    return render_template("map.html", treasure=TREASURE)
+    treasure = get_current_treasure()
+    if treasure is None:
+        return "No treasures in the database yet.", 404
+    return render_template("map.html", treasure=treasure.to_dict())
 
 
 @app.route("/api/distance")
@@ -21,8 +37,12 @@ def distance():
     except (KeyError, ValueError):
         return jsonify(error="Need numeric lat and lon"), 400
 
-    meters = haversine_m(lat, lon, TREASURE["lat"], TREASURE["lon"])
-    return jsonify(treasure=TREASURE["name"], meters=round(meters, 1))
+    treasure = get_current_treasure()
+    if treasure is None:
+        return jsonify(error="No treasures in the database yet"), 404
+
+    meters = haversine_m(lat, lon, treasure.lat, treasure.lon)
+    return jsonify(treasure=treasure.name, meters=round(meters, 1))
 
 
 if __name__ == "__main__":
