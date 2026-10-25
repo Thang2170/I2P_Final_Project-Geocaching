@@ -45,7 +45,7 @@ We follow one design rule everywhere: **the browser only collects raw data, and 
 | Map | Leaflet, OpenStreetMap |
 | Frontend | HTML, CSS, a little JavaScript |
 | Testing | Python `unittest` |
-| Teamwork | Git and GitHub (branches and pull requests) |
+| Teamwork | Git and GitHub |
 
 ## Project overview
 
@@ -55,8 +55,7 @@ We follow one design rule everywhere: **the browser only collects raw data, and 
 | `location.py` | Distance between GPS points (`haversine_m`) and the nearness check (`is_near`) |
 | `calculator.py` | Steps and calories from distance |
 | `models.py` | Database tables for treasures |
-| `templates/` | HTML pages, including `map.html` and `home.html` |
-| `static/style.css` | Styling for the pages |
+| `templates/` | HTML pages, including `map.html` |
 | `test_location.py`, `test_calculator.py` | Automatic tests |
 
 ## Project status
