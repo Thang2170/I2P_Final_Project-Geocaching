@@ -1,10 +1,13 @@
 from flask import Flask, jsonify, render_template, request
 
-from location import haversine_m
+from location import FOUND_RADIUS_M, haversine_m
 from models import Treasure, db, seed_demo_data
 
-app = Flask(__name__)
+from route_api import route_api
 
+
+app = Flask(__name__)
+app.register_blueprint(route_api)
 # SQLite database file. Flask puts it in a folder called "instance".
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///geohunt.db"
 db.init_app(app)
@@ -42,8 +45,8 @@ def distance():
         return jsonify(error="No treasures in the database yet"), 404
 
     meters = haversine_m(lat, lon, treasure.lat, treasure.lon)
-    return jsonify(treasure=treasure.name, meters=round(meters, 1))
+    return jsonify(treasure=treasure.name, meters=round(meters, 1), found = meters <= FOUND_RADIUS_M)
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True, ssl_context="adhoc")

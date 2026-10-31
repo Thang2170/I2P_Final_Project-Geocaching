@@ -62,6 +62,22 @@ We follow one design rule everywhere: **the browser only collects raw data, and 
 
 Geocaching Treasure Hunt is a class team project and is still under development. The map, distance calculation and nearness check work today; the database, calculator, home page and the rest of the game features are being added step by step.
 
+## Testing on a phone with GPS
+
+Phone browsers require HTTPS before they allow a web page opened over the local network to use GPS. Connect the phone and computer to the same Wi-Fi, then run:
+
+```powershell
+python app.py
+```
+
+Find the computer's Wi-Fi IPv4 address with `ipconfig`, then open this address on the phone:
+
+```text
+https://COMPUTER_IP:5000/
+```
+
+The local development certificate is temporary and not trusted by the phone. Continue past the browser's certificate warning, then allow location access. This HTTPS setup is for local testing only; use a trusted certificate or HTTPS hosting for production.
+
 ## Team
 
 Built by a team of three students Nguyen Cao Thang, Le Tran Vinh Hung, Luong Quoc Bao as a class project.

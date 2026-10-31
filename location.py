@@ -1,7 +1,7 @@
 from math import asin, cos, radians, sin, sqrt
 
 EARTH_RADIUS_M = 6_371_000  
-
+FOUND_RADIUS_M = 20
 
 def haversine_m(lat1, lon1, lat2, lon2):
     """Return the distance in meters between two GPS points (inputs in degrees)."""
@@ -12,6 +12,6 @@ def haversine_m(lat1, lon1, lat2, lon2):
 
     a = sin(d_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(d_lambda / 2) ** 2
     return 2 * EARTH_RADIUS_M * asin(sqrt(a))
-def is_near(lat1, lon1, lat2, lon2, threshold_m=20):
+def is_near(lat1, lon1, lat2, lon2, threshold_m=FOUND_RADIUS_M):
     """Return True if the two GPS points are within threshold_m meters of each other."""
     return haversine_m(lat1, lon1, lat2, lon2) <= threshold_m
