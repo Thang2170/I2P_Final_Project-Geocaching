@@ -51,6 +51,30 @@
     L.marker([treasure.lat, treasure.lon]).addTo(map)
       .bindPopup(treasure.name).openPopup();
 
+    // Every other treasure players have hidden (added by B): one marker each.
+    // The popup is built with textContent, so a treasure name can never inject HTML.
+    async function showOtherTreasures() {
+      try {
+        const res = await fetch("/api/treasures");
+        const list = await res.json();
+        if (!res.ok) throw new Error(list.error || "Could not load treasures");
+        for (const t of list) {
+          if (t.id === treasure.id) continue;  // already drawn above
+          const popup = document.createElement("div");
+          const title = document.createElement("b");
+          title.textContent = t.name;
+          popup.append(title);
+          if (t.description) {
+            popup.append(document.createElement("br"), document.createTextNode(t.description));
+          }
+          L.marker([t.lat, t.lon]).addTo(map).bindPopup(popup);
+        }
+      } catch (err) {
+        console.error("Treasure markers failed:", err);
+      }
+    }
+    showOtherTreasures();
+
     // Everything that happens once we know where the user is
     const statusBox = document.getElementById("status");
     const routeInfo = document.getElementById("routeInfo");

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
@@ -25,16 +26,28 @@ def _utcnow():
 
 
 class User(db.Model):
-    """A player. More columns (password, weight, coins) come in later weeks."""
+    """A player. More columns (weight, coins) come in later weeks."""
 
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
+    # Only a scrambled (hashed) copy of the password is ever stored, never the password itself.
+    password_hash = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
     # user.treasures gives every treasure this player uploaded
     treasures = db.relationship("Treasure", back_populates="creator")
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return self.password_hash is not None and check_password_hash(self.password_hash, password)
+
+    def to_dict(self):
+        """Safe to send to the browser: never includes the password hash."""
+        return {"id": self.id, "username": self.username}
 
 
 class Treasure(db.Model):

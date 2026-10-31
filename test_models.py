@@ -98,6 +98,21 @@ class TestModels(unittest.TestCase):
             db.session.commit()
         db.session.rollback()
 
+    def test_password_is_hashed_and_checked(self):
+        user = User(username="bao")
+        user.set_password("secret1")
+        self.assertNotEqual(user.password_hash, "secret1")
+        self.assertTrue(user.check_password("secret1"))
+        self.assertFalse(user.check_password("Secret1"))
+
+    def test_user_without_password_never_matches(self):
+        self.assertFalse(User(username="old").check_password("anything"))
+
+    def test_user_to_dict_hides_the_password(self):
+        user = User(username="bao")
+        user.set_password("secret1")
+        self.assertEqual(user.to_dict(), {"id": None, "username": "bao"})
+
 
 if __name__ == "__main__":
     unittest.main()
