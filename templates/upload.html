@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hide a treasure</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; max-width: 480px; }
+    h1 { font-size: 1.4rem; }
+    label { display: block; margin-top: 14px; font-weight: 600; }
+    input, textarea, button { width: 100%; box-sizing: border-box; font-size: 1.05rem;
+                              padding: 12px; margin-top: 6px; }
+    button { border: 0; border-radius: 8px; background: #1a73e8; color: white; }
+    button.secondary { background: #e8eaed; color: #202124; }
+    #message { margin-top: 14px; font-weight: 600; }
+    .ok { color: #137333; }
+    .bad { color: #c5221f; }
+  </style>
+</head>
+<body>
+  <h1>Hide a treasure</h1>
+
+  <form id="form">
+    <label for="name">Name</label>
+    <input id="name" name="name" maxlength="100" required>
+
+    <label for="description">Description (a hint for finders)</label>
+    <textarea id="description" name="description" maxlength="300" rows="3"></textarea>
+
+    <label for="lat">Latitude</label>
+    <input id="lat" name="lat" inputmode="decimal" required>
+
+    <label for="lon">Longitude</label>
+    <input id="lon" name="lon" inputmode="decimal" required>
+
+    <button type="button" id="locate" class="secondary">Use my current location</button>
+    <button type="submit">Hide treasure</button>
+  </form>
+
+  <p id="message"></p>
+
+  <script>
+    // The browser only collects the data. Python checks it and saves it.
+    const form = document.getElementById("form");
+    const message = document.getElementById("message");
+
+    function show(text, ok) {
+      message.textContent = text;
+      message.className = ok ? "ok" : "bad";
+    }
+
+    document.getElementById("locate").addEventListener("click", () => {
+      if (!navigator.geolocation) { show("Location is not supported by this browser.", false); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          form.lat.value = pos.coords.latitude.toFixed(6);
+          form.lon.value = pos.coords.longitude.toFixed(6);
+          show("Location filled in.", true);
+        },
+        error => show("Could not get your location: " + error.message, false),
+        { timeout: 30000 }
+      );
+    });
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const body = Object.fromEntries(new FormData(form));
+      try {
+        const res = await fetch("/api/treasures", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "The upload failed.");
+        show(`Saved "${data.name}" (treasure #${data.id}).`, true);
+        form.reset();
+      } catch (error) {
+        show(error.message, false);
+      }
+    });
+  </script>
+</body>
+</html>

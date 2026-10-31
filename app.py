@@ -4,10 +4,12 @@ from location import FOUND_RADIUS_M, haversine_m
 from models import Treasure, db, seed_demo_data
 
 from route_api import route_api
+from treasure_api import treasure_api
 
 
 app = Flask(__name__)
 app.register_blueprint(route_api)
+app.register_blueprint(treasure_api)
 # SQLite database file. Flask puts it in a folder called "instance".
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///geohunt.db"
 db.init_app(app)
