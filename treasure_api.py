@@ -8,6 +8,7 @@ Like route_api.py, this lives in its own Blueprint. app.py only needs:
 
 from flask import Blueprint, jsonify, render_template, request
 
+from auth_api import current_user
 from models import Treasure, db
 from treasure_input import parse_treasure
 
@@ -32,7 +33,8 @@ def create_treasure():
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
-    treasure = Treasure(**clean)
+    user = current_user()  # None when nobody is logged in; uploading still works
+    treasure = Treasure(**clean, created_by=user.id if user else None)
     db.session.add(treasure)
     db.session.commit()
     return jsonify(treasure.to_dict()), 201

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; max-width: 480px; }
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.1rem; margin-top: 28px; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input, button { width: 100%; box-sizing: border-box; font-size: 1.05rem; padding: 12px; margin-top: 6px; }
+    button { border: 0; border-radius: 8px; background: #1a73e8; color: white; }
+    button.secondary { background: #e8eaed; color: #202124; }
+    #message { margin-top: 14px; font-weight: 600; }
+    .ok { color: #137333; }
+    .bad { color: #c5221f; }
+  </style>
+</head>
+<body>
+  <h1>Treasure Hunt account</h1>
+  <p id="who">Checking who you are…</p>
+  <button type="button" id="logout" class="secondary" hidden>Log out</button>
+
+  <div id="forms">
+    <h2>Log in</h2>
+    <form id="loginForm">
+      <label for="loginUser">Username</label>
+      <input id="loginUser" name="username" autocomplete="username" required>
+      <label for="loginPass">Password</label>
+      <input id="loginPass" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Log in</button>
+    </form>
+
+    <h2>Create an account</h2>
+    <form id="registerForm">
+      <label for="regUser">Username (3 to 50 letters, numbers or _)</label>
+      <input id="regUser" name="username" autocomplete="username" required>
+      <label for="regPass">Password (at least 6 characters)</label>
+      <input id="regPass" name="password" type="password" autocomplete="new-password" required>
+      <button type="submit">Create account</button>
+    </form>
+  </div>
+
+  <p id="message"></p>
+
+  <script>
+    // The browser only collects the details. Python checks them and keeps you logged in.
+    const who = document.getElementById("who");
+    const message = document.getElementById("message");
+    const forms = document.getElementById("forms");
+    const logoutButton = document.getElementById("logout");
+
+    function show(text, ok) {
+      message.textContent = text;
+      message.className = ok ? "ok" : "bad";
+    }
+
+    function showLoggedIn(user) {
+      who.textContent = user ? `Logged in as ${user.username}` : "You are not logged in.";
+      forms.hidden = Boolean(user);
+      logoutButton.hidden = !user;
+    }
+
+    async function send(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      return data;
+    }
+
+    function handleForm(form, url, okText) {
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        try {
+          const user = await send(url, Object.fromEntries(new FormData(form)));
+          form.reset();
+          showLoggedIn(user);
+          show(okText, true);
+        } catch (error) {
+          show(error.message, false);
+        }
+      });
+    }
+
+    handleForm(document.getElementById("loginForm"), "/api/login", "Logged in.");
+    handleForm(document.getElementById("registerForm"), "/api/register", "Account created and logged in.");
+
+    logoutButton.addEventListener("click", async () => {
+      await send("/api/logout");
+      showLoggedIn(null);
+      show("Logged out.", true);
+    });
+
+    fetch("/api/me").then(res => res.ok ? res.json() : null).then(showLoggedIn);
+  </script>
+</body>
+</html>
