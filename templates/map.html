@@ -12,55 +12,147 @@
 </head>
 <body>
   <div id="map"></div>
-
+  <div id="status" style="position:absolute;top:12px;left:56px;right:12px;z-index:1000;background:#fffdf6;padding:10px 14px;border-radius:12px;font:600 16px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.2)">Finding you…</div>
+  <div id="routeInfo" style="position:absolute;top:64px;left:56px;right:12px;z-index:1000;background:#fffdf6;padding:8px 14px;border-radius:12px;font:600 14px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     const treasure = {{ treasure | tojson }};
 
     const map = L.map("map").setView([treasure.lat, treasure.lon], 17);
 
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const openStreetMap = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors"
+    });
+
+    const esriStreet = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution: "Tiles &copy; Esri"
+      }
+    );
+
+    const esriSatellite = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+      }
+    );
+
+    openStreetMap.addTo(map);
+    L.control.layers({
+      "OpenStreetMap": openStreetMap,
+      "Esri street map": esriStreet,
+      "Satellite imagery": esriSatellite
     }).addTo(map);
 
     L.marker([treasure.lat, treasure.lon]).addTo(map)
       .bindPopup(treasure.name).openPopup();
 
     // Everything that happens once we know where the user is
-    async function showPosition(lat, lon) {
-      L.circleMarker([lat, lon], { radius: 8 }).addTo(map).bindPopup("You are here");
-      map.setView([lat, lon], 17);
+    const statusBox = document.getElementById("status");
+    const routeInfo = document.getElementById("routeInfo");
+    let userDot = null;
+    let firstFix = true;
+    let lastSent = 0;
+    let routeLine = null;
+    let routeFrom = null;           // where the current route starts
+    let routeRequestId = 0;         // so an old, slow answer can't replace a newer route
+    const REROUTE_DISTANCE_M = 25;  // real GPS: ask for a new route after moving this far
+
+    // Ask Python for a walking route and draw it.
+    // fit = true zooms the map to the whole route (only the first time).
+    async function drawRoute(from, to, fit = false) {
+      const requestId = ++routeRequestId;
+      routeFrom = from;
+      const points = `${from[0]},${from[1]};${to[0]},${to[1]}`;
+      try {
+        const res = await fetch(`/api/route?points=${points}`);
+        const data = await res.json();
+        if (requestId !== routeRequestId) return;  // a newer route was requested meanwhile
+        if (!res.ok) throw new Error(data.error || "Route request failed");
+        if (routeLine) routeLine.remove();
+        routeLine = L.polyline(data.path, { weight: 5 }).addTo(map);
+        if (fit) map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+        const km = (data.distance_m / 1000).toFixed(2);
+        const min = Math.max(1, Math.round(data.duration_s / 60));
+        routeInfo.textContent = `Route: ${km} km, about ${min} min` + (data.warning ? " (straight line)" : "");
+      } catch (err) {
+        if (requestId !== routeRequestId) return;
+        if (routeLine) { routeLine.remove(); routeLine = null; }  // don't leave an out-of-date line
+        routeInfo.textContent = `Could not get a route: ${err.message}`;
+      }
+    }
+    async function showPosition(lat, lon, force = false) {
+      if (userDot) userDot.setLatLng([lat, lon]);
+      else userDot = L.circleMarker([lat, lon], { radius: 8 }).addTo(map).bindPopup("You are here");
+
+      // Only recenter on the first fix, or the map fights the user's panning
+      if (firstFix) {
+        map.setView([lat, lon], 17);
+        firstFix = false;
+        drawRoute([lat, lon], [treasure.lat, treasure.lon], true);
+      } else if (!dragMode && routeFrom && map.distance(routeFrom, [lat, lon]) > REROUTE_DISTANCE_M) {
+        // Real GPS: the user walked away from where the route started, so make a new one.
+        // (Drag mode reroutes when you let go of the marker instead, see "dragend" below.)
+        drawRoute([lat, lon], [treasure.lat, treasure.lon]);
+      }
+
+      // Ask Python at most once every 3 seconds
+      const now = Date.now();
+      if (!force && now - lastSent < 3000) return;
+      lastSent = now;
+
       try {
         const res = await fetch(`/api/distance?lat=${lat}&lon=${lon}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "The distance request failed.");
-        alert(`You are ${Math.round(data.meters)} m from ${data.treasure}`);
-      } catch (error) {
-        alert(`Could not calculate your distance: ${error.message}`);
+        if (!res.ok) throw new Error(data.error || "Distance request failed");
+        statusBox.textContent = data.found
+          ? `You found ${data.treasure}!`
+          : `${Math.round(data.meters)} m to ${data.treasure}`;
+      } catch (err) {
+        statusBox.textContent = `Could not get distance: ${err.message}`;
       }
     }
-
+    const params = new URLSearchParams(window.location.search);
+    const dragMode = params.has("drag");
     const fake = new URLSearchParams(window.location.search).get("fake");
 
-    if (fake) {
+    if (dragMode) {
+      const startLat = treasure.lat + 0.001;
+      const dragMarker = L.marker([startLat, treasure.lon], {
+        draggable: true,
+        title: "Drag to simulate your location"
+      }).addTo(map);
+
+      statusBox.textContent = "Drag the marker to simulate your location";
+      showPosition(startLat, treasure.lon, true);
+      dragMarker.on("drag", event => {
+        const position = event.target.getLatLng();
+        showPosition(position.lat, position.lng, true);
+      });
+      // Let go of the marker: make a new route from where you dropped it
+      dragMarker.on("dragend", event => {
+        const position = event.target.getLatLng();
+        drawRoute([position.lat, position.lng], [treasure.lat, treasure.lon]);
+      });
+    } else if (fake) {
       // Development mode: http://127.0.0.1:5000/?fake=24.7960,120.9950
-      const [lat, lon] = fake.split(",").map(Number);
-      showPosition(lat, lon);
+      const [fLat, fLon] = fake.split(",").map(Number);
+      if (!Number.isFinite(fLat) || !Number.isFinite(fLon)) {
+        statusBox.textContent = "Use ?fake=lat,lon, for example ?fake=24.7960,120.9950";
+      } else {
+        showPosition(fLat, fLon);
+      }
     } else if (!navigator.geolocation) {
-      alert("Location is not supported by this browser.");
+      statusBox.textContent = "Location is not supported by this browser.";
     } else {
-      navigator.geolocation.getCurrentPosition(
+      navigator.geolocation.watchPosition(
         pos => showPosition(pos.coords.latitude, pos.coords.longitude),
-        error => {
-          const messages = {
-            1: "Location permission was denied. Allow it for this site and reload.",
-            2: "Your location could not be determined.",
-            3: "Finding your location timed out."
-          };
-          alert((messages[error.code] || "Unknown location error.") + "\n\nDetails: " + error.message);
-        },
-        { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 }
+        err => { statusBox.textContent = "Location problem: " + err.message; },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
       );
     }
   </script>
