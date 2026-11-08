@@ -82,7 +82,17 @@
       return marker;
     }
 
-    addTreasurePin(treasure, "target");
+    // The treasure you are hunting: its pin is orange and the status card
+    // measures to it. Starts as the first treasure, changes when you tap another.
+    let huntId = treasure.id;
+    let huntMarker = addTreasurePin(treasure, "target");
+
+    function setHunt(t, marker) {
+      huntMarker.getElement().classList.replace("pin--target", "pin--treasure");
+      marker.getElement().classList.replace("pin--treasure", "pin--target");
+      huntMarker = marker;
+      huntId = t.id;
+    }
 
     // Every other treasure players have hidden
     async function showOtherTreasures() {
@@ -121,10 +131,12 @@
       board.classList.add("is-open");
       board.setAttribute("aria-hidden", "false");
 
+      setHunt(t, marker);
       routeTarget = [t.lat, t.lon];
       if (currentPos) {
         boardNote.textContent = "Finding a walking route…";
         drawRoute(currentPos, routeTarget, true);
+        updateDistance(currentPos[0], currentPos[1]);  // status card switches right away
       } else {
         boardNote.textContent = "Waiting for your location…";
       }
@@ -242,10 +254,16 @@
       const now = Date.now();
       if (!force && now - lastSent < 3000) return;
       lastSent = now;
+      updateDistance(lat, lon);
+    }
 
+    // Ask Python how far you are from the treasure you are hunting
+    async function updateDistance(lat, lon) {
+      const askedFor = huntId;
       try {
-        const res = await fetch(`/api/distance?lat=${lat}&lon=${lon}`);
+        const res = await fetch(`/api/distance?lat=${lat}&lon=${lon}&treasure_id=${huntId}`);
         const data = await res.json();
+        if (askedFor !== huntId) return;  // you picked another treasure meanwhile
         if (!res.ok) throw new Error(data.error || "Distance request failed");
         statusBox.textContent = data.found
           ? `🎉 You found ${data.treasure}!`

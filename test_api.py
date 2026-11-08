@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch  # A: needed by test_home_page_loads
 
 from app import app
+from models import Treasure, db
 
 
 class TestDistanceApi(unittest.TestCase):
@@ -21,6 +22,25 @@ class TestDistanceApi(unittest.TestCase):
 
     def test_bad_coordinates_return_400(self):
         r = self.client.get("/api/distance?lat=abc&lon=1")
+        self.assertEqual(r.status_code, 400)
+
+    def test_distance_to_a_chosen_treasure(self):
+        with app.app_context():
+            first = db.session.execute(db.select(Treasure).order_by(Treasure.id)).scalars().first()
+            lat, lon, name = first.lat, first.lon, first.name
+            first_id = first.id
+        r = self.client.get(f"/api/distance?lat={lat}&lon={lon}&treasure_id={first_id}")
+        data = r.get_json()
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(data["treasure"], name)
+        self.assertTrue(data["found"])
+
+    def test_unknown_treasure_id_returns_404(self):
+        r = self.client.get("/api/distance?lat=24.79&lon=120.99&treasure_id=99999999")
+        self.assertEqual(r.status_code, 404)
+
+    def test_bad_treasure_id_returns_400(self):
+        r = self.client.get("/api/distance?lat=24.79&lon=120.99&treasure_id=abc")
         self.assertEqual(r.status_code, 400)
 
     def test_home_page_loads(self):

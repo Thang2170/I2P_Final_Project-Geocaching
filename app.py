@@ -61,9 +61,19 @@ def distance():
     except (KeyError, ValueError):
         return jsonify(error="Need numeric lat and lon"), 400
 
-    treasure = get_current_treasure()
+    # Optional treasure_id: measure to the treasure the player tapped on the map.
+    # Without it we keep the old behaviour (the first treasure).
+    treasure_id = request.args.get("treasure_id")
+    if treasure_id is None:
+        treasure = get_current_treasure()
+    else:
+        try:
+            treasure = db.session.get(Treasure, int(treasure_id))
+        except ValueError:
+            return jsonify(error="treasure_id must be a whole number"), 400
+
     if treasure is None:
-        return jsonify(error="No treasures in the database yet"), 404
+        return jsonify(error="No such treasure"), 404
 
     meters = haversine_m(lat, lon, treasure.lat, treasure.lon)
     return jsonify(treasure=treasure.name, meters=round(meters, 1), found = meters <= FOUND_RADIUS_M)
