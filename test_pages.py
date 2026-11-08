@@ -28,6 +28,15 @@ class TestPages(unittest.TestCase):
         self.assertIn('href="/upload" class="is-active"', html)
         self.assertIn('href="/login" class=""', html)
 
+    def test_map_has_info_board_and_satellite_only(self):
+        with patch("app.current_user", return_value=object()):
+            html = self.get_page("/")
+        self.assertIn('id="board"', html)            # slide-in info board
+        self.assertIn("World_Imagery", html)          # satellite is the base map
+        self.assertIn("World_Transportation", html)   # street names on top
+        self.assertNotIn("L.control.layers", html)    # no layer switcher any more
+        self.assertNotIn("tile.openstreetmap.org", html)
+
     def test_welcome_page_loads_without_login(self):
         html = self.get_page("/welcome")
         self.assertIn("css/styles.css", html)
