@@ -1,0 +1,370 @@
+/* Shared look for the map, login and upload pages.
+   Main colours: deep green #17332d, with orange #f2a93b for highlights. */
+
+:root {
+  --green-dark: #17332d;   /* main colour: top bar, headings, other treasures */
+  --orange: #f2a93b;       /* highlight: buttons, active link, chosen treasure, route */
+  --ink: #14231f;          /* body text */
+  --cream: #f6f5ef;        /* page background */
+  --paper: #fffefa;        /* cards */
+  --muted: #6f7c77;
+  --line: #e2e6df;
+  --success: #2f7d5b;
+  --red: #b3412e;
+  --bar: linear-gradient(160deg, #1d4038, #17332d);
+  --shadow: 0 16px 45px rgba(23, 51, 45, .18);
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: "DM Sans", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+/* ---------- top bar (every page) ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bar);
+  color: #eef3ef;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(242, 169, 59, .65);
+  border-radius: 50%;
+  color: var(--orange);
+  font-size: 20px;
+}
+
+.brand__name {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.topbar__nav {
+  display: flex;
+  gap: 6px;
+}
+
+.topbar__nav a {
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: #eef3ef;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar__nav a:hover { background: rgba(255, 255, 255, .08); }
+
+.topbar__nav a.is-active {
+  background: rgba(242, 169, 59, .18);
+  color: var(--orange);
+}
+
+/* On a phone, hide the brand name so the links still fit on one line
+   (otherwise the page gets wider than the screen and scrolls sideways). */
+@media (max-width: 560px) {
+  .brand__name { display: none; }
+  .topbar { padding: 8px 12px; }
+  .topbar__nav { gap: 2px; }
+  .topbar__nav a { padding: 7px 10px; }
+}
+
+/* ---------- buttons and forms (login, upload) ---------- */
+
+.btn {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--orange);
+  color: var(--green-dark);
+  font: 700 16px "DM Sans", Arial, sans-serif;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn:hover { filter: brightness(.96); }
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--green-dark);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-dark);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--orange);
+  text-decoration-thickness: 2px;
+  cursor: pointer;
+}
+
+.card {
+  max-width: 440px;
+  margin: 32px auto;
+  padding: 28px 24px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* 16px side gutter on phones */
+@media (max-width: 480px) {
+  .card { margin: 16px; }
+}
+
+.card h1 {
+  margin: 0 0 4px;
+  color: var(--green-dark);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 28px;
+}
+
+.muted { color: var(--muted); }
+
+label {
+  display: block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input, textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: 16px "DM Sans", Arial, sans-serif;  /* 16px stops phones zooming in */
+}
+
+input:focus, textarea:focus {
+  outline: 2px solid var(--orange);
+  border-color: transparent;
+}
+
+.row { display: flex; gap: 10px; }
+.row > div { flex: 1; }
+
+.switch {
+  margin: 18px 0 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.message { min-height: 1.5em; margin: 16px 0 0; font-weight: 700; }
+.message.ok { color: var(--success); }
+.message.bad { color: var(--red); }
+
+/* ---------- map page ---------- */
+
+.map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;  /* phones: don't hide the bottom under the browser bar */
+}
+
+/* Holds the map, the status card and the info board.
+   overflow: hidden keeps the closed board (parked off to the right) from
+   making the page scroll sideways. */
+.map-wrap {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+#map { position: absolute; inset: 0; }
+
+/* The status card floats at the bottom, above Leaflet's attribution line. */
+.sheet {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 30px;
+  z-index: 1000;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  background: var(--paper);
+  border-left: 5px solid var(--green-dark);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: background .3s, border-color .3s;
+}
+
+.sheet__status { color: var(--green-dark); font-size: 17px; font-weight: 700; }
+.sheet__route { margin-top: 2px; color: var(--muted); font-size: 14px; }
+
+.sheet.is-found {
+  background: #fff4e0;
+  border-left-color: var(--orange);
+}
+
+/* ---------- treasure pins ---------- */
+
+/* Leaflet moves .pin around with its own transform, so the grow animation
+   goes on the inner .pin__grow instead, scaling from the tip (bottom middle)
+   so the pin keeps pointing at the same spot. */
+.pin__grow {
+  position: relative;
+  width: 30px;
+  height: 36px;
+  transform-origin: 50% 94%;
+  transition: transform .3s cubic-bezier(.34, 1.56, .64, 1);  /* small bounce */
+}
+
+/* A plain teardrop: a square with three round corners, turned 45 degrees */
+.pin__shape {
+  position: absolute;
+  left: 3px;
+  top: 5px;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--pin-colour);
+  box-shadow: -2px 2px 6px rgba(0, 0, 0, .35);
+}
+
+.pin--treasure { --pin-colour: var(--green-dark); }
+.pin--target { --pin-colour: var(--orange); }
+
+.pin.is-selected .pin__grow { transform: scale(1.45); }
+
+/* The draggable "you" marker in ?drag mode */
+.you-marker {
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #1a73e8;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
+  font-size: 18px;
+  cursor: grab;
+}
+
+/* ---------- info board (slides in from the right) ---------- */
+
+.board {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  max-height: calc(100% - 24px);  /* only as tall as its content, so the map shows below */
+  z-index: 1100;  /* above the status card */
+  width: min(340px, calc(100% - 24px));
+  padding: 22px 22px 24px;
+  overflow-y: auto;
+  background: var(--paper);
+  border-top: 6px solid var(--orange);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  /* Closed: parked just past the right edge. Open: slides in. */
+  transform: translateX(calc(100% + 24px));
+  transition: transform .35s ease;
+}
+
+.board.is-open { transform: translateX(0); }
+
+.board__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--green-dark);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board__eyebrow {
+  margin: 0;
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+.board h2 {
+  margin: 4px 40px 6px 0;
+  color: var(--green-dark);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.board__hint { margin: 0; color: var(--muted); }
+
+.board__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.board__stat {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--green-dark);
+  color: #fff;
+}
+
+.board__stat span {
+  display: block;
+  color: rgba(255, 255, 255, .7);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.board__stat strong {
+  color: var(--orange);
+  font-size: 22px;
+}
+
+.board__note { margin: 12px 0 0; color: var(--muted); font-size: 14px; }
+
+/* People who turn off animations in their phone settings get none here either */
+@media (prefers-reduced-motion: reduce) {
+  .board, .pin__grow, .sheet { transition: none; }
+}

@@ -1,73 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Geocaching Treasure Hunt</title>
+  {% include "_head.html" %}
+  <title>Map · Treasure Hunt Club</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <style>
-    html, body { height: 100%; margin: 0; }
-    #map { height: 100%; }
-  </style>
 </head>
-<body>
-  <div id="map"></div>
-  <div id="status" style="position:absolute;top:12px;left:56px;right:12px;z-index:1000;background:#fffdf6;padding:10px 14px;border-radius:12px;font:600 16px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.2)">Finding you…</div>
-  <div id="routeInfo" style="position:absolute;top:64px;left:56px;right:12px;z-index:1000;background:#fffdf6;padding:8px 14px;border-radius:12px;font:600 14px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>
+<body class="map-page">
+  {% set active = "map" %}
+  {% include "_topbar.html" %}
+
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <!-- Status card at the bottom: distance to the treasure and the route summary -->
+    <section id="sheet" class="sheet" aria-live="polite">
+      <div id="status" class="sheet__status">Finding you…</div>
+      <div id="routeInfo" class="sheet__route" hidden></div>
+    </section>
+
+    <!-- Info board: slides in from the right when you tap a treasure -->
+    <aside id="board" class="board" aria-hidden="true">
+      <button type="button" id="boardClose" class="board__close" aria-label="Close">×</button>
+      <p class="board__eyebrow">TREASURE</p>
+      <h2 id="boardName"></h2>
+      <p id="boardHint" class="board__hint"></p>
+      <div class="board__stats">
+        <div class="board__stat"><span>Walk</span><strong id="boardKm">–</strong></div>
+        <div class="board__stat"><span>Time</span><strong id="boardMin">–</strong></div>
+      </div>
+      <p id="boardNote" class="board__note"></p>
+    </aside>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
+  <script>
     const treasure = {{ treasure | tojson }};
+
+    // Test modes, read from the address bar: ?drag or ?fake=lat,lon
+    const params = new URLSearchParams(window.location.search);
+    const dragMode = params.has("drag");
+    const fake = params.get("fake");
+
+    // ------------------------------------------------------------ the map
 
     const map = L.map("map").setView([treasure.lat, treasure.lon], 17);
 
-    const openStreetMap = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Colour satellite photos, with street and place names drawn on top
+    // (photos alone have no names, which makes a walking route hard to follow).
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    });
-
-    const esriStreet = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-      {
-        maxZoom: 19,
-        attribution: "Tiles &copy; Esri"
-      }
-    );
-
-    const esriSatellite = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        maxZoom: 19,
-        attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
-      }
-    );
-
-    openStreetMap.addTo(map);
-    L.control.layers({
-      "OpenStreetMap": openStreetMap,
-      "Esri street map": esriStreet,
-      "Satellite imagery": esriSatellite
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19
     }).addTo(map);
 
-    L.marker([treasure.lat, treasure.lon]).addTo(map)
-      .bindPopup(treasure.name).openPopup();
+    // ------------------------------------------------------------ treasure pins
 
-    // Every other treasure players have hidden (added by B): one marker each.
-    // The popup is built with textContent, so a treasure name can never inject HTML.
+    // A plain coloured pin. kind is "target" (orange: the treasure the
+    // status card measures to) or "treasure" (green: every other one).
+    function pinIcon(kind) {
+      return L.divIcon({
+        className: `pin pin--${kind}`,
+        html: '<div class="pin__grow"><div class="pin__shape"></div></div>',
+        iconSize: [30, 36],
+        iconAnchor: [15, 34],  // the tip of the pin sits on the treasure
+      });
+    }
+
+    function addTreasurePin(t, kind) {
+      const marker = L.marker([t.lat, t.lon], {
+        icon: pinIcon(kind),
+        title: t.name,
+        zIndexOffset: kind === "target" ? 500 : 0
+      }).addTo(map);
+      marker.on("click", () => selectTreasure(t, marker));
+      return marker;
+    }
+
+    // The treasure you are hunting: its pin is orange and the status card
+    // measures to it. Starts as the first treasure, changes when you tap another.
+    let huntId = treasure.id;
+    let huntMarker = addTreasurePin(treasure, "target");
+
+    function setHunt(t, marker) {
+      huntMarker.getElement().classList.replace("pin--target", "pin--treasure");
+      marker.getElement().classList.replace("pin--treasure", "pin--target");
+      huntMarker = marker;
+      huntId = t.id;
+    }
+
+    // Every other treasure players have hidden
     async function showOtherTreasures() {
       try {
         const res = await fetch("/api/treasures");
         const list = await res.json();
         if (!res.ok) throw new Error(list.error || "Could not load treasures");
         for (const t of list) {
-          if (t.id === treasure.id) continue;  // already drawn above
-          const popup = document.createElement("div");
-          const title = document.createElement("b");
-          title.textContent = t.name;
-          popup.append(title);
-          if (t.description) {
-            popup.append(document.createElement("br"), document.createTextNode(t.description));
-          }
-          L.marker([t.lat, t.lon]).addTo(map).bindPopup(popup);
+          if (t.id !== treasure.id) addTreasurePin(t, "treasure");
         }
       } catch (err) {
         console.error("Treasure markers failed:", err);
@@ -75,19 +109,93 @@
     }
     showOtherTreasures();
 
-    // Everything that happens once we know where the user is
+    // ------------------------------------------------------------ info board
+
+    const board = document.getElementById("board");
+    const boardKm = document.getElementById("boardKm");
+    const boardMin = document.getElementById("boardMin");
+    const boardNote = document.getElementById("boardNote");
+    let selectedMarker = null;
+
+    // Tap a treasure: grow its pin, slide the board in, and route to it.
+    // textContent (not innerHTML) because names and hints come from players.
+    function selectTreasure(t, marker) {
+      if (selectedMarker) selectedMarker.getElement().classList.remove("is-selected");
+      selectedMarker = marker;
+      marker.getElement().classList.add("is-selected");
+
+      document.getElementById("boardName").textContent = t.name;
+      document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
+      boardKm.textContent = "–";
+      boardMin.textContent = "–";
+      board.classList.add("is-open");
+      board.setAttribute("aria-hidden", "false");
+
+      setHunt(t, marker);
+      routeTarget = [t.lat, t.lon];
+      if (currentPos) {
+        boardNote.textContent = "Finding a walking route…";
+        drawRoute(currentPos, routeTarget, true);
+        updateDistance(currentPos[0], currentPos[1]);  // status card switches right away
+      } else {
+        boardNote.textContent = "Waiting for your location…";
+      }
+    }
+
+    function closeBoard() {
+      board.classList.remove("is-open");
+      board.setAttribute("aria-hidden", "true");
+      if (selectedMarker) selectedMarker.getElement().classList.remove("is-selected");
+      selectedMarker = null;
+    }
+
+    document.getElementById("boardClose").addEventListener("click", closeBoard);
+    map.on("click", closeBoard);  // tapping empty map closes it too
+
+    // ------------------------------------------------------------ routes
+
+    const sheet = document.getElementById("sheet");
     const statusBox = document.getElementById("status");
     const routeInfo = document.getElementById("routeInfo");
-    let userDot = null;
-    let firstFix = true;
-    let lastSent = 0;
     let routeLine = null;
     let routeFrom = null;           // where the current route starts
+    let routeTarget = [treasure.lat, treasure.lon];  // where it goes (changes when you tap a treasure)
     let routeRequestId = 0;         // so an old, slow answer can't replace a newer route
     const REROUTE_DISTANCE_M = 25;  // real GPS: ask for a new route after moving this far
 
+    // Write the route summary in the status card and, if open, the info board
+    function showRoute(data) {
+      const km = (data.distance_m / 1000).toFixed(2);
+      const min = Math.max(1, Math.round(data.duration_s / 60));
+      const straight = data.warning ? " (straight line)" : "";
+      routeInfo.textContent = `🚶 ${km} km walk, about ${min} min${straight}`;
+      routeInfo.hidden = false;
+      boardKm.textContent = `${km} km`;
+      boardMin.textContent = `${min} min`;
+      boardNote.textContent = data.warning ? "Straight-line estimate: no walking-route service right now." : "";
+    }
+
+    function showRouteError(message) {
+      routeInfo.textContent = `Could not get a route: ${message}`;
+      routeInfo.hidden = false;
+      boardNote.textContent = `Could not get a route: ${message}`;
+    }
+
+    // Space the map should keep free when zooming to a route: the status card
+    // at the bottom, plus the open board. On a wide screen the board takes the
+    // right side; on a phone it is almost full width, so it takes the top instead.
+    function routePadding() {
+      let top = 40, right = 40;
+      if (board.classList.contains("is-open")) {
+        const spaceLeft = map.getSize().x - board.offsetWidth;
+        if (spaceLeft > 250) right = board.offsetWidth + 40;
+        else top = board.offsetHeight + 30;
+      }
+      return { paddingTopLeft: [40, top], paddingBottomRight: [right, 150] };
+    }
+
     // Ask Python for a walking route and draw it.
-    // fit = true zooms the map to the whole route (only the first time).
+    // fit = true zooms the map to the whole route.
     async function drawRoute(from, to, fit = false) {
       const requestId = ++routeRequestId;
       routeFrom = from;
@@ -98,69 +206,95 @@
         if (requestId !== routeRequestId) return;  // a newer route was requested meanwhile
         if (!res.ok) throw new Error(data.error || "Route request failed");
         if (routeLine) routeLine.remove();
-        routeLine = L.polyline(data.path, { weight: 5 }).addTo(map);
-        if (fit) map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
-        const km = (data.distance_m / 1000).toFixed(2);
-        const min = Math.max(1, Math.round(data.duration_s / 60));
-        routeInfo.textContent = `Route: ${km} km, about ${min} min` + (data.warning ? " (straight line)" : "");
+        // Orange line with a dark green edge so it stands out on satellite photos.
+        // Dashed = straight-line fallback, so it's clear it isn't a real path.
+        const dash = data.warning ? "10 10" : null;
+        routeLine = L.featureGroup([
+          L.polyline(data.path, { color: "#17332d", weight: 9, opacity: 0.9, dashArray: dash }),
+          L.polyline(data.path, { color: "#f2a93b", weight: 5, opacity: 1, dashArray: dash })
+        ]).addTo(map);
+        if (fit) map.fitBounds(routeLine.getBounds(), routePadding());
+        showRoute(data);
       } catch (err) {
         if (requestId !== routeRequestId) return;
         if (routeLine) { routeLine.remove(); routeLine = null; }  // don't leave an out-of-date line
-        routeInfo.textContent = `Could not get a route: ${err.message}`;
+        showRouteError(err.message);
       }
     }
+
+    // ------------------------------------------------------------ your position
+
+    let userDot = null;
+    let currentPos = null;  // [lat, lon] of the last known position
+    let firstFix = true;
+    let lastSent = 0;
+
     async function showPosition(lat, lon, force = false) {
-      if (userDot) userDot.setLatLng([lat, lon]);
-      else userDot = L.circleMarker([lat, lon], { radius: 8 }).addTo(map).bindPopup("You are here");
+      currentPos = [lat, lon];
+      // In drag mode the draggable marker already shows where you are
+      if (!dragMode) {
+        if (userDot) userDot.setLatLng(currentPos);
+        else userDot = L.circleMarker(currentPos, {
+          radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1
+        }).addTo(map);
+      }
 
       // Only recenter on the first fix, or the map fights the user's panning
       if (firstFix) {
-        map.setView([lat, lon], 17);
+        map.setView(currentPos, 17);
         firstFix = false;
-        drawRoute([lat, lon], [treasure.lat, treasure.lon], true);
-      } else if (!dragMode && routeFrom && map.distance(routeFrom, [lat, lon]) > REROUTE_DISTANCE_M) {
+        drawRoute(currentPos, routeTarget, true);
+      } else if (!dragMode && routeFrom && map.distance(routeFrom, currentPos) > REROUTE_DISTANCE_M) {
         // Real GPS: the user walked away from where the route started, so make a new one.
         // (Drag mode reroutes when you let go of the marker instead, see "dragend" below.)
-        drawRoute([lat, lon], [treasure.lat, treasure.lon]);
+        drawRoute(currentPos, routeTarget);
       }
 
       // Ask Python at most once every 3 seconds
       const now = Date.now();
       if (!force && now - lastSent < 3000) return;
       lastSent = now;
+      updateDistance(lat, lon);
+    }
 
+    // Ask Python how far you are from the treasure you are hunting
+    async function updateDistance(lat, lon) {
+      const askedFor = huntId;
       try {
-        const res = await fetch(`/api/distance?lat=${lat}&lon=${lon}`);
+        const res = await fetch(`/api/distance?lat=${lat}&lon=${lon}&treasure_id=${huntId}`);
         const data = await res.json();
+        if (askedFor !== huntId) return;  // you picked another treasure meanwhile
         if (!res.ok) throw new Error(data.error || "Distance request failed");
         statusBox.textContent = data.found
-          ? `You found ${data.treasure}!`
+          ? `🎉 You found ${data.treasure}!`
           : `${Math.round(data.meters)} m to ${data.treasure}`;
+        sheet.classList.toggle("is-found", data.found);
       } catch (err) {
         statusBox.textContent = `Could not get distance: ${err.message}`;
       }
     }
-    const params = new URLSearchParams(window.location.search);
-    const dragMode = params.has("drag");
-    const fake = new URLSearchParams(window.location.search).get("fake");
 
     if (dragMode) {
       const startLat = treasure.lat + 0.001;
       const dragMarker = L.marker([startLat, treasure.lon], {
         draggable: true,
+        icon: L.divIcon({ className: "you-marker", html: "🚶", iconSize: [40, 40], iconAnchor: [20, 20] }),
+        zIndexOffset: 1000,
         title: "Drag to simulate your location"
       }).addTo(map);
 
-      statusBox.textContent = "Drag the marker to simulate your location";
+      statusBox.textContent = "Drag 🚶 to simulate your location";
       showPosition(startLat, treasure.lon, true);
+      // While dragging: normal 3-second limit, so we don't flood the server
       dragMarker.on("drag", event => {
         const position = event.target.getLatLng();
-        showPosition(position.lat, position.lng, true);
+        showPosition(position.lat, position.lng);
       });
-      // Let go of the marker: make a new route from where you dropped it
+      // Let go of the marker: exact distance now, and a new route from where you dropped it
       dragMarker.on("dragend", event => {
         const position = event.target.getLatLng();
-        drawRoute([position.lat, position.lng], [treasure.lat, treasure.lon]);
+        showPosition(position.lat, position.lng, true);
+        drawRoute([position.lat, position.lng], routeTarget);
       });
     } else if (fake) {
       // Development mode: http://127.0.0.1:5000/?fake=24.7960,120.9950

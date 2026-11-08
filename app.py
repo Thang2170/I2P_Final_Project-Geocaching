@@ -1,11 +1,11 @@
 import os
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from location import FOUND_RADIUS_M, haversine_m
 from models import Treasure, db, seed_demo_data
 
-from auth_api import auth_api
+from auth_api import auth_api, current_user
 from route_api import route_api
 from treasure_api import treasure_api
 
@@ -36,10 +36,21 @@ def get_current_treasure():
 
 @app.route("/")
 def home():
+    # A: the map is for logged-in players, so send everyone else to the login page first.
+    # "next" remembers the full address (e.g. /?drag) so login can bring them back to it.
+    if current_user() is None:
+        return redirect(url_for("auth_api.login_page", next=request.full_path.rstrip("?")))
+
     treasure = get_current_treasure()
     if treasure is None:
         return "No treasures in the database yet.", 404
     return render_template("map.html", treasure=treasure.to_dict())
+
+
+@app.route("/welcome")
+def welcome():
+    """C's landing page that introduces the app. Anyone can see it."""
+    return render_template("index.html")
 
 
 @app.route("/api/distance")
@@ -50,13 +61,27 @@ def distance():
     except (KeyError, ValueError):
         return jsonify(error="Need numeric lat and lon"), 400
 
-    treasure = get_current_treasure()
+    # Optional treasure_id: measure to the treasure the player tapped on the map.
+    # Without it we keep the old behaviour (the first treasure).
+    treasure_id = request.args.get("treasure_id")
+    if treasure_id is None:
+        treasure = get_current_treasure()
+    else:
+        try:
+            treasure = db.session.get(Treasure, int(treasure_id))
+        except ValueError:
+            return jsonify(error="treasure_id must be a whole number"), 400
+
     if treasure is None:
-        return jsonify(error="No treasures in the database yet"), 404
+        return jsonify(error="No such treasure"), 404
 
     meters = haversine_m(lat, lon, treasure.lat, treasure.lon)
     return jsonify(treasure=treasure.name, meters=round(meters, 1), found = meters <= FOUND_RADIUS_M)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, ssl_context="adhoc")
+    # Debug mode lets anyone who can reach the page run code on this computer, and
+    # host 0.0.0.0 lets the whole Wi-Fi reach it. So debug is OFF unless you ask:
+    #   $env:FLASK_DEBUG = "1"; python app.py
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    app.run(host="0.0.0.0", port=5000, debug=debug, ssl_context="adhoc")

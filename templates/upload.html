@@ -1,43 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hide a treasure</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; max-width: 480px; }
-    h1 { font-size: 1.4rem; }
-    label { display: block; margin-top: 14px; font-weight: 600; }
-    input, textarea, button { width: 100%; box-sizing: border-box; font-size: 1.05rem;
-                              padding: 12px; margin-top: 6px; }
-    button { border: 0; border-radius: 8px; background: #1a73e8; color: white; }
-    button.secondary { background: #e8eaed; color: #202124; }
-    #message { margin-top: 14px; font-weight: 600; }
-    .ok { color: #137333; }
-    .bad { color: #c5221f; }
-  </style>
+  {% include "_head.html" %}
+  <title>Hide a treasure · Treasure Hunt Club</title>
 </head>
 <body>
-  <h1>Hide a treasure</h1>
+  {% set active = "upload" %}
+  {% include "_topbar.html" %}
 
-  <form id="form">
-    <label for="name">Name</label>
-    <input id="name" name="name" maxlength="100" required>
+  <main class="card">
+    <h1>Hide a treasure</h1>
+    <p class="muted">Stand where you want to hide it, then tap "Use my location".</p>
 
-    <label for="description">Description (a hint for finders)</label>
-    <textarea id="description" name="description" maxlength="300" rows="3"></textarea>
+    <form id="form">
+      <label for="name">Name</label>
+      <input id="name" name="name" maxlength="100" required>
 
-    <label for="lat">Latitude</label>
-    <input id="lat" name="lat" inputmode="decimal" required>
+      <label for="description">Hint for finders <span class="muted">(optional)</span></label>
+      <textarea id="description" name="description" maxlength="300" rows="3"></textarea>
 
-    <label for="lon">Longitude</label>
-    <input id="lon" name="lon" inputmode="decimal" required>
+      <div class="row">
+        <div>
+          <label for="lat">Latitude</label>
+          <input id="lat" name="lat" inputmode="decimal" required>
+        </div>
+        <div>
+          <label for="lon">Longitude</label>
+          <input id="lon" name="lon" inputmode="decimal" required>
+        </div>
+      </div>
 
-    <button type="button" id="locate" class="secondary">Use my current location</button>
-    <button type="submit">Hide treasure</button>
-  </form>
+      <button type="button" id="locate" class="btn btn--ghost">📍 Use my location</button>
+      <button type="submit" class="btn">Hide treasure</button>
+    </form>
 
-  <p id="message"></p>
+    <p id="message" class="message" role="status"></p>
+  </main>
 
   <script>
     // The browser only collects the data. Python checks it and saves it.
@@ -46,11 +44,12 @@
 
     function show(text, ok) {
       message.textContent = text;
-      message.className = ok ? "ok" : "bad";
+      message.className = "message " + (ok ? "ok" : "bad");
     }
 
     document.getElementById("locate").addEventListener("click", () => {
       if (!navigator.geolocation) { show("Location is not supported by this browser.", false); return; }
+      show("Finding you…", true);
       navigator.geolocation.getCurrentPosition(
         pos => {
           form.lat.value = pos.coords.latitude.toFixed(6);
@@ -58,7 +57,7 @@
           show("Location filled in.", true);
         },
         error => show("Could not get your location: " + error.message, false),
-        { timeout: 30000 }
+        { enableHighAccuracy: true, timeout: 30000 }
       );
     });
 
@@ -73,7 +72,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "The upload failed.");
-        show(`Saved "${data.name}" (treasure #${data.id}).`, true);
+        show(`Saved "${data.name}". It is on the map now.`, true);
         form.reset();
       } catch (error) {
         show(error.message, false);

@@ -1,65 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Log in</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; max-width: 480px; }
-    h1 { font-size: 1.4rem; }
-    h2 { font-size: 1.1rem; margin-top: 28px; }
-    label { display: block; margin-top: 12px; font-weight: 600; }
-    input, button { width: 100%; box-sizing: border-box; font-size: 1.05rem; padding: 12px; margin-top: 6px; }
-    button { border: 0; border-radius: 8px; background: #1a73e8; color: white; }
-    button.secondary { background: #e8eaed; color: #202124; }
-    #message { margin-top: 14px; font-weight: 600; }
-    .ok { color: #137333; }
-    .bad { color: #c5221f; }
-  </style>
+  {% include "_head.html" %}
+  <title>Log in · Treasure Hunt Club</title>
 </head>
 <body>
-  <h1>Treasure Hunt account</h1>
-  <p id="who">Checking who you are…</p>
-  <button type="button" id="logout" class="secondary" hidden>Log out</button>
+  {% set active = "account" %}
+  {% include "_topbar.html" %}
 
-  <div id="forms">
-    <h2>Log in</h2>
-    <form id="loginForm">
-      <label for="loginUser">Username</label>
-      <input id="loginUser" name="username" autocomplete="username" required>
-      <label for="loginPass">Password</label>
-      <input id="loginPass" name="password" type="password" autocomplete="current-password" required>
-      <button type="submit">Log in</button>
-    </form>
+  <main class="card">
+    <h1>Welcome, explorer</h1>
+    <p id="who" class="muted">Checking who you are…</p>
 
-    <h2>Create an account</h2>
-    <form id="registerForm">
-      <label for="regUser">Username (3 to 50 letters, numbers or _)</label>
-      <input id="regUser" name="username" autocomplete="username" required>
-      <label for="regPass">Password (at least 6 characters)</label>
-      <input id="regPass" name="password" type="password" autocomplete="new-password" required>
-      <button type="submit">Create account</button>
-    </form>
-  </div>
+    <!-- Shown when you are already logged in -->
+    <div id="loggedIn" hidden>
+      <a id="toMap" class="btn" href="/">Go to the map →</a>
+      <button type="button" id="logout" class="btn btn--ghost">Log out</button>
+    </div>
 
-  <p id="message"></p>
+    <!-- Shown when you are logged out: one form at a time, so the page stays short -->
+    <div id="forms" hidden>
+      <form id="loginForm">
+        <label for="loginUser">Username</label>
+        <input id="loginUser" name="username" autocomplete="username" required>
+        <label for="loginPass">Password</label>
+        <input id="loginPass" name="password" type="password" autocomplete="current-password" required>
+        <button type="submit" class="btn">Log in</button>
+        <p class="switch">New here? <button type="button" class="link-button" data-show="registerForm">Create an account</button></p>
+      </form>
+
+      <form id="registerForm" hidden>
+        <label for="regUser">Username <span class="muted">(3 to 50 letters, numbers or _)</span></label>
+        <input id="regUser" name="username" autocomplete="username" required>
+        <label for="regPass">Password <span class="muted">(at least 6 characters)</span></label>
+        <input id="regPass" name="password" type="password" autocomplete="new-password" required>
+        <button type="submit" class="btn">Create account</button>
+        <p class="switch">Already have an account? <button type="button" class="link-button" data-show="loginForm">Log in</button></p>
+      </form>
+    </div>
+
+    <p id="message" class="message" role="status"></p>
+  </main>
 
   <script>
     // The browser only collects the details. Python checks them and keeps you logged in.
     const who = document.getElementById("who");
     const message = document.getElementById("message");
     const forms = document.getElementById("forms");
-    const logoutButton = document.getElementById("logout");
+    const loggedIn = document.getElementById("loggedIn");
+    const loginForm = document.getElementById("loginForm");
+    const registerForm = document.getElementById("registerForm");
 
     function show(text, ok) {
       message.textContent = text;
-      message.className = ok ? "ok" : "bad";
+      message.className = "message " + (ok ? "ok" : "bad");
     }
 
     function showLoggedIn(user) {
-      who.textContent = user ? `Logged in as ${user.username}` : "You are not logged in.";
+      who.textContent = user
+        ? `You are logged in as ${user.username}.`
+        : "Log in to start hunting for treasure.";
       forms.hidden = Boolean(user);
-      logoutButton.hidden = !user;
+      loggedIn.hidden = !user;
+    }
+
+    // "Create an account" / "Log in" links swap which form is visible
+    document.querySelectorAll("[data-show]").forEach(button => {
+      button.addEventListener("click", () => {
+        const showRegister = button.dataset.show === "registerForm";
+        registerForm.hidden = !showRegister;
+        loginForm.hidden = showRegister;
+        show("", true);
+      });
+    });
+
+    // After logging in, go back to the page that sent us here (e.g. "/?drag").
+    // Only follow paths on our own site, so a crafted link can't send users elsewhere.
+    function goToNextPage() {
+      const next = new URLSearchParams(location.search).get("next") || "/";
+      const safe = next.startsWith("/") && !next.startsWith("//");
+      location.href = safe ? next : "/";
     }
 
     async function send(url, body) {
@@ -77,20 +97,20 @@
       form.addEventListener("submit", async event => {
         event.preventDefault();
         try {
-          const user = await send(url, Object.fromEntries(new FormData(form)));
+          await send(url, Object.fromEntries(new FormData(form)));
           form.reset();
-          showLoggedIn(user);
           show(okText, true);
+          goToNextPage();
         } catch (error) {
           show(error.message, false);
         }
       });
     }
 
-    handleForm(document.getElementById("loginForm"), "/api/login", "Logged in.");
-    handleForm(document.getElementById("registerForm"), "/api/register", "Account created and logged in.");
+    handleForm(loginForm, "/api/login", "Logged in. Taking you to the map…");
+    handleForm(registerForm, "/api/register", "Account created. Taking you to the map…");
 
-    logoutButton.addEventListener("click", async () => {
+    document.getElementById("logout").addEventListener("click", async () => {
       await send("/api/logout");
       showLoggedIn(null);
       show("Logged out.", true);
