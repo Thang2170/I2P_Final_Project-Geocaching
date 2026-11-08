@@ -3,15 +3,15 @@
 ============================== */
 
 :root {
-  --ink: #2b211b;
-  --brown: #8b5e3c;
-  --gold: #f4b942;
+  --ink: #14231f;
+  --brown: #17332d;
+  --gold: #f2a93b;
   --cream: #f9f7f1;
   --paper: #fffdf8;
   --muted: #8c8176;
   --line: #ece3d7;
   --green: #64815a;
-  --shadow: 0 16px 45px rgba(62,43,27,.08);
+  --shadow: 0 16px 45px rgba(27,62,54,.08);
   --radius: 18px;
 }
 
@@ -56,7 +56,7 @@ button {
 .ambient--one {
   top: -250px;
   right: 8%;
-  background: #f3c66d;
+  background: #f3bd6d;
 }
 
 .ambient--two {
@@ -83,9 +83,9 @@ button {
   padding: 30px 19px 22px;
   color: #f8f0e3;
   background:
-    radial-gradient(ellipse at 12% 0%, rgba(244,185,66,.15), transparent 42%),
-    linear-gradient(160deg, #30251e, #211a16);
-  box-shadow: 12px 0 35px rgba(40,28,19,.08);
+    radial-gradient(ellipse at 12% 0%, rgba(242,169,59,.15), transparent 42%),
+    linear-gradient(160deg, #1d4038, #17332d);
+  box-shadow: 12px 0 35px rgba(19,40,35,.08);
 }
 
 .brand {
@@ -100,7 +100,7 @@ button {
   place-items: center;
   width: 43px;
   height: 43px;
-  border: 1px solid rgba(244,185,66,.65);
+  border: 1px solid rgba(242,169,59,.65);
   border-radius: 50%;
   color: var(--gold);
   font-size: 28px;
@@ -162,7 +162,7 @@ button {
 
 .side-nav__link.is-active {
   color: #fff8e9;
-  background: rgba(244,185,66,.14);
+  background: rgba(242,169,59,.14);
 }
 
 .side-nav__link.is-active::before {
@@ -200,7 +200,7 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: rgba(244,185,66,.14);
+  background: rgba(242,169,59,.14);
   font-size: 18px;
 }
 
@@ -232,9 +232,9 @@ button {
 .help-card {
   margin: 0 1px 20px;
   padding: 18px 15px;
-  border: 1px solid rgba(244,185,66,.19);
+  border: 1px solid rgba(242,169,59,.19);
   border-radius: 14px;
-  background: rgba(244,185,66,.09);
+  background: rgba(242,169,59,.09);
 }
 
 .help-card__spark {
@@ -275,7 +275,7 @@ button {
   align-items: center;
   justify-content: space-between;
   min-height: 82px;
-  border-bottom: 1px solid rgba(139,94,60,.12);
+  border-bottom: 1px solid rgba(60,139,122,.12);
 }
 
 .breadcrumb {
@@ -285,7 +285,7 @@ button {
 }
 
 .breadcrumb span {
-  color: #b39b7d;
+  color: #7db3a7;
   font-size: 9px;
   letter-spacing: 1.2px;
 }
@@ -309,7 +309,7 @@ button {
   border: 1px solid #f0e1c9;
   border-radius: 99px;
   background: #fffaf0;
-  color: #76502b;
+  color: #2c7565;
   font-size: 10px;
 }
 
@@ -337,7 +337,7 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg,#d8a15b,#83583b);
+  background: linear-gradient(135deg,#d8a65b,#3b8373);
   color: white;
   font-family: "Playfair Display", Georgia, serif;
   font-weight: 800;
@@ -370,9 +370,9 @@ button {
   border: 1px solid rgba(255,255,255,.18);
   border-radius: 24px;
   background:
-    radial-gradient(ellipse at 76% 52%, rgba(244,185,66,.23), transparent 32%),
-    linear-gradient(105deg,#493426,#62452e 54%,#392b23);
-  box-shadow: 0 20px 50px rgba(67,44,27,.16);
+    radial-gradient(ellipse at 76% 52%, rgba(242,169,59,.23), transparent 32%),
+    linear-gradient(105deg,#264941,#2e6257 54%,#233a35);
+  box-shadow: 0 20px 50px rgba(27,67,58,.16);
   color: #fff8eb;
 }
 
@@ -387,7 +387,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #e9c989;
+  color: #e9c389;
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 1.8px;
@@ -409,7 +409,7 @@ button {
 }
 
 .welcome-banner h1 em {
-  color: #f6c765;
+  color: #f6bc65;
 }
 
 .welcome-banner__content p {
@@ -439,9 +439,9 @@ button {
 }
 
 .button--gold {
-  background: linear-gradient(135deg,#ffda7c,#f1b43d);
-  color: #392719;
-  box-shadow: 0 7px 18px rgba(244,185,66,.18);
+  background: linear-gradient(135deg,#ffcb7c,#f1a93d);
+  color: #193932;
+  box-shadow: 0 7px 18px rgba(242,169,59,.18);
 }
 
 .welcome-banner__art {
@@ -483,13 +483,13 @@ button {
 }
 
 .eyebrow--dark {
-  color: #a17a45;
+  color: #4b9b8a;
 }
 
 .feature-showcase__heading h2,
 .section-heading h2 {
   margin: 5px 0 4px;
-  color: #34271e;
+  color: #1e342f;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 23px;
 }
@@ -501,7 +501,7 @@ button {
 }
 
 .text-link {
-  color: #9b6c32;
+  color: #389581;
   font-size: 10px;
   font-weight: 800;
 }
@@ -537,13 +537,13 @@ button {
   height: 30px;
   border-radius: 9px;
   background: #fff0cf;
-  color: #a87328;
+  color: #399783;
   font-size: 17px;
 }
 
 .feature-list__item h3 {
   margin: 1px 0 4px;
-  color: #493526;
+  color: #264941;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 12px;
 }
@@ -591,7 +591,7 @@ button {
 
 .stat-icon--gold {
   background: #fff0cc;
-  color: #b27a23;
+  color: #3b9a86;
 }
 
 .stat-icon--green {
@@ -601,7 +601,7 @@ button {
 
 .stat-icon--orange {
   background: #ffeadc;
-  color: #c16f38;
+  color: #c18a38;
 }
 
 .stat-card small {
@@ -615,7 +615,7 @@ button {
 .stat-card strong {
   display: block;
   margin-top: 3px;
-  color: #453327;
+  color: #27453f;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 19px;
 }
@@ -640,7 +640,7 @@ button {
 
 .level-medal {
   background: #f8e6bd;
-  color: #b17b28;
+  color: #b17a28;
 }
 
 .level-progress {
@@ -663,7 +663,7 @@ button {
 
 .level-percent {
   margin-left: auto;
-  color: #a17a45;
+  color: #4b9b8a;
   font-size: 9px;
   font-weight: 800;
 }
@@ -722,9 +722,9 @@ button {
 }
 
 .filter-chip--active {
-  border-color: #e9c77f;
+  border-color: #e9bf7f;
   background: #fff4d9;
-  color: #8a6029;
+  color: #318270;
   font-weight: 800;
 }
 
@@ -743,7 +743,7 @@ button {
 }
 
 .quest-art--park {
-  background: linear-gradient(160deg,#f5d99b,#c7c98b 65%,#80956a);
+  background: linear-gradient(160deg,#f5d19b,#c7c98b 65%,#80956a);
 }
 
 .art-sun {
@@ -813,7 +813,7 @@ button {
   padding: 7px 10px;
   border-radius: 99px;
   background: rgba(255,253,248,.9);
-  color: #72512d;
+  color: #2d7263;
   font-size: 8px;
   font-weight: 800;
 }
@@ -854,17 +854,17 @@ button {
 }
 
 .difficulty--medium {
-  color: #bd8741;
+  color: #53ab98;
 }
 
 .difficulty--medium i {
-  background: #d9a04e;
+  background: #d9a14e;
 }
 
 .quest-card h3,
 .mini-card h3 {
   margin: 9px 0 5px;
-  color: #493526;
+  color: #264941;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 19px;
 }
@@ -887,7 +887,7 @@ button {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #b17b28;
+  color: #b17a28;
 }
 
 .reward strong {
@@ -901,7 +901,7 @@ button {
 }
 
 .button--dark {
-  background: #493426;
+  background: #264941;
   color: #fff5e5;
 }
 
@@ -929,7 +929,7 @@ button {
 }
 
 .mini-art--city {
-  background: linear-gradient(145deg,#e9c994,#aa8765);
+  background: linear-gradient(145deg,#e9c794,#65aa9b);
 }
 
 .mini-art--lake {
@@ -963,7 +963,7 @@ button {
   align-items: center;
   justify-content: space-between;
   margin-top: 12px;
-  color: #a8752e;
+  color: #3b9b86;
   font-size: 9px;
   font-weight: 800;
 }
@@ -1135,7 +1135,7 @@ button {
   height: 27px;
   border: 3px solid white;
   border-radius: 50% 50% 50% 0;
-  background: #d8a23e;
+  background: #d89a3e;
   color: white;
   font-size: 12px;
   transform: rotate(-45deg);
@@ -1191,9 +1191,9 @@ button {
 
 .button--map {
   width: 100%;
-  border: 1px solid #ead6ae;
+  border: 1px solid #ead2ae;
   background: #fff5df;
-  color: #88602d;
+  color: #328372;
 }
 
 .daily-card {
@@ -1201,7 +1201,7 @@ button {
   overflow: hidden;
   padding: 18px;
   border-radius: var(--radius);
-  background: linear-gradient(140deg,#6a4a30,#3b2a20);
+  background: linear-gradient(140deg,#306a5d,#203b35);
   color: #fff4e1;
   box-shadow: var(--shadow);
 }
@@ -1218,12 +1218,12 @@ button {
   width: 27px;
   height: 27px;
   border-radius: 9px;
-  background: rgba(244,185,66,.17);
-  color: #ffd16e;
+  background: rgba(242,169,59,.17);
+  color: #ffc56e;
 }
 
 .daily-label {
-  color: #e3c38c;
+  color: #e3c08c;
   font-size: 8px;
   font-weight: 900;
   letter-spacing: 1.2px;
@@ -1233,8 +1233,8 @@ button {
   margin-left: auto;
   padding: 4px 7px;
   border-radius: 99px;
-  background: #f4bd4d;
-  color: #53381f;
+  background: #f4b14d;
+  color: #1f5348;
   font-size: 7px;
   font-weight: 900;
 }
@@ -1282,7 +1282,7 @@ button {
 }
 
 .daily-card > a {
-  color: #f6c866;
+  color: #f6bc66;
   font-size: 9px;
   font-weight: 800;
 }
@@ -1297,12 +1297,12 @@ button {
 }
 
 .tip-icon {
-  color: #d39c3d;
+  color: #d3973d;
   font-size: 22px;
 }
 
 .tip-card strong {
-  color: #7c572d;
+  color: #2e7b6a;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 12px;
 }
@@ -1330,13 +1330,13 @@ button {
 }
 
 .footer span:first-child {
-  color: #9d7844;
+  color: #499887;
   font-weight: 900;
   letter-spacing: 1px;
 }
 
 .footer a {
-  color: #9b6c32;
+  color: #389581;
   font-weight: 700;
 }
 
