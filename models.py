@@ -10,6 +10,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from walk_input import MAX_WEIGHT_KG, MIN_WEIGHT_KG
+
 db = SQLAlchemy()
 
 # The treasure that is saved on the very first run, so the map is never empty.
@@ -26,7 +28,7 @@ def _utcnow():
 
 
 class User(db.Model):
-    """A player. More columns (weight, coins) come in later weeks."""
+    """A player. Weight lives in Profile; coins come in a later week."""
 
     __tablename__ = "users"
 
@@ -48,6 +50,26 @@ class User(db.Model):
     def to_dict(self):
         """Safe to send to the browser: never includes the password hash."""
         return {"id": self.id, "username": self.username}
+
+
+class Profile(db.Model):
+    """Extra facts about a player. One row per user who has saved something.
+
+    A separate table (instead of a new User column) so databases that already
+    exist pick it up automatically: db.create_all() adds new tables but never
+    changes old ones.
+    """
+
+    __tablename__ = "profiles"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    weight_kg = db.Column(db.Float, nullable=True)  # used to estimate calories
+
+    @validates("weight_kg")
+    def _check_weight(self, key, value):
+        if value is not None and not MIN_WEIGHT_KG <= value <= MAX_WEIGHT_KG:
+            raise ValueError(f"weight_kg must be between {MIN_WEIGHT_KG} and {MAX_WEIGHT_KG}")
+        return value
 
 
 class Treasure(db.Model):

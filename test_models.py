@@ -3,7 +3,7 @@ import unittest
 from flask import Flask
 from sqlalchemy.exc import IntegrityError
 
-from models import DEMO_TREASURE, Treasure, User, db, seed_demo_data
+from models import DEMO_TREASURE, Profile, Treasure, User, db, seed_demo_data
 
 
 class TestModels(unittest.TestCase):
@@ -112,6 +112,20 @@ class TestModels(unittest.TestCase):
         user = User(username="bao")
         user.set_password("secret1")
         self.assertEqual(user.to_dict(), {"id": None, "username": "bao"})
+
+    def test_profile_saves_a_weight(self):
+        user = User(username="bao")
+        db.session.add(user)
+        db.session.commit()
+        db.session.add(Profile(user_id=user.id, weight_kg=62.5))
+        db.session.commit()
+        self.assertEqual(db.session.get(Profile, user.id).weight_kg, 62.5)
+
+    def test_profile_rejects_impossible_weights(self):
+        for weight in [0, 5, 400, -60]:
+            with self.subTest(weight=weight):
+                with self.assertRaises(ValueError):
+                    Profile(user_id=1, weight_kg=weight)
 
 
 if __name__ == "__main__":

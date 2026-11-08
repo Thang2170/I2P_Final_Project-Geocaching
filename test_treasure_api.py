@@ -2,6 +2,7 @@ import unittest
 
 from flask import Flask
 
+from auth_api import auth_api
 from models import Treasure, db, seed_demo_data
 from treasure_api import treasure_api
 
@@ -11,12 +12,16 @@ class TestTreasureApi(unittest.TestCase):
         # A throwaway app with an in-memory database, so tests never touch geohunt.db.
         self.app = Flask(__name__)
         self.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        self.app.config["SECRET_KEY"] = "test-key"
         db.init_app(self.app)
         self.app.register_blueprint(treasure_api)
+        self.app.register_blueprint(auth_api)
         self.context = self.app.app_context()
         self.context.push()
         db.create_all()
         self.client = self.app.test_client()
+        # Hiding a treasure needs a login, so most tests start as a logged-in player.
+        self.client.post("/api/register", json={"username": "bao", "password": "secret1"})
 
     def tearDown(self):
         db.session.remove()
@@ -53,6 +58,34 @@ class TestTreasureApi(unittest.TestCase):
                 self.assertEqual(r.status_code, 400)
                 self.assertIn("error", r.get_json())
         self.assertEqual(db.session.query(Treasure).count(), 0)
+
+    def test_upload_needs_a_login(self):
+        logged_out = self.app.test_client()
+        r = logged_out.post("/api/treasures", json={"name": "Library", "lat": 24.79, "lon": 120.99})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(db.session.query(Treasure).count(), 0)
+
+    def test_upload_remembers_the_player(self):
+        self.post()
+        self.assertEqual(db.session.query(Treasure).one().creator.username, "bao")
+
+    def test_a_second_treasure_on_the_same_spot_is_rejected(self):
+        self.assertEqual(self.post().status_code, 201)
+        r = self.post(name="Another")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("Library", r.get_json()["error"])
+        self.assertEqual(db.session.query(Treasure).count(), 1)
+
+    def test_a_treasure_a_few_meters_away_is_rejected(self):
+        self.post()
+        r = self.post(name="Another", lat=24.79005)  # about 5.6 m north
+        self.assertEqual(r.status_code, 409)
+
+    def test_a_treasure_far_enough_away_is_saved(self):
+        self.post()
+        r = self.post(name="Another", lat=24.7905)  # about 55 m north
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(db.session.query(Treasure).count(), 2)
 
     def test_empty_body_returns_400(self):
         self.assertEqual(self.client.post("/api/treasures").status_code, 400)

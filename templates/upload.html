@@ -10,7 +10,8 @@
 
   <main class="card">
     <h1>Hide a treasure</h1>
-    <p class="muted">Stand where you want to hide it, then tap "Use my location".</p>
+    <p class="muted">Stand where you want to hide it, then tap "Use my location".
+      You need to be logged in, and a new treasure must be at least 10 m from any other.</p>
 
     <form id="form">
       <label for="name">Name</label>
@@ -61,8 +62,17 @@
       );
     });
 
+    // Hiding treasures needs a login: send visitors to the login page first,
+    // and bring them back here afterwards.
+    const LOGIN_URL = "/login?next=/upload";
+    fetch("/api/me").then(res => { if (!res.ok) location.href = LOGIN_URL; });
+
+    const submitButton = form.querySelector('button[type="submit"]');
+
     form.addEventListener("submit", async event => {
       event.preventDefault();
+      if (submitButton.disabled) return;  // a double tap must not hide the treasure twice
+      submitButton.disabled = true;
       const body = Object.fromEntries(new FormData(form));
       try {
         const res = await fetch("/api/treasures", {
@@ -70,12 +80,15 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
         });
+        if (res.status === 401) { location.href = LOGIN_URL; return; }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "The upload failed.");
         show(`Saved "${data.name}". It is on the map now.`, true);
         form.reset();
       } catch (error) {
         show(error.message, false);
+      } finally {
+        submitButton.disabled = false;
       }
     });
   </script>
