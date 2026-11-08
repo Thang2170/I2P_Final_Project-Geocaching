@@ -112,6 +112,27 @@ class Treasure(db.Model):
         }
 
 
+class CoinTransaction(db.Model):
+    """One line in a player's coin ledger: coins earned (+) or spent (-).
+
+    A player's balance is the sum of their amounts. Keeping every change as its
+    own row means nothing is ever overwritten, and the shop can later add
+    negative rows for purchases.
+    """
+
+    __tablename__ = "coin_transactions"
+    # A player can be paid for a treasure only once. (Rows with no treasure, such as
+    # shop purchases, are not limited: SQL treats each empty value as different.)
+    __table_args__ = (db.UniqueConstraint("user_id", "treasure_id", name="one_payment_per_treasure"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    amount = db.Column(db.Integer, nullable=False)       # + earned, - spent
+    reason = db.Column(db.String(30), nullable=False)    # "found_treasure", later "shop"
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
 def seed_demo_data():
     """Save the demo treasure if there are no treasures yet.
 
