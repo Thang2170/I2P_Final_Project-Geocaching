@@ -16,6 +16,7 @@
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
+      <div id="coinInfo" class="sheet__route" hidden></div>
     </section>
 
     <!-- Info board: slides in from the right when you tap a treasure -->
@@ -259,6 +260,46 @@
       }
     }
 
+    // ------------------------------------------------------------ coins
+
+    // Python decides whether you really are within 20 m and pays the coins
+    // (/api/treasures/<id>/claim). We only say where we are, and ask once per treasure.
+    const coinInfo = document.getElementById("coinInfo");
+    const triedClaim = new Set();  // treasure ids we already asked about
+
+    function showBalance(balance, earned) {
+      coinInfo.textContent = `🪙 ${balance} coins` + (earned ? `  (+${earned})` : "");
+      coinInfo.hidden = false;
+    }
+
+    async function loadBalance() {
+      try {
+        const res = await fetch("/api/coins");
+        if (res.ok) showBalance((await res.json()).balance);
+      } catch (err) {
+        console.error("Coin balance failed:", err);
+      }
+    }
+    loadBalance();
+
+    async function claimCoins(treasureId, lat, lon) {
+      if (triedClaim.has(treasureId)) return;
+      triedClaim.add(treasureId);
+      try {
+        const res = await fetch(`/api/treasures/${treasureId}/claim`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lon })
+        });
+        const data = await res.json();
+        // Refused (you hid it yourself, or already found it): nothing to show.
+        if (res.ok) showBalance(data.balance, data.coins_earned);
+      } catch (err) {
+        triedClaim.delete(treasureId);  // network problem: try again on the next update
+        console.error("Claim failed:", err);
+      }
+    }
+
     // ------------------------------------------------------------ your position
 
     let userDot = null;
@@ -306,6 +347,7 @@
           ? `🎉 You found ${data.treasure}!`
           : `${Math.round(data.meters)} m to ${data.treasure}`;
         sheet.classList.toggle("is-found", data.found);
+        if (data.found) claimCoins(askedFor, lat, lon);
       } catch (err) {
         statusBox.textContent = `Could not get distance: ${err.message}`;
       }

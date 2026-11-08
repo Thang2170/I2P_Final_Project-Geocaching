@@ -3,7 +3,8 @@ import unittest
 from flask import Flask
 from sqlalchemy.exc import IntegrityError
 
-from models import DEMO_TREASURE, Profile, Treasure, User, db, seed_demo_data
+from models import (DEMO_TREASURE, CoinTransaction, Profile, Treasure, User, db,
+                    seed_demo_data)
 
 
 class TestModels(unittest.TestCase):
@@ -126,6 +127,32 @@ class TestModels(unittest.TestCase):
             with self.subTest(weight=weight):
                 with self.assertRaises(ValueError):
                     Profile(user_id=1, weight_kg=weight)
+
+    def make_player_and_treasure(self):
+        player = User(username="bao")
+        treasure = Treasure(name="Library", lat=24.79, lon=120.99)
+        db.session.add_all([player, treasure])
+        db.session.commit()
+        return player, treasure
+
+    def test_a_player_is_paid_once_per_treasure(self):
+        player, treasure = self.make_player_and_treasure()
+        db.session.add(CoinTransaction(user_id=player.id, amount=10, reason="found_treasure",
+                                       treasure_id=treasure.id))
+        db.session.commit()
+        db.session.add(CoinTransaction(user_id=player.id, amount=10, reason="found_treasure",
+                                       treasure_id=treasure.id))
+        with self.assertRaises(IntegrityError):
+            db.session.commit()
+        db.session.rollback()
+
+    def test_rows_without_a_treasure_are_not_limited(self):
+        # shop purchases have no treasure, and a player can buy more than once
+        player, _ = self.make_player_and_treasure()
+        for _ in range(2):
+            db.session.add(CoinTransaction(user_id=player.id, amount=-5, reason="shop"))
+        db.session.commit()
+        self.assertEqual(db.session.query(CoinTransaction).count(), 2)
 
 
 if __name__ == "__main__":

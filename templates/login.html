@@ -14,6 +14,7 @@
 
     <!-- Shown when you are already logged in -->
     <div id="loggedIn" hidden>
+      <p id="coins" class="muted"></p>
       <a id="toMap" class="btn" href="/">Go to the map →</a>
 
       <form id="weightForm">
@@ -69,7 +70,15 @@
         : "Log in to start hunting for treasure.";
       forms.hidden = Boolean(user);
       loggedIn.hidden = !user;
-      if (user) loadWeight();
+      if (user) { loadWeight(); loadCoins(); }
+    }
+
+    async function loadCoins() {
+      const res = await fetch("/api/coins");
+      if (!res.ok) return;
+      const data = await res.json();
+      document.getElementById("coins").textContent =
+        `🪙 ${data.balance} coins · ${data.found_treasure_ids.length} treasures found`;
     }
 
     // Your saved weight, shown in the weight box
