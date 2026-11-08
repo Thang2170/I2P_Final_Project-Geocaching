@@ -20,6 +20,8 @@
 <body>
   <h1>Treasure Hunt account</h1>
   <p id="who">Checking who you are…</p>
+  <!-- A: way back to the map when you are already logged in -->
+  <p><a id="toMap" href="/" hidden>Go to the map →</a></p>
   <button type="button" id="logout" class="secondary" hidden>Log out</button>
 
   <div id="forms">
@@ -60,6 +62,15 @@
       who.textContent = user ? `Logged in as ${user.username}` : "You are not logged in.";
       forms.hidden = Boolean(user);
       logoutButton.hidden = !user;
+      document.getElementById("toMap").hidden = !user;
+    }
+
+    // A: after logging in, go back to the page that sent us here (e.g. "/?drag").
+    // Only follow paths on our own site, so a crafted link can't send users elsewhere.
+    function goToNextPage() {
+      const next = new URLSearchParams(location.search).get("next") || "/";
+      const safe = next.startsWith("/") && !next.startsWith("//");
+      location.href = safe ? next : "/";
     }
 
     async function send(url, body) {
@@ -81,6 +92,7 @@
           form.reset();
           showLoggedIn(user);
           show(okText, true);
+          goToNextPage();
         } catch (error) {
           show(error.message, false);
         }

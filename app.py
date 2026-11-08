@@ -1,11 +1,11 @@
 import os
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from location import FOUND_RADIUS_M, haversine_m
 from models import Treasure, db, seed_demo_data
 
-from auth_api import auth_api
+from auth_api import auth_api, current_user
 from route_api import route_api
 from treasure_api import treasure_api
 
@@ -36,6 +36,11 @@ def get_current_treasure():
 
 @app.route("/")
 def home():
+    # A: the map is for logged-in players, so send everyone else to the login page first.
+    # "next" remembers the full address (e.g. /?drag) so login can bring them back to it.
+    if current_user() is None:
+        return redirect(url_for("auth_api.login_page", next=request.full_path.rstrip("?")))
+
     treasure = get_current_treasure()
     if treasure is None:
         return "No treasures in the database yet.", 404

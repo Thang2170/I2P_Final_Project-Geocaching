@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch  # A: needed by test_home_page_loads
 
 from app import app
 
@@ -23,7 +24,9 @@ class TestDistanceApi(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
 
     def test_home_page_loads(self):
-        self.assertEqual(self.client.get("/").status_code, 200)
+        # A: "/" now needs a logged-in user, so pretend someone is logged in.
+        with patch("app.current_user", return_value=object()):
+            self.assertEqual(self.client.get("/").status_code, 200)
 
 
 if __name__ == "__main__":
