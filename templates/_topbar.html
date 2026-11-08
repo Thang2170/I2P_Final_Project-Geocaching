@@ -1,0 +1,13 @@
+{# Shared top bar. A page picks its highlighted link with: {% set active = "map" %}
+   Plain paths (not url_for) because test apps only register some blueprints. #}
+<header class="topbar">
+  <a class="brand" href="/welcome">
+    <span class="brand__mark">✦</span>
+    <span class="brand__name">Treasure Hunt Club</span>
+  </a>
+  <nav class="topbar__nav">
+    <a href="/" class="{{ 'is-active' if active == 'map' }}">Map</a>
+    <a href="/upload" class="{{ 'is-active' if active == 'upload' }}">Hide a treasure</a>
+    <a href="/login" class="{{ 'is-active' if active == 'account' }}">Account</a>
+  </nav>
+</header>

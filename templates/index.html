@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 
 <body>
@@ -36,7 +36,7 @@
         <a class="side-nav__link is-active" href="#discover">
           <span class="nav-icon">⌖</span> Discover
         </a>
-        <a class="side-nav__link" href="#quests">
+        <a class="side-nav__link" href="/">
           <span class="nav-icon">◇</span> My quests
         </a>
         <a class="side-nav__link" href="#rewards">
@@ -122,13 +122,12 @@
             Make every journey an adventure.
           </p>
 
-          <a class="button button--gold" href="#quests">
+          <a class="button button--gold" href="/">
             Find your next quest <span>→</span>
           </a>
         </div>
 
         
-        </div>
 
       </section>
 
@@ -147,7 +146,7 @@
             </p>
           </div>
 
-          <a class="text-link" href="#quests">
+          <a class="text-link" href="/">
             Start exploring →
           </a>
         </div>
@@ -445,7 +444,7 @@
               <span>⚪ Locked</span>
             </div>
 
-            <a class="button button--map" href="#map-view">
+            <a class="button button--map" href="/">
               Explore full map →
             </a>
           </section>

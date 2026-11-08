@@ -47,6 +47,12 @@ def home():
     return render_template("map.html", treasure=treasure.to_dict())
 
 
+@app.route("/welcome")
+def welcome():
+    """C's landing page that introduces the app. Anyone can see it."""
+    return render_template("index.html")
+
+
 @app.route("/api/distance")
 def distance():
     try:
@@ -64,4 +70,8 @@ def distance():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, ssl_context="adhoc")
+    # Debug mode lets anyone who can reach the page run code on this computer, and
+    # host 0.0.0.0 lets the whole Wi-Fi reach it. So debug is OFF unless you ask:
+    #   $env:FLASK_DEBUG = "1"; python app.py
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    app.run(host="0.0.0.0", port=5000, debug=debug, ssl_context="adhoc")
