@@ -27,8 +27,14 @@
       <div class="board__stats">
         <div class="board__stat"><span>Walk</span><strong id="boardKm">–</strong></div>
         <div class="board__stat"><span>Time</span><strong id="boardMin">–</strong></div>
+        <div class="board__stat"><span>Steps</span><strong id="boardSteps">–</strong></div>
+        <div class="board__stat"><span>Calories (kcal)</span><strong id="boardCal">–</strong></div>
       </div>
       <p id="boardNote" class="board__note"></p>
+      <p id="boardWeightNote" class="board__note" hidden>
+        Calories assume <span id="boardWeight"></span> kg.
+        <a href="/login">Save your weight</a> for a better estimate.
+      </p>
     </aside>
   </div>
 
@@ -114,6 +120,8 @@
     const board = document.getElementById("board");
     const boardKm = document.getElementById("boardKm");
     const boardMin = document.getElementById("boardMin");
+    const boardSteps = document.getElementById("boardSteps");
+    const boardCal = document.getElementById("boardCal");
     const boardNote = document.getElementById("boardNote");
     let selectedMarker = null;
 
@@ -128,6 +136,8 @@
       document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
       boardKm.textContent = "–";
       boardMin.textContent = "–";
+      boardSteps.textContent = "–";
+      boardCal.textContent = "–";
       board.classList.add("is-open");
       board.setAttribute("aria-hidden", "false");
 
@@ -164,18 +174,45 @@
     const REROUTE_DISTANCE_M = 25;  // real GPS: ask for a new route after moving this far
 
     // Write the route summary in the status card and, if open, the info board
+    let routeSummary = "";  // the status-card text without the steps and calories
     function showRoute(data) {
       const km = (data.distance_m / 1000).toFixed(2);
       const min = Math.max(1, Math.round(data.duration_s / 60));
       const straight = data.warning ? " (straight line)" : "";
-      routeInfo.textContent = `🚶 ${km} km walk, about ${min} min${straight}`;
+      routeSummary = `🚶 ${km} km walk, about ${min} min${straight}`;
+      routeInfo.textContent = routeSummary;
       routeInfo.hidden = false;
       boardKm.textContent = `${km} km`;
       boardMin.textContent = `${min} min`;
       boardNote.textContent = data.warning ? "Straight-line estimate: no walking-route service right now." : "";
+      showWalkStats(data.distance_m);
+    }
+
+    // Steps and calories: Python does the maths from the route length (/api/walk-stats).
+    // The counter makes sure a slow answer for an old route can't replace a newer one.
+    let statsRequestId = 0;
+    async function showWalkStats(distanceM) {
+      const requestId = ++statsRequestId;
+      try {
+        const res = await fetch(`/api/walk-stats?distance_m=${distanceM}`);
+        const data = await res.json();
+        if (requestId !== statsRequestId) return;
+        if (!res.ok) throw new Error(data.error || "Stats request failed");
+        boardSteps.textContent = data.steps.toLocaleString();
+        boardCal.textContent = data.calories;
+        routeInfo.textContent = `${routeSummary} · ${data.steps.toLocaleString()} steps · ${data.calories} kcal`;
+        document.getElementById("boardWeight").textContent = data.weight_kg;
+        document.getElementById("boardWeightNote").hidden = data.weight_source !== "default";
+      } catch (err) {
+        if (requestId !== statsRequestId) return;
+        boardSteps.textContent = "–";
+        boardCal.textContent = "–";
+        console.error("Walk stats failed:", err);
+      }
     }
 
     function showRouteError(message) {
+      statsRequestId++;  // ignore any steps-and-calories answer still on its way
       routeInfo.textContent = `Could not get a route: ${message}`;
       routeInfo.hidden = false;
       boardNote.textContent = `Could not get a route: ${message}`;

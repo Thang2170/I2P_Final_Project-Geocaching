@@ -15,6 +15,13 @@
     <!-- Shown when you are already logged in -->
     <div id="loggedIn" hidden>
       <a id="toMap" class="btn" href="/">Go to the map →</a>
+
+      <form id="weightForm">
+        <label for="weight">Your weight in kg <span class="muted">(used to estimate calories)</span></label>
+        <input id="weight" name="weight_kg" inputmode="decimal" placeholder="for example 65">
+        <button type="submit" class="btn btn--ghost">Save weight</button>
+      </form>
+
       <button type="button" id="logout" class="btn btn--ghost">Log out</button>
     </div>
 
@@ -62,7 +69,26 @@
         : "Log in to start hunting for treasure.";
       forms.hidden = Boolean(user);
       loggedIn.hidden = !user;
+      if (user) loadWeight();
     }
+
+    // Your saved weight, shown in the weight box
+    async function loadWeight() {
+      const res = await fetch("/api/me/weight");
+      if (!res.ok) return;
+      const data = await res.json();
+      document.getElementById("weight").value = data.weight_kg ?? "";
+    }
+
+    document.getElementById("weightForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const data = await send("/api/me/weight", Object.fromEntries(new FormData(event.target)));
+        show(`Saved. Calories will use ${data.weight_kg} kg.`, true);
+      } catch (error) {
+        show(error.message, false);
+      }
+    });
 
     // "Create an account" / "Log in" links swap which form is visible
     document.querySelectorAll("[data-show]").forEach(button => {

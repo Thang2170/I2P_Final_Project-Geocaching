@@ -103,10 +103,10 @@ class TestAuthApi(unittest.TestCase):
         treasure = db.session.query(Treasure).one()
         self.assertEqual(treasure.creator.username, "bao")
 
-    def test_upload_still_works_when_logged_out(self):
+    def test_upload_is_refused_when_logged_out(self):
         r = self.client.post("/api/treasures", json={"name": "Library", "lat": 24.79, "lon": 120.99})
-        self.assertEqual(r.status_code, 201)
-        self.assertIsNone(db.session.query(Treasure).one().created_by)
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(db.session.query(Treasure).count(), 0)
 
 
 if __name__ == "__main__":

@@ -3,11 +3,15 @@
 Plain Python with no Flask and no database, so it is easy to test.
 """
 
+from location import haversine_m
+
 MAX_NAME_LENGTH = 100
 MAX_DESCRIPTION_LENGTH = 300
+# Two treasures closer than this would be found at the same time, so we don't allow it.
+MIN_TREASURE_GAP_M = 10
 
 
-def _number(value, field, low, high):
+def parse_number(value, field, low, high):
     """Turn value into a float between low and high, or raise ValueError."""
     if isinstance(value, bool) or value is None or str(value).strip() == "":
         raise ValueError(f"{field} is required")
@@ -46,6 +50,17 @@ def parse_treasure(data):
     return {
         "name": name,
         "description": description,
-        "lat": _number(data.get("lat"), "lat", -90, 90),
-        "lon": _number(data.get("lon"), "lon", -180, 180),
+        "lat": parse_number(data.get("lat"), "lat", -90, 90),
+        "lon": parse_number(data.get("lon"), "lon", -180, 180),
     }
+
+
+def find_too_close(lat, lon, existing, min_distance_m=MIN_TREASURE_GAP_M):
+    """Return the name of a treasure closer than min_distance_m, or None.
+
+    existing is any list of (name, lat, lon) tuples.
+    """
+    for name, other_lat, other_lon in existing:
+        if haversine_m(lat, lon, other_lat, other_lon) < min_distance_m:
+            return name
+    return None

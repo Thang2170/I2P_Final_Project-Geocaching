@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, render_template, request
 
 from auth_api import current_user
 from models import Treasure, db
-from treasure_input import parse_treasure
+from treasure_input import MIN_TREASURE_GAP_M, find_too_close, parse_treasure
 
 treasure_api = Blueprint("treasure_api", __name__)
 
@@ -23,7 +23,15 @@ def upload_page():
 
 @treasure_api.route("/api/treasures", methods=["POST"])
 def create_treasure():
-    """Save a new treasure. Send JSON or form fields: name, description, lat, lon."""
+    """Save a new treasure. Send JSON or form fields: name, description, lat, lon.
+
+    Only logged-in players can hide treasures, and a treasure must be at least
+    MIN_TREASURE_GAP_M from every other one.
+    """
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in to hide a treasure"), 401
+
     data = request.get_json(silent=True)
     if data is None:
         data = request.form.to_dict()
@@ -33,8 +41,13 @@ def create_treasure():
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
-    user = current_user()  # None when nobody is logged in; uploading still works
-    treasure = Treasure(**clean, created_by=user.id if user else None)
+    others = db.session.execute(db.select(Treasure.name, Treasure.lat, Treasure.lon)).all()
+    nearby = find_too_close(clean["lat"], clean["lon"], others)
+    if nearby is not None:
+        return jsonify(error=f'"{nearby}" is already hidden within {MIN_TREASURE_GAP_M} m of '
+                             "this spot. Choose a different place."), 409
+
+    treasure = Treasure(**clean, created_by=user.id)
     db.session.add(treasure)
     db.session.commit()
     return jsonify(treasure.to_dict()), 201

@@ -1,6 +1,6 @@
 import unittest
 
-from treasure_input import parse_treasure
+from treasure_input import MIN_TREASURE_GAP_M, find_too_close, parse_treasure
 
 
 class TestParseTreasure(unittest.TestCase):
@@ -64,6 +64,30 @@ class TestParseTreasure(unittest.TestCase):
     def test_non_text_name_rejected(self):
         with self.assertRaises(ValueError):
             parse_treasure(self.good(name=123))
+
+
+class TestFindTooClose(unittest.TestCase):
+    EXISTING = [("Library", 24.7953, 120.9948), ("Gym", 24.8000, 121.0000)]
+
+    def test_same_spot_is_too_close(self):
+        self.assertEqual(find_too_close(24.7953, 120.9948, self.EXISTING), "Library")
+
+    def test_a_few_meters_away_is_too_close(self):
+        # 0.00005 degrees of latitude is about 5.6 m
+        self.assertEqual(find_too_close(24.79535, 120.9948, self.EXISTING), "Library")
+
+    def test_far_away_is_fine(self):
+        self.assertIsNone(find_too_close(24.7970, 120.9960, self.EXISTING))
+
+    def test_just_outside_the_gap_is_fine(self):
+        # 0.0001 degrees of latitude is about 11 m, more than the 10 m gap
+        self.assertIsNone(find_too_close(24.7954, 120.9948, self.EXISTING))
+
+    def test_no_existing_treasures(self):
+        self.assertIsNone(find_too_close(24.79, 120.99, []))
+
+    def test_gap_is_ten_meters(self):
+        self.assertEqual(MIN_TREASURE_GAP_M, 10)
 
 
 if __name__ == "__main__":
