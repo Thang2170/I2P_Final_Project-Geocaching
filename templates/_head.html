@@ -1,8 +1,10 @@
-{# Shared <head> lines: phone-friendly viewport, the team fonts and app.css. #}
+{# Shared <head> lines: phone-friendly viewport, the pixel fonts, pixel.css and app.css. #}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#17332d">  {# phone browser bar matches the top bar #}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Playfair+Display:wght@800&display=swap">
+{# Press Start 2P for headings and buttons, VT323 for reading text #}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pixel.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">

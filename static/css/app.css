@@ -1,29 +1,30 @@
-/* Shared look for the map, login and upload pages.
-   Main colours: deep green #17332d, with orange #f2a93b for highlights. */
+/* Shared 8-bit look for the map, login, upload, hunts and shop pages.
+   Colours, sprites and animations come from pixel.css (loaded first).
+   Rules of the style: no rounded corners, no blur, hard 4px shadows,
+   and anything that moves moves in steps. */
 
 :root {
-  --green-dark: #17332d;   /* main colour: top bar, headings, other treasures */
-  --orange: #f2a93b;       /* highlight: buttons, active link, chosen treasure, route */
-  --ink: #14231f;          /* body text */
-  --cream: #f6f5ef;        /* page background */
-  --paper: #fffefa;        /* cards */
-  --muted: #6f7c77;
-  --line: #e2e6df;
-  --success: #2f7d5b;
-  --red: #b3412e;
-  --bar: linear-gradient(160deg, #1d4038, #17332d);
-  --shadow: 0 16px 45px rgba(23, 51, 45, .18);
-  --radius: 18px;
+  /* Old names kept so inline page styles still work */
+  --green-dark: var(--px-green);
+  --orange: var(--px-gold);
+  --ink: var(--px-ink);
+  --cream: var(--px-bg);
+  --paper: var(--px-paper);
+  --muted: var(--px-muted);
+  --line: var(--px-line);
+  --success: var(--px-good);
+  --red: var(--px-bad);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--cream);
-  color: var(--ink);
-  font-family: "DM Sans", Arial, sans-serif;
-  line-height: 1.5;
+  background: var(--px-bg);
+  color: var(--px-ink);
+  font-family: var(--font-body);
+  font-size: 20px;
+  line-height: 1.25;
 }
 
 /* ---------- top bar (every page) ---------- */
@@ -32,165 +33,267 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--bar);
-  color: #eef3ef;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--px-green);
+  border-bottom: 4px solid var(--px-ink);
+  color: var(--px-paper);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: inherit;
   text-decoration: none;
 }
 
-.brand__mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(242, 169, 59, .65);
-  border-radius: 50%;
-  color: var(--orange);
-  font-size: 20px;
-}
+/* The coin in the logo bobs gently, like a pickup in a game */
+.brand__mark { animation: px-bob 1.2s steps(2) infinite; }
 
 .brand__name {
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 19px;
-  font-weight: 800;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 .topbar__nav {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
+/* The left padding leaves room for the ▸ cursor, so links don't shift */
 .topbar__nav a {
-  padding: 7px 12px;
-  border-radius: 999px;
-  color: #eef3ef;
-  font-size: 14px;
-  font-weight: 600;
+  position: relative;
+  padding: 4px 8px 4px 20px;
+  color: var(--px-paper);
+  font-size: 22px;
   text-decoration: none;
   white-space: nowrap;
+  transition: background-color .1s steps(2), color .1s steps(2);
 }
 
-.topbar__nav a:hover { background: rgba(255, 255, 255, .08); }
+.topbar__nav a:hover { background: rgba(255, 252, 242, .1); }
 
-.topbar__nav a.is-active {
-  background: rgba(242, 169, 59, .18);
-  color: var(--orange);
+.topbar__nav a:focus-visible {
+  outline: 4px solid var(--px-gold);
+  outline-offset: -4px;
 }
 
-/* On a phone, hide the brand name so the links still fit on one line
-   (otherwise the page gets wider than the screen and scrolls sideways). */
-@media (max-width: 560px) {
+.topbar__nav a.is-active { color: var(--px-gold); }
+
+/* The menu cursor next to the page you are on, blinking like "press start".
+   Same shape as .px-arrow-right in pixel.css. */
+.topbar__nav a.is-active::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: calc(50% - 6px);
+  width: 6px;
+  height: 12px;
+  background: currentColor;
+  clip-path: polygon(0 0, 2px 0, 2px 2px, 4px 2px, 4px 4px, 6px 4px, 6px 8px,
+                     4px 8px, 4px 10px, 2px 10px, 2px 12px, 0 12px);
+  animation: px-blink 1s steps(1) infinite;
+}
+
+/* On a phone the brand name hides and the links can scroll sideways
+   inside the bar, so the page itself never gets wider than the screen. */
+@media (max-width: 640px) {
   .brand__name { display: none; }
-  .topbar { padding: 8px 12px; }
-  .topbar__nav { gap: 2px; }
-  .topbar__nav a { padding: 7px 10px; }
+  .topbar { padding: 8px 12px; gap: 8px; }
+  .topbar__nav { overflow-x: auto; scrollbar-width: none; }
+  .topbar__nav a { font-size: 20px; padding-right: 4px; padding-left: 18px; }
 }
 
-/* ---------- buttons and forms (login, upload) ---------- */
+/* ---------- buttons and forms (login, upload, hunts, shop) ---------- */
 
+/* An arcade button: a light top-left edge and a dark bottom-right edge,
+   and pressing it pushes it down 4px. */
 .btn {
   display: block;
   width: 100%;
-  margin-top: 18px;
-  padding: 13px 16px;
+  margin-top: 24px;
+  padding: 16px;
   border: 0;
-  border-radius: 12px;
-  background: var(--orange);
-  color: var(--green-dark);
-  font: 700 16px "DM Sans", Arial, sans-serif;
+  border-radius: 0;
+  background: var(--px-gold);
+  color: var(--px-ink);
+  box-shadow: var(--px-edge),
+              inset -4px -4px 0 0 var(--px-gold-dark),
+              inset 4px 4px 0 0 var(--px-gold-light);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1.5;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: transform .08s steps(2), background-color .1s steps(2);
 }
 
-.btn:hover { filter: brightness(.96); }
+.btn:hover { background: #ffb84d; }
+
+.btn:active {
+  transform: translateY(4px);
+  box-shadow: var(--px-edge),
+              inset 4px 4px 0 0 var(--px-gold-dark);
+}
+
+.btn:focus-visible {
+  outline: 4px solid var(--px-leaf);
+  outline-offset: 8px;
+}
+
+.btn[disabled] { opacity: .5; cursor: default; }
 
 .btn--ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--green-dark);
+  background: var(--px-paper);
+  box-shadow: var(--px-edge),
+              inset -4px -4px 0 0 #d9d3bf,
+              inset 4px 4px 0 0 #fff;
+}
+
+.btn--ghost:hover { background: #fff; }
+
+.btn--ghost:active {
+  box-shadow: var(--px-edge),
+              inset 4px 4px 0 0 #d9d3bf;
 }
 
 .link-button {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--green-dark);
+  color: var(--px-green);
   font: inherit;
-  font-weight: 700;
   text-decoration: underline;
-  text-decoration-color: var(--orange);
+  text-decoration-color: var(--px-gold);
   text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
 
+/* The page's main box: a dialogue box that draws in from the top */
 .card {
-  max-width: 440px;
-  margin: 32px auto;
+  max-width: 480px;
+  margin: 40px auto;
   padding: 28px 24px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  background: var(--px-paper);
+  box-shadow: var(--px-edge), var(--px-drop);
+  animation: px-boot .4s steps(6) both;
 }
 
-/* 16px side gutter on phones */
-@media (max-width: 480px) {
-  .card { margin: 16px; }
+/* 16px side gutter on phones (plus 4px for the pixel edge) */
+@media (max-width: 520px) {
+  .card { margin: 24px 20px; padding: 24px 16px; }
 }
 
 .card h1 {
-  margin: 0 0 4px;
-  color: var(--green-dark);
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 28px;
+  margin: 0 0 12px;
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
-.muted { color: var(--muted); }
+.card h2 {
+  margin: 32px 0 8px;
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.muted { color: var(--px-muted); }
+
+/* A line that shows a coin balance gets a little coin in front */
+.coin-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coin-line::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  /* The 2px coin from pixel.css, drawn as a background so a plain <p> can use it */
+  background:
+    linear-gradient(var(--px-ink) 0 0) 4px 0 / 8px 2px,
+    linear-gradient(var(--px-ink) 0 0) 4px 14px / 8px 2px,
+    linear-gradient(var(--px-ink) 0 0) 0 4px / 2px 8px,
+    linear-gradient(var(--px-ink) 0 0) 14px 4px / 2px 8px,
+    linear-gradient(var(--px-gold-light) 0 0) 4px 4px / 2px 4px,
+    linear-gradient(var(--px-gold-dark) 0 0) 12px 4px / 2px 8px,
+    linear-gradient(var(--px-gold) 0 0) 2px 2px / 12px 12px;
+  background-repeat: no-repeat;
+}
+
+.coin-line:empty::before { display: none; }
 
 label {
   display: block;
-  margin-top: 14px;
-  font-size: 14px;
-  font-weight: 700;
+  margin-top: 16px;
+  font-size: 20px;
 }
 
 input, textarea {
   width: 100%;
-  margin-top: 6px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
   background: #fff;
-  color: var(--ink);
-  font: 16px "DM Sans", Arial, sans-serif;  /* 16px stops phones zooming in */
+  color: var(--px-ink);
+  box-shadow: var(--px-edge), inset 4px 4px 0 0 #e8e3d3;
+  font-family: var(--font-body);
+  font-size: 22px;  /* 16px or more stops phones zooming in */
 }
 
 input:focus, textarea:focus {
-  outline: 2px solid var(--orange);
-  border-color: transparent;
+  outline: none;
+  background: #fffbe8;
+  box-shadow: 0 -4px 0 0 var(--px-gold-dark), 0 4px 0 0 var(--px-gold-dark),
+              -4px 0 0 0 var(--px-gold-dark), 4px 0 0 0 var(--px-gold-dark);
 }
 
-.row { display: flex; gap: 10px; }
-.row > div { flex: 1; }
+.row { display: flex; gap: 16px; }
+.row > div { flex: 1; min-width: 0; }
 
 .switch {
-  margin: 18px 0 0;
+  margin: 20px 0 0;
   text-align: center;
-  color: var(--muted);
+  color: var(--px-muted);
 }
 
-.message { min-height: 1.5em; margin: 16px 0 0; font-weight: 700; }
-.message.ok { color: var(--success); }
-.message.bad { color: var(--red); }
+details { margin-top: 24px; }
+
+summary {
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--px-green);
+  cursor: pointer;
+}
+
+.message { min-height: 1.25em; margin: 16px 0 0; }
+.message.ok { color: var(--px-good); }
+.message.bad { color: var(--px-bad); }
+
+/* A message starts with a ">" prompt and pops in */
+.message:not(:empty)::before { content: "> "; }
+.message.ok:not(:empty), .message.bad:not(:empty) { animation: px-rise .2s steps(2) both; }
+
+/* Rows that JavaScript adds (hunts, shop items, purchases) hop in one by one */
+.hunt, .item, #purchases li { animation: px-rise .3s steps(3) both; }
+.hunt:nth-child(2), .item:nth-child(2), #purchases li:nth-child(2) { animation-delay: .06s; }
+.hunt:nth-child(3), .item:nth-child(3), #purchases li:nth-child(3) { animation-delay: .12s; }
+.hunt:nth-child(4), .item:nth-child(4), #purchases li:nth-child(4) { animation-delay: .18s; }
+.hunt:nth-child(n+5), .item:nth-child(n+5), #purchases li:nth-child(n+5) { animation-delay: .24s; }
 
 /* ---------- map page ---------- */
 
@@ -201,7 +304,7 @@ input:focus, textarea:focus {
   height: 100dvh;  /* phones: don't hide the bottom under the browser bar */
 }
 
-/* Holds the map, the status card and the info board.
+/* Holds the map, the status box and the info board.
    overflow: hidden keeps the closed board (parked off to the right) from
    making the page scroll sideways. */
 .map-wrap {
@@ -212,159 +315,238 @@ input:focus, textarea:focus {
 
 #map { position: absolute; inset: 0; }
 
-/* The status card floats at the bottom, above Leaflet's attribution line. */
+/* Leaflet's zoom buttons and credits, in the same pixel style */
+.leaflet-bar {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: var(--px-edge) !important;
+}
+
+.leaflet-bar a {
+  border-radius: 0 !important;
+  font-family: var(--font-pixel);
+  font-size: 14px;
+}
+
+.leaflet-control-attribution { font-family: var(--font-body); font-size: 14px; }
+
+/* The status box is a game dialogue box at the bottom, above Leaflet's credits */
 .sheet {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 30px;
+  left: 20px;
+  right: 20px;
+  bottom: 36px;
   z-index: 1000;
   max-width: 520px;
   margin: 0 auto;
-  padding: 14px 18px;
-  background: var(--paper);
-  border-left: 5px solid var(--green-dark);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  transition: background .3s, border-color .3s;
+  padding: 12px 16px;
+  background: var(--px-paper);
+  box-shadow: var(--px-edge), var(--px-drop);
+  animation: px-boot .4s steps(5) both;
 }
 
-.sheet__status { color: var(--green-dark); font-size: 17px; font-weight: 700; }
-.sheet__route { margin-top: 2px; color: var(--muted); font-size: 14px; }
+.sheet__status {
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1.75;
+}
 
+/* The blinking arrow at the end of a game's text box: "there is more".
+   Same shape as .px-arrow-down in pixel.css. */
+.sheet__status::after {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 6px;
+  margin-left: 12px;
+  vertical-align: middle;
+  background: var(--px-gold-dark);
+  clip-path: polygon(0 0, 12px 0, 12px 2px, 10px 2px, 10px 4px, 8px 4px, 8px 6px,
+                     4px 6px, 4px 4px, 2px 4px, 2px 2px, 0 2px);
+  animation: px-blink 1s steps(1) infinite;
+}
+
+.sheet__route { margin-top: 4px; color: var(--px-muted); font-size: 20px; }
+
+/* Treasure found: the box turns gold, flashes and throws out pixels */
 .sheet.is-found {
-  background: #fff4e0;
-  border-left-color: var(--orange);
+  background: #fff1c7;
+  animation: px-flash .24s steps(1) 4;
+}
+
+.sheet.is-found::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  animation: px-burst .6s steps(6) both;
+  pointer-events: none;
 }
 
 /* ---------- treasure pins ---------- */
 
-/* Leaflet moves .pin around with its own transform, so the grow animation
-   goes on the inner .pin__grow instead, scaling from the tip (bottom middle)
-   so the pin keeps pointing at the same spot. */
+/* Leaflet moves .pin around with its own transform, so the grow effect goes
+   on the inner .pin__grow, scaling from the bottom middle so the pin keeps
+   standing on the same spot. */
 .pin__grow {
   position: relative;
   width: 30px;
   height: 36px;
   transform-origin: 50% 94%;
-  transition: transform .3s cubic-bezier(.34, 1.56, .64, 1);  /* small bounce */
+  transition: transform .15s steps(3);
 }
 
-/* A plain teardrop: a square with three round corners, turned 45 degrees */
+/* Every treasure is a little chest standing on the spot */
 .pin__shape {
   position: absolute;
-  left: 3px;
-  top: 5px;
-  width: 24px;
+  left: 0;
+  top: 10px;
+  width: 30px;
   height: 24px;
-  border: 3px solid #fff;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: var(--pin-colour);
-  box-shadow: -2px 2px 6px rgba(0, 0, 0, .35);
 }
 
-.pin--treasure { --pin-colour: var(--green-dark); }
-.pin--target { --pin-colour: var(--orange); }
+.pin__shape::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 3px;
+  height: 3px;
+}
 
-.pin.is-selected .pin__grow { transform: scale(1.45); }
+/* The chest and coin pictures themselves are in pixel.css,
+   next to .sprite--chest and .sprite--coin. */
 
-/* The draggable "you" marker in ?drag mode */
+/* The treasure you are hunting is a spinning gold coin that bobs */
+.pin--target .pin__shape {
+  left: 3px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  animation: px-bob 1s steps(2) infinite;
+}
+
+.pin--target .pin__shape::before {
+  transform-origin: 15px 15px;  /* the middle of the coin */
+  animation: px-spin 1s steps(1) infinite;
+}
+
+/* A small dark shadow under the coin, so it reads as floating */
+.pin--target .pin__grow::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  bottom: 2px;
+  width: 12px;
+  height: 4px;
+  background: rgba(20, 35, 31, .5);
+}
+
+/* Tapped pin grows by a third, so each pixel becomes exactly 4px */
+.pin.is-selected .pin__grow { transform: scale(1.3333); }
+
+/* The explorer marker (you). The sprite does the drawing. */
 .you-marker {
   display: grid;
   place-items: center;
-  border: 3px solid #fff;
-  border-radius: 50%;
-  background: #1a73e8;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
-  font-size: 18px;
   cursor: grab;
 }
+
+.you-marker:active { cursor: grabbing; }
 
 /* ---------- info board (slides in from the right) ---------- */
 
 .board {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  max-height: calc(100% - 24px);  /* only as tall as its content, so the map shows below */
-  z-index: 1100;  /* above the status card */
-  width: min(340px, calc(100% - 24px));
-  padding: 22px 22px 24px;
+  top: 20px;
+  right: 20px;
+  max-height: calc(100% - 40px);  /* only as tall as its content, so the map shows below */
+  z-index: 1100;  /* above the status box */
+  width: min(340px, calc(100% - 40px));
+  padding: 24px 20px;
   overflow-y: auto;
-  background: var(--paper);
-  border-top: 6px solid var(--orange);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  /* Closed: parked just past the right edge. Open: slides in. */
-  transform: translateX(calc(100% + 24px));
-  transition: transform .35s ease;
+  background: var(--px-paper);
+  box-shadow: var(--px-edge), var(--px-drop);
+  /* Closed: parked just past the right edge. Open: slides in, in six steps. */
+  transform: translateX(calc(100% + 40px));
+  transition: transform .3s steps(6);
 }
 
 .board.is-open { transform: translateX(0); }
 
 .board__close {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 36px;
-  height: 36px;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
   border: 0;
-  border-radius: 50%;
-  background: var(--cream);
-  color: var(--green-dark);
-  font-size: 22px;
+  border-radius: 0;
+  background: var(--px-bg);
+  color: var(--px-ink);
+  font-family: var(--font-pixel);
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
 }
 
+.board__close:hover { background: var(--px-gold); }
+
+.board__close:focus-visible { outline: 4px solid var(--px-gold); }
+
 .board__eyebrow {
   margin: 0;
-  color: var(--orange);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.8px;
+  color: var(--px-gold-dark);
+  font-size: 20px;
 }
 
 .board h2 {
-  margin: 4px 40px 6px 0;
-  color: var(--green-dark);
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 24px;
-  line-height: 1.2;
+  margin: 4px 40px 8px 0;
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
-.board__hint { margin: 0; color: var(--muted); }
+.board__hint { margin: 0; color: var(--px-muted); }
 
 .board__stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
+/* Stat tiles look like a game's HUD: dark panel, gold numbers */
 .board__stat {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--green-dark);
-  color: #fff;
+  padding: 8px 12px;
+  background: var(--px-green);
+  box-shadow: inset -4px -4px 0 0 rgba(0, 0, 0, .25);
+  color: var(--px-paper);
 }
 
 .board__stat span {
   display: block;
-  color: rgba(255, 255, 255, .7);
-  font-size: 12px;
-  font-weight: 700;
+  color: rgba(255, 252, 242, .72);
+  font-size: 18px;
 }
 
 .board__stat strong {
-  color: var(--orange);
-  font-size: 22px;
+  display: block;
+  margin-top: 4px;
+  color: var(--px-gold);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
-.board__note { margin: 12px 0 0; color: var(--muted); font-size: 14px; }
+.board__note { margin: 12px 0 0; color: var(--px-muted); font-size: 18px; }
 
-/* People who turn off animations in their phone settings get none here either */
-@media (prefers-reduced-motion: reduce) {
-  .board, .pin__grow, .sheet { transition: none; }
-}
+.board__note a { color: var(--px-green); text-decoration-color: var(--px-gold); }

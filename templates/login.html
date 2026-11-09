@@ -14,8 +14,8 @@
 
     <!-- Shown when you are already logged in -->
     <div id="loggedIn" hidden>
-      <p id="coins" class="muted"></p>
-      <a id="toMap" class="btn" href="/">Go to the map →</a>
+      <p id="coins" class="muted coin-line"></p>
+      <a id="toMap" class="btn" href="/">Go to the map</a>
 
       <form id="weightForm">
         <label for="weight">Your weight in kg <span class="muted">(used to estimate calories)</span></label>
@@ -78,7 +78,7 @@
       if (!res.ok) return;
       const data = await res.json();
       document.getElementById("coins").textContent =
-        `🪙 ${data.balance} coins · ${data.found_treasure_ids.length} treasures found`;
+        `${data.balance} coins · ${data.found_treasure_ids.length} treasures found`;
     }
 
     // Your saved weight, shown in the weight box
