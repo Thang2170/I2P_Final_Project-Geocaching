@@ -10,6 +10,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from hunt_input import DEFAULT_CAPACITY, MAX_CAPACITY, MIN_CAPACITY
 from walk_input import MAX_WEIGHT_KG, MIN_WEIGHT_KG
 
 db = SQLAlchemy()
@@ -148,6 +149,45 @@ class Purchase(db.Model):
     price = db.Column(db.Integer, nullable=False)         # what it cost at the time
     voucher_code = db.Column(db.String(20), unique=True, nullable=True)  # vouchers only
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class Hunt(db.Model):
+    """A group hunt that players can join (Feature 8). Extra players wait in line."""
+
+    __tablename__ = "hunts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), nullable=False)
+    description = db.Column(db.Text, nullable=False, default="")
+    capacity = db.Column(db.Integer, nullable=False, default=DEFAULT_CAPACITY)  # players at once
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # None: demo hunt
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    @validates("capacity")
+    def _check_capacity(self, key, value):
+        if value is not None and not MIN_CAPACITY <= value <= MAX_CAPACITY:
+            raise ValueError(f"capacity must be between {MIN_CAPACITY} and {MAX_CAPACITY}")
+        return value
+
+
+class HuntMember(db.Model):
+    """A player who joined a hunt. The id order is the order they joined."""
+
+    __tablename__ = "hunt_members"
+    __table_args__ = (db.UniqueConstraint("hunt_id", "user_id", name="one_place_per_player"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    hunt_id = db.Column(db.Integer, db.ForeignKey("hunts.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    joined_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+def seed_demo_hunt():
+    """Save a demo hunt if there are no hunts yet, so the Hunts page is never empty."""
+    if db.session.execute(db.select(Hunt.id).limit(1)).first() is None:
+        db.session.add(Hunt(name="NTHU campus walk", capacity=5,
+                            description="Demo hunt. Join, then explore the campus together."))
+        db.session.commit()
 
 
 def seed_demo_data():
