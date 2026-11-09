@@ -8,6 +8,7 @@ from models import Treasure, db, seed_demo_data
 from auth_api import auth_api, current_user
 from coin_api import coin_api
 from route_api import route_api
+from shop_api import shop_api
 from treasure_api import treasure_api
 from walk_api import walk_api
 
@@ -31,6 +32,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(auth_api)
     app.register_blueprint(walk_api)
     app.register_blueprint(coin_api)
+    app.register_blueprint(shop_api)
     # Login sessions are signed with this key. For the real deployment, set a SECRET_KEY
     # environment variable (never commit a real key); the fallback is for local testing only.
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")

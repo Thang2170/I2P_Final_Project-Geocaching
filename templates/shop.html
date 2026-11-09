@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Shop · Treasure Hunt Club</title>
+  <style>
+    .item { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 12px 0; border-top: 1px solid rgba(0, 0, 0, .1); }
+    .item__name { font-weight: 700; margin: 0; }
+    .item__text { margin: 2px 0 0; }
+    .item .btn { width: auto; white-space: nowrap; }
+    .item .btn[disabled] { opacity: .5; }
+    #purchases { list-style: none; padding: 0; margin: 0; }
+    #purchases li { padding: 8px 0; border-top: 1px solid rgba(0, 0, 0, .1); }
+    .code { font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
+  </style>
+</head>
+<body>
+  {% set active = "shop" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Shop</h1>
+    <p id="balance" class="muted">Loading your coins…</p>
+
+    <div id="items"></div>
+
+    <p id="message" class="message" role="status"></p>
+
+    <h2>My purchases</h2>
+    <ul id="purchases"></ul>
+    <p id="noPurchases" class="muted" hidden>Nothing yet. Find treasures to earn coins!</p>
+  </main>
+
+  <script>
+    // The browser only shows things and sends what you tap. Python checks your coins and charges you.
+    // textContent (not innerHTML) is used everywhere, so nothing from the server can inject HTML.
+    const LOGIN_URL = "/login?next=/shop";
+    const message = document.getElementById("message");
+
+    function show(text, ok) {
+      message.textContent = text;
+      message.className = "message " + (ok ? "ok" : "bad");
+    }
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    async function getJson(url) {
+      const res = await fetch(url);
+      if (res.status === 401) { location.href = LOGIN_URL; throw new Error("Log in first"); }
+      return res.json();
+    }
+
+    function renderItems(items) {
+      const box = document.getElementById("items");
+      box.replaceChildren();
+      for (const item of items) {
+        const row = el("div", undefined, "item");
+        const info = el("div");
+        info.append(el("p", item.name, "item__name"), el("p", item.description, "muted item__text"));
+        const button = el("button", item.owned ? "Owned" : `🪙 ${item.price}`, "btn");
+        button.type = "button";
+        button.disabled = item.owned;
+        button.addEventListener("click", () => buy(item, button));
+        row.append(info, button);
+        box.append(row);
+      }
+    }
+
+    function renderPurchases(list) {
+      const ul = document.getElementById("purchases");
+      ul.replaceChildren();
+      document.getElementById("noPurchases").hidden = list.length > 0;
+      for (const p of list) {
+        const li = el("li", `${p.name} · 🪙 ${p.price}`);
+        if (p.voucher_code) li.append(" · code ", el("span", p.voucher_code, "code"));
+        ul.append(li);
+      }
+    }
+
+    async function refresh() {
+      const [coins, items, purchases] = await Promise.all([
+        getJson("/api/coins"), getJson("/api/shop/items"), getJson("/api/shop/purchases")
+      ]);
+      document.getElementById("balance").textContent = `You have 🪙 ${coins.balance} coins.`;
+      renderItems(items);
+      renderPurchases(purchases);
+    }
+
+    async function buy(item, button) {
+      if (button.disabled) return;  // a double tap must not buy twice
+      button.disabled = true;
+      try {
+        const res = await fetch("/api/shop/buy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: item.id })
+        });
+        if (res.status === 401) { location.href = LOGIN_URL; return; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "The purchase failed.");
+        show(data.voucher_code
+          ? `Bought "${item.name}". Your code: ${data.voucher_code}`
+          : `Bought "${item.name}".`, true);
+      } catch (error) {
+        show(error.message, false);
+      }
+      await refresh();  // new balance, and the button comes back unless you now own it
+    }
+
+    refresh().catch(error => console.error(error));
+  </script>
+</body>
+</html>
