@@ -121,6 +121,13 @@ class TestCoinApi(unittest.TestCase):
         db.session.commit()
         self.assertEqual(self.player.get("/api/coins").get_json()["balance"], 6)
 
+    def test_coins_not_tied_to_a_treasure_are_not_listed_as_finds(self):
+        player = db.session.query(User).filter_by(username="player").one()
+        db.session.add(CoinTransaction(user_id=player.id, amount=25, reason="found_treasure"))  # no treasure
+        db.session.commit()
+        data = self.player.get("/api/coins").get_json()
+        self.assertEqual((data["balance"], data["found_treasure_ids"]), (25, []))
+
 
 if __name__ == "__main__":
     unittest.main()

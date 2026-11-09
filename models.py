@@ -133,6 +133,23 @@ class CoinTransaction(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
 
+class Purchase(db.Model):
+    """Something a player bought in the shop.
+
+    The coins it cost are a separate negative row in CoinTransaction, saved in the
+    same commit, so the balance and the purchase list can never disagree.
+    """
+
+    __tablename__ = "purchases"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    item_id = db.Column(db.String(50), nullable=False)    # an id from shop.ITEMS
+    price = db.Column(db.Integer, nullable=False)         # what it cost at the time
+    voucher_code = db.Column(db.String(20), unique=True, nullable=True)  # vouchers only
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
 def seed_demo_data():
     """Save the demo treasure if there are no treasures yet.
 
