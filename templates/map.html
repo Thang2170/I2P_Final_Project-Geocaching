@@ -16,13 +16,13 @@
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
-      <div id="coinInfo" class="sheet__route" hidden></div>
+      <div id="coinInfo" class="sheet__route coin-line" hidden></div>
     </section>
 
     <!-- Info board: slides in from the right when you tap a treasure -->
     <aside id="board" class="board" aria-hidden="true">
       <button type="button" id="boardClose" class="board__close" aria-label="Close">×</button>
-      <p class="board__eyebrow">TREASURE</p>
+      <p class="board__eyebrow">Treasure</p>
       <h2 id="boardName"></h2>
       <p id="boardHint" class="board__hint"></p>
       <div class="board__stats">
@@ -68,8 +68,8 @@
 
     // ------------------------------------------------------------ treasure pins
 
-    // A plain coloured pin. kind is "target" (orange: the treasure the
-    // status card measures to) or "treasure" (green: every other one).
+    // A pixel pin, drawn in CSS. kind is "target" (a spinning gold coin: the
+    // treasure the status box measures to) or "treasure" (a chest: every other one).
     function pinIcon(kind) {
       return L.divIcon({
         className: `pin pin--${kind}`,
@@ -180,7 +180,7 @@
       const km = (data.distance_m / 1000).toFixed(2);
       const min = Math.max(1, Math.round(data.duration_s / 60));
       const straight = data.warning ? " (straight line)" : "";
-      routeSummary = `🚶 ${km} km walk, about ${min} min${straight}`;
+      routeSummary = `${km} km walk, about ${min} min${straight}`;
       routeInfo.textContent = routeSummary;
       routeInfo.hidden = false;
       boardKm.textContent = `${km} km`;
@@ -244,12 +244,13 @@
         if (requestId !== routeRequestId) return;  // a newer route was requested meanwhile
         if (!res.ok) throw new Error(data.error || "Route request failed");
         if (routeLine) routeLine.remove();
-        // Orange line with a dark green edge so it stands out on satellite photos.
+        // Gold line with a dark edge so it stands out on satellite photos.
+        // Square ends and corners so it looks drawn in pixels, like the rest of the map.
         // Dashed = straight-line fallback, so it's clear it isn't a real path.
         const dash = data.warning ? "10 10" : null;
         routeLine = L.featureGroup([
-          L.polyline(data.path, { color: "#17332d", weight: 9, opacity: 0.9, dashArray: dash }),
-          L.polyline(data.path, { color: "#f2a93b", weight: 5, opacity: 1, dashArray: dash })
+          L.polyline(data.path, { color: "#14231f", weight: 10, opacity: 0.9, dashArray: dash, lineCap: "square", lineJoin: "miter" }),
+          L.polyline(data.path, { color: "#f2a93b", weight: 6, opacity: 1, dashArray: dash, lineCap: "square", lineJoin: "miter" })
         ]).addTo(map);
         if (fit) map.fitBounds(routeLine.getBounds(), routePadding());
         showRoute(data);
@@ -268,7 +269,7 @@
     const triedClaim = new Set();  // treasure ids we already asked about
 
     function showBalance(balance, earned) {
-      coinInfo.textContent = `🪙 ${balance} coins` + (earned ? `  (+${earned})` : "");
+      coinInfo.textContent = `${balance} coins` + (earned ? `  (+${earned})` : "");
       coinInfo.hidden = false;
     }
 
@@ -302,6 +303,17 @@
 
     // ------------------------------------------------------------ your position
 
+    // You are a little walking explorer (the sprite is drawn in pixel.css).
+    // The anchor is at the feet, so the explorer stands on your position.
+    function youIcon() {
+      return L.divIcon({
+        className: "you-marker",
+        html: '<span class="sprite sprite--hero"></span>',
+        iconSize: [24, 36],
+        iconAnchor: [12, 34]
+      });
+    }
+
     let userDot = null;
     let currentPos = null;  // [lat, lon] of the last known position
     let firstFix = true;
@@ -312,8 +324,8 @@
       // In drag mode the draggable marker already shows where you are
       if (!dragMode) {
         if (userDot) userDot.setLatLng(currentPos);
-        else userDot = L.circleMarker(currentPos, {
-          radius: 9, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1
+        else userDot = L.marker(currentPos, {
+          icon: youIcon(), interactive: false, zIndexOffset: 1000
         }).addTo(map);
       }
 
@@ -344,7 +356,7 @@
         if (askedFor !== huntId) return;  // you picked another treasure meanwhile
         if (!res.ok) throw new Error(data.error || "Distance request failed");
         statusBox.textContent = data.found
-          ? `🎉 You found ${data.treasure}!`
+          ? `You found ${data.treasure}`
           : `${Math.round(data.meters)} m to ${data.treasure}`;
         sheet.classList.toggle("is-found", data.found);
         if (data.found) claimCoins(askedFor, lat, lon);
@@ -357,12 +369,12 @@
       const startLat = treasure.lat + 0.001;
       const dragMarker = L.marker([startLat, treasure.lon], {
         draggable: true,
-        icon: L.divIcon({ className: "you-marker", html: "🚶", iconSize: [40, 40], iconAnchor: [20, 20] }),
+        icon: youIcon(),
         zIndexOffset: 1000,
         title: "Drag to simulate your location"
       }).addTo(map);
 
-      statusBox.textContent = "Drag 🚶 to simulate your location";
+      statusBox.textContent = "Drag the explorer to simulate your location";
       showPosition(startLat, treasure.lon, true);
       // While dragging: normal 3-second limit, so we don't flood the server
       dragMarker.on("drag", event => {

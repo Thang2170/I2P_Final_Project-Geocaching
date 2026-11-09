@@ -4,21 +4,22 @@
   {% include "_head.html" %}
   <title>Shop · Treasure Hunt Club</title>
   <style>
-    .item { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            padding: 12px 0; border-top: 1px solid rgba(0, 0, 0, .1); }
-    .item__name { font-weight: 700; margin: 0; }
-    .item__text { margin: 2px 0 0; }
-    .item .btn { width: auto; white-space: nowrap; }
+    .item { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 16px 0; border-top: 2px dashed var(--line); }
+    .item__name { font-size: 24px; margin: 0; }
+    .item__text { margin: 4px 0 0; }
+    .item .btn { width: auto; margin: 0 4px 0 0; padding: 12px; font-size: 10px; white-space: nowrap; }
     .item .btn[disabled] { opacity: .5; }
     #purchases { list-style: none; padding: 0; margin: 0; }
-    #purchases li { padding: 8px 0; border-top: 1px solid rgba(0, 0, 0, .1); }
-    .code { font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
-    /* The popup that tells you a purchase did not go through. */
-    .toast { position: fixed; top: 16px; left: 50%; transform: translate(-50%, -140%); z-index: 1000;
-             max-width: min(92vw, 420px); padding: 12px 18px; border-radius: 10px; font-weight: 700;
-             color: #fff; background: #b3261e; box-shadow: 0 6px 20px rgba(0, 0, 0, .3);
-             transition: transform .25s ease; }
-    .toast.is-visible { transform: translate(-50%, 0); }
+    #purchases li { padding: 8px 0; border-top: 2px dashed var(--line); }
+    .code { color: var(--px-gold-dark); font-size: 22px; letter-spacing: 1px; }
+    /* The popup that tells you a purchase did not go through: a red dialogue
+       box that drops in from the top in steps, then shakes "no". */
+    .toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -160%); z-index: 1000;
+             width: max-content; max-width: min(calc(100vw - 40px), 420px); padding: 12px 16px;
+             font-size: 22px; color: #fff; background: var(--px-bad);
+             box-shadow: var(--px-edge), var(--px-drop); transition: transform .2s steps(4); }
+    .toast.is-visible { transform: translate(-50%, 0); animation: px-shake .3s steps(2) .2s 2; }
   </style>
 </head>
 <body>
@@ -27,7 +28,7 @@
 
   <main class="card">
     <h1>Shop</h1>
-    <p id="balance" class="muted">Loading your coins…</p>
+    <p id="balance" class="muted coin-line">Loading your coins…</p>
 
     <div id="items"></div>
 
@@ -36,7 +37,7 @@
 
     <h2>My purchases</h2>
     <ul id="purchases"></ul>
-    <p id="noPurchases" class="muted" hidden>Nothing yet. Find treasures to earn coins!</p>
+    <p id="noPurchases" class="muted" hidden>Nothing yet. Find treasures to earn coins</p>
   </main>
 
   <script>
@@ -82,7 +83,7 @@
         const row = el("div", undefined, "item");
         const info = el("div");
         info.append(el("p", item.name, "item__name"), el("p", item.description, "muted item__text"));
-        const button = el("button", item.owned ? "Owned" : `🪙 ${item.price}`, "btn");
+        const button = el("button", item.owned ? "Owned" : `${item.price} coins`, "btn");
         button.type = "button";
         button.disabled = item.owned;
         button.addEventListener("click", () => buy(item, button));
@@ -96,7 +97,7 @@
       ul.replaceChildren();
       document.getElementById("noPurchases").hidden = list.length > 0;
       for (const p of list) {
-        const li = el("li", `${p.name} · 🪙 ${p.price}`);
+        const li = el("li", `${p.name} · ${p.price} coins`);
         if (p.voucher_code) li.append(" · code ", el("span", p.voucher_code, "code"));
         ul.append(li);
       }
@@ -107,7 +108,7 @@
         getJson("/api/coins"), getJson("/api/shop/items"), getJson("/api/shop/purchases")
       ]);
       balance = coins.balance;
-      document.getElementById("balance").textContent = `You have 🪙 ${coins.balance} coins.`;
+      document.getElementById("balance").textContent = `You have ${coins.balance} coins`;
       renderItems(items);
       renderPurchases(purchases);
     }
@@ -125,7 +126,7 @@
         const data = await res.json();
         if (res.status === 402) {  // not enough coins
           const missing = Math.max(item.price - balance, 1);
-          showToast(`Not enough coins! "${item.name}" costs 🪙 ${item.price}. You need 🪙 ${missing} more.`);
+          showToast(`Not enough coins! "${item.name}" costs ${item.price} coins. You need ${missing} more.`);
         }
         if (!res.ok) throw new Error(data.error || "The purchase failed.");
         show(data.voucher_code
