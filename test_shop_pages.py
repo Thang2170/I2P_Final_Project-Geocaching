@@ -38,6 +38,12 @@ class TestShopPages(unittest.TestCase):
     def test_shop_routes_are_registered_in_the_real_app(self):
         self.assertEqual(self.client.get("/api/shop/items").status_code, 200)
 
+    def test_shop_page_has_a_popup_for_not_enough_coins(self):
+        html = self.html("/shop")
+        self.assertIn('id="toast"', html)
+        self.assertIn("res.status === 402", html)
+        self.assertIn("Not enough coins!", html)
+
 
 if __name__ == "__main__":
     unittest.main()
