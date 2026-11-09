@@ -13,6 +13,12 @@
     #purchases { list-style: none; padding: 0; margin: 0; }
     #purchases li { padding: 8px 0; border-top: 1px solid rgba(0, 0, 0, .1); }
     .code { font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
+    /* The popup that tells you a purchase did not go through. */
+    .toast { position: fixed; top: 16px; left: 50%; transform: translate(-50%, -140%); z-index: 1000;
+             max-width: min(92vw, 420px); padding: 12px 18px; border-radius: 10px; font-weight: 700;
+             color: #fff; background: #b3261e; box-shadow: 0 6px 20px rgba(0, 0, 0, .3);
+             transition: transform .25s ease; }
+    .toast.is-visible { transform: translate(-50%, 0); }
   </style>
 </head>
 <body>
@@ -26,6 +32,7 @@
     <div id="items"></div>
 
     <p id="message" class="message" role="status"></p>
+    <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
 
     <h2>My purchases</h2>
     <ul id="purchases"></ul>
@@ -42,6 +49,18 @@
       message.textContent = text;
       message.className = "message " + (ok ? "ok" : "bad");
     }
+
+    // A popup at the top of the page that goes away by itself after a few seconds.
+    const toast = document.getElementById("toast");
+    let toastTimer = null;
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("is-visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 4500);
+    }
+
+    let balance = 0;  // only used to say how many more coins are needed; Python still decides
 
     function el(tag, text, className) {
       const node = document.createElement(tag);
@@ -87,6 +106,7 @@
       const [coins, items, purchases] = await Promise.all([
         getJson("/api/coins"), getJson("/api/shop/items"), getJson("/api/shop/purchases")
       ]);
+      balance = coins.balance;
       document.getElementById("balance").textContent = `You have 🪙 ${coins.balance} coins.`;
       renderItems(items);
       renderPurchases(purchases);
@@ -103,6 +123,10 @@
         });
         if (res.status === 401) { location.href = LOGIN_URL; return; }
         const data = await res.json();
+        if (res.status === 402) {  // not enough coins
+          const missing = Math.max(item.price - balance, 1);
+          showToast(`Not enough coins! "${item.name}" costs 🪙 ${item.price}. You need 🪙 ${missing} more.`);
+        }
         if (!res.ok) throw new Error(data.error || "The purchase failed.");
         show(data.voucher_code
           ? `Bought "${item.name}". Your code: ${data.voucher_code}`
