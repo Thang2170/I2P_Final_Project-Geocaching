@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Hunts · Treasure Hunt Club</title>
+  <style>
+    .hunt { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 12px 0; border-top: 1px solid rgba(0, 0, 0, .1); }
+    .hunt__name { font-weight: 700; margin: 0; }
+    .hunt__text { margin: 2px 0 0; }
+    .hunt .btn { width: auto; white-space: nowrap; }
+    .hunt .btn[disabled] { opacity: .5; }
+    details { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  {% set active = "hunts" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Hunts</h1>
+    <p class="muted">Join a hunt to explore with others. When a hunt is full, you wait in line and move up as players leave.</p>
+
+    <div id="hunts"></div>
+    <p id="noHunts" class="muted" hidden>No hunts yet. Create the first one below.</p>
+
+    <p id="message" class="message" role="status"></p>
+
+    <details>
+      <summary>Create a hunt</summary>
+      <form id="createForm">
+        <label for="name">Name</label>
+        <input id="name" name="name" maxlength="60" required>
+        <label for="description">Description</label>
+        <input id="description" name="description" maxlength="200">
+        <label for="capacity">Players at once (1 to 50, default 10)</label>
+        <input id="capacity" name="capacity" inputmode="numeric" placeholder="10">
+        <button type="submit" class="btn">Create hunt</button>
+      </form>
+    </details>
+  </main>
+
+  <script>
+    // The browser only shows things and sends what you tap. Python decides who is playing and who waits.
+    // textContent (not innerHTML) is used everywhere, so nothing from the server can inject HTML.
+    const LOGIN_URL = "/login?next=/hunts";
+    const message = document.getElementById("message");
+
+    function show(text, ok) {
+      message.textContent = text;
+      message.className = "message " + (ok ? "ok" : "bad");
+    }
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function myStatus(me) {
+      if (!me) return "";
+      return me.state === "playing" ? `You are playing (#${me.position})` : `You are waiting: #${me.position} in line`;
+    }
+
+    function render(hunts) {
+      const box = document.getElementById("hunts");
+      box.replaceChildren();
+      document.getElementById("noHunts").hidden = hunts.length > 0;
+      for (const hunt of hunts) {
+        const row = el("div", undefined, "hunt");
+        const info = el("div");
+        const counts = `${hunt.playing}/${hunt.capacity} playing` + (hunt.waiting ? ` · ${hunt.waiting} waiting` : "");
+        info.append(el("p", hunt.name, "hunt__name"), el("p", counts, "muted hunt__text"));
+        if (hunt.description) info.append(el("p", hunt.description, "muted hunt__text"));
+        if (hunt.me) info.append(el("p", myStatus(hunt.me), "hunt__text"));
+
+        const button = el("button", hunt.me ? "Leave" : "Join", "btn");
+        button.type = "button";
+        button.addEventListener("click", () => act(hunt, button));
+        row.append(info, button);
+        box.append(row);
+      }
+    }
+
+    async function load() {
+      const res = await fetch("/api/hunts");
+      render(await res.json());
+    }
+
+    async function post(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      if (res.status === 401) { location.href = LOGIN_URL; throw new Error("Log in first"); }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      return data;
+    }
+
+    async function act(hunt, button) {
+      if (button.disabled) return;  // a double tap must not send twice
+      button.disabled = true;
+      try {
+        const data = await post(`/api/hunts/${hunt.id}/${hunt.me ? "leave" : "join"}`);
+        show(data.me ? `Joined "${data.name}". ${myStatus(data.me)}.` : `Left "${data.name}".`, true);
+      } catch (error) {
+        show(error.message, false);
+      }
+      await load();
+    }
+
+    document.getElementById("createForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const data = await post("/api/hunts", Object.fromEntries(new FormData(event.target)));
+        event.target.reset();
+        show(`Created "${data.name}". You are the first player.`, true);
+        await load();
+      } catch (error) {
+        show(error.message, false);
+      }
+    });
+
+    load().catch(error => console.error(error));
+  </script>
+</body>
+</html>
