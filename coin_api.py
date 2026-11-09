@@ -35,7 +35,8 @@ def get_balance(user_id):
 def found_treasure_ids(user_id):
     """The ids of the treasures this player has been paid for."""
     query = db.select(CoinTransaction.treasure_id).where(
-        CoinTransaction.user_id == user_id, CoinTransaction.reason == FOUND_REASON)
+        CoinTransaction.user_id == user_id, CoinTransaction.reason == FOUND_REASON,
+        CoinTransaction.treasure_id.is_not(None))  # a find always names its treasure
     return sorted(db.session.execute(query).scalars().all())
 
 
