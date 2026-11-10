@@ -24,6 +24,12 @@ class TestCoinPages(unittest.TestCase):
         self.assertIn('id="coinInfo"', html)
         self.assertIn("/claim", html)
 
+    def test_map_explains_why_a_find_paid_no_coins(self):
+        with patch("app.current_user", return_value=object()):
+            html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("claimNotes", html)         # the reason from the server is remembered...
+        self.assertIn("foundText(", html)         # ...and shown next to "You found"
+
     def test_account_page_shows_coins(self):
         html = self.client.get("/login").get_data(as_text=True)
         self.assertIn('id="coins"', html)

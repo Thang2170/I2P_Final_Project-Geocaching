@@ -19,6 +19,27 @@
       <div id="coinInfo" class="sheet__route coin-line" hidden></div>
     </section>
 
+    <!-- Journey panel: replaces the status card while you walk to a treasure (like a run tracker) -->
+    <section id="journey" class="journey" hidden>
+      <p id="jTitle" class="journey__title"></p>
+      <div class="journey__main">
+        <div class="journey__stat"><strong id="jTime">00:00</strong><span>Time</span></div>
+        <div class="journey__stat"><strong id="jPace">--:--</strong><span>Avg pace (/km)</span></div>
+        <div class="journey__stat"><strong id="jDist">0.00</strong><span>Distance (km)</span></div>
+      </div>
+      <div class="journey__sub">
+        <div class="journey__stat"><strong id="jSteps">0</strong><span>Steps</span></div>
+        <div class="journey__stat"><strong id="jCal">0</strong><span>Calories (kcal)</span></div>
+        <div class="journey__stat"><strong id="jTo">–</strong><span>To treasure</span></div>
+      </div>
+      <p id="jMsg" class="journey__msg"></p>
+      <p id="jNote" class="journey__note" hidden></p>
+      <div class="journey__buttons">
+        <button type="button" id="jPause" class="btn btn--ghost">Pause</button>
+        <button type="button" id="jFinish" class="btn">Finish</button>
+      </div>
+    </section>
+
     <!-- Info board: slides in from the right when you tap a treasure -->
     <aside id="board" class="board" aria-hidden="true">
       <button type="button" id="boardClose" class="board__close" aria-label="Close">×</button>
@@ -36,6 +57,7 @@
         Calories assume <span id="boardWeight"></span> kg.
         <a href="/login">Save your weight</a> for a better estimate.
       </p>
+      <button type="button" id="startBtn" class="btn" disabled>Start journey</button>
     </aside>
   </div>
 
@@ -128,7 +150,14 @@
 
     // Tap a treasure: grow its pin, slide the board in, and route to it.
     // textContent (not innerHTML) because names and hints come from players.
+    let selectedTreasure = null;
     function selectTreasure(t, marker) {
+      // While you are on a journey the map keeps measuring to that one treasure.
+      if (journeyActive() && t.id !== journey.targetId) {
+        journeyNote("Finish this journey before you pick another treasure.");
+        return;
+      }
+      selectedTreasure = t;
       if (selectedMarker) selectedMarker.getElement().classList.remove("is-selected");
       selectedMarker = marker;
       marker.getElement().classList.add("is-selected");
@@ -143,6 +172,7 @@
       board.setAttribute("aria-hidden", "false");
 
       setHunt(t, marker);
+      updateStartButton();
       routeTarget = [t.lat, t.lon];
       if (currentPos) {
         boardNote.textContent = "Finding a walking route…";
@@ -261,12 +291,217 @@
       }
     }
 
+    // ------------------------------------------------------------ journey (live stats, like a run tracker)
+
+    // Start: tap a treasure, then "Start journey". The panel shows time, pace and distance
+    // while you walk. Steps and calories come from Python (/api/walk-stats), and so does
+    // "you found it" (/api/distance): the browser only keeps the clock and adds up your steps.
+    const MIN_STEP_M = 3;       // moves smaller than this are GPS wobble while standing still
+    const MAX_SPEED_MS = 12;    // faster than this (m/s) is a GPS jump, not walking
+    const STATS_EVERY_MS = 3000;
+
+    const journeyBox = document.getElementById("journey");
+    const startBtn = document.getElementById("startBtn");
+    const jPause = document.getElementById("jPause");
+    const jFinish = document.getElementById("jFinish");
+    const jNote = document.getElementById("jNote");
+    const jEls = {
+      time: document.getElementById("jTime"), pace: document.getElementById("jPace"),
+      dist: document.getElementById("jDist"), steps: document.getElementById("jSteps"),
+      cal: document.getElementById("jCal"), to: document.getElementById("jTo"),
+      msg: document.getElementById("jMsg"), title: document.getElementById("jTitle")
+    };
+
+    // state: "idle" | "running" | "paused" | "finished"
+    const journey = { state: "idle" };
+    let journeyTimer = null;
+    let wakeLock = null;
+    let noteTimer = null;
+
+    function journeyActive() { return journey.state === "running" || journey.state === "paused"; }
+
+    function fmtTime(ms) {
+      const total = Math.floor(ms / 1000);
+      const h = Math.floor(total / 3600), m = Math.floor(total % 3600 / 60), s = total % 60;
+      const two = n => String(n).padStart(2, "0");
+      return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${two(m)}:${two(s)}`;
+    }
+
+    // Average pace as minutes:seconds per km. Not shown until you have walked 20 m.
+    function fmtPace(ms, meters) {
+      if (meters < 20) return "--:--";
+      const perKm = Math.round((ms / 1000) / (meters / 1000));
+      if (!isFinite(perKm) || perKm >= 6000) return "--:--";
+      return `${Math.floor(perKm / 60)}:${String(perKm % 60).padStart(2, "0")}`;
+    }
+
+    function fmtAway(meters) {
+      return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+    }
+
+    function updateStartButton() {
+      if (journeyActive()) {
+        startBtn.disabled = true;
+        startBtn.textContent = "Journey in progress";
+      } else {
+        startBtn.disabled = !currentPos || !selectedTreasure;
+        startBtn.textContent = currentPos ? "Start journey" : "Waiting for your location…";
+      }
+    }
+
+    function journeyNote(text) {
+      jNote.textContent = text;
+      jNote.hidden = false;
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(() => { jNote.hidden = true; }, 4000);
+    }
+
+    function renderJourney() {
+      jEls.time.textContent = fmtTime(journey.elapsedMs);
+      jEls.pace.textContent = fmtPace(journey.elapsedMs, journey.meters);
+      jEls.dist.textContent = (journey.meters / 1000).toFixed(2);
+      jEls.steps.textContent = journey.steps.toLocaleString();
+      jEls.cal.textContent = journey.calories;
+      jEls.to.textContent = currentPos ? fmtAway(map.distance(currentPos, journey.target)) : "–";
+      jPause.hidden = journey.state === "finished";
+      jPause.textContent = journey.state === "paused" ? "Resume" : "Pause";
+      jFinish.textContent = journey.state === "finished" ? "Close" : "Finish";
+      jEls.title.textContent = journey.state === "finished"
+        ? `Journey to ${journey.name}: done`
+        : `Journey to ${journey.name}` + (journey.state === "paused" ? " (paused)" : "");
+    }
+
+    // Called with every new position (from showPosition). Adds to your distance while running.
+    function journeyPoint(lat, lon) {
+      if (journey.state !== "running") return;
+      const now = Date.now();
+      if (journey.last) {
+        const moved = map.distance(journey.last.pos, [lat, lon]);
+        const seconds = (now - journey.last.time) / 1000;
+        if (moved < MIN_STEP_M) return;  // keep the old anchor so slow walking still adds up
+        const jump = !dragMode && seconds > 0 && moved / seconds > MAX_SPEED_MS;
+        if (!jump) journey.meters += moved;  // a jump re-anchors without counting
+      }
+      journey.last = { pos: [lat, lon], time: now };
+    }
+
+    // Steps and calories: Python does the maths from the distance (/api/walk-stats).
+    let journeyStatsId = 0;
+    async function loadJourneyStats() {
+      const requestId = ++journeyStatsId;
+      journey.statsAt = Date.now();
+      journey.statsMeters = journey.meters;
+      try {
+        const res = await fetch(`/api/walk-stats?distance_m=${Math.round(journey.meters)}`);
+        const data = await res.json();
+        if (requestId !== journeyStatsId || !res.ok) return;
+        journey.steps = data.steps;
+        journey.calories = data.calories;
+        renderJourney();
+      } catch (err) {
+        console.error("Journey stats failed:", err);
+      }
+    }
+
+    function journeyTick() {
+      const now = Date.now();
+      if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
+      journey.tickAt = now;
+      if (journey.state === "running" && journey.meters !== journey.statsMeters
+          && now - journey.statsAt >= STATS_EVERY_MS) loadJourneyStats();
+      renderJourney();
+    }
+
+    async function keepScreenOn(on) {
+      try {
+        if (on && "wakeLock" in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request("screen");
+        else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+      } catch (err) {
+        wakeLock = null;  // not allowed or not supported: the journey still works
+      }
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && journey.state === "running") keepScreenOn(true);
+    });
+
+    function startJourney(t) {
+      Object.assign(journey, {
+        state: "running", targetId: t.id, name: t.name, target: [t.lat, t.lon],
+        elapsedMs: 0, meters: 0, steps: 0, calories: 0, statsAt: 0, statsMeters: 0,
+        tickAt: Date.now(), last: currentPos ? { pos: currentPos, time: Date.now() } : null
+      });
+      closeBoard();
+      document.body.classList.add("is-journey");
+      journeyBox.hidden = false;
+      jEls.msg.textContent = statusBox.textContent;
+      clearInterval(journeyTimer);
+      journeyTimer = setInterval(journeyTick, 1000);
+      keepScreenOn(true);
+      updateStartButton();
+      renderJourney();
+    }
+
+    function pauseOrResume() {
+      if (journey.state === "running") {
+        journey.state = "paused";
+      } else if (journey.state === "paused") {
+        journey.state = "running";
+        journey.tickAt = Date.now();
+        journey.last = currentPos ? { pos: currentPos, time: Date.now() } : null;  // don't count the pause
+      }
+      renderJourney();
+    }
+
+    function finishJourney() {
+      if (!journeyActive()) return;
+      journey.state = "finished";
+      clearInterval(journeyTimer);
+      keepScreenOn(false);
+      loadJourneyStats();
+      updateStartButton();
+      renderJourney();
+    }
+
+    function closeJourney() {
+      journey.state = "idle";
+      journeyBox.hidden = true;
+      document.body.classList.remove("is-journey");
+      updateStartButton();
+    }
+
+    startBtn.addEventListener("click", () => {
+      if (!journeyActive() && currentPos && selectedTreasure) startJourney(selectedTreasure);
+    });
+    jPause.addEventListener("click", pauseOrResume);
+    jFinish.addEventListener("click", () => (journey.state === "finished" ? closeJourney() : finishJourney()));
+
+    // The status card is hidden during a journey, so its messages ("123 m to Library",
+    // "You found it", the coins you got) are copied into the panel.
+    new MutationObserver(() => { if (journey.state !== "idle") jEls.msg.textContent = statusBox.textContent; })
+      .observe(statusBox, { childList: true, characterData: true, subtree: true });
+
+    // Python says you are within 20 m of the treasure (the status card turns gold): the journey is over.
+    new MutationObserver(() => {
+      if (sheet.classList.contains("is-found") && journeyActive() && huntId === journey.targetId) finishJourney();
+    }).observe(sheet, { attributes: true, attributeFilter: ["class"] });
+
+    // Closing the tab in the middle of a walk would lose it, so ask first.
+    window.addEventListener("beforeunload", event => {
+      if (journeyActive()) { event.preventDefault(); event.returnValue = ""; }
+    });
+
     // ------------------------------------------------------------ coins
 
     // Python decides whether you really are within 20 m and pays the coins
     // (/api/treasures/<id>/claim). We only say where we are, and ask once per treasure.
     const coinInfo = document.getElementById("coinInfo");
     const triedClaim = new Set();  // treasure ids we already asked about
+    const claimNotes = new Map();  // treasure id -> why it paid no coins (shown next to "You found")
+
+    function foundText(name, treasureId) {
+      const note = claimNotes.get(treasureId);
+      return `You found ${name}` + (note ? ` · ${note}` : "");
+    }
 
     function showBalance(balance, earned) {
       coinInfo.textContent = `${balance} coins` + (earned ? `  (+${earned})` : "");
@@ -283,7 +518,7 @@
     }
     loadBalance();
 
-    async function claimCoins(treasureId, lat, lon) {
+    async function claimCoins(treasureId, name, lat, lon) {
       if (triedClaim.has(treasureId)) return;
       triedClaim.add(treasureId);
       try {
@@ -293,8 +528,15 @@
           body: JSON.stringify({ lat, lon })
         });
         const data = await res.json();
-        // Refused (you hid it yourself, or already found it): nothing to show.
-        if (res.ok) showBalance(data.balance, data.coins_earned);
+        if (res.ok) {
+          claimNotes.delete(treasureId);
+          showBalance(data.balance, data.coins_earned);
+        } else {
+          // Refused: say why (you hid it yourself, you already found it, ...) instead of staying silent.
+          claimNotes.set(treasureId, data.error || "No coins this time.");
+          if (res.status === 400) triedClaim.delete(treasureId);  // e.g. too far: allow another try
+        }
+        if (treasureId === huntId) statusBox.textContent = foundText(name, treasureId);
       } catch (err) {
         triedClaim.delete(treasureId);  // network problem: try again on the next update
         console.error("Claim failed:", err);
@@ -321,6 +563,8 @@
 
     async function showPosition(lat, lon, force = false) {
       currentPos = [lat, lon];
+      journeyPoint(lat, lon);
+      if (startBtn.disabled && !journeyActive()) updateStartButton();  // the first fix lets you start
       // In drag mode the draggable marker already shows where you are
       if (!dragMode) {
         if (userDot) userDot.setLatLng(currentPos);
@@ -356,10 +600,10 @@
         if (askedFor !== huntId) return;  // you picked another treasure meanwhile
         if (!res.ok) throw new Error(data.error || "Distance request failed");
         statusBox.textContent = data.found
-          ? `You found ${data.treasure}`
+          ? foundText(data.treasure, askedFor)
           : `${Math.round(data.meters)} m to ${data.treasure}`;
         sheet.classList.toggle("is-found", data.found);
-        if (data.found) claimCoins(askedFor, lat, lon);
+        if (data.found) claimCoins(askedFor, data.treasure, lat, lon);
       } catch (err) {
         statusBox.textContent = `Could not get distance: ${err.message}`;
       }

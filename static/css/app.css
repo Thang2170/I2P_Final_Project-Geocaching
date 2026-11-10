@@ -387,6 +387,71 @@ summary {
   pointer-events: none;
 }
 
+/* ---------- journey panel (live stats while you walk to a treasure) ---------- */
+
+/* It takes the place of the status card, whose messages are copied into it. */
+body.is-journey .sheet { display: none; }
+
+.journey {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 36px;
+  z-index: 1050;  /* above the status card, below the info board */
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 16px 16px;
+  background: var(--px-paper);
+  box-shadow: var(--px-edge), var(--px-drop);
+  animation: px-boot .4s steps(5) both;
+}
+
+.journey[hidden] { display: none; }
+
+.journey__title {
+  margin: 0 0 8px;
+  color: var(--px-gold-dark);
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.journey__main,
+.journey__sub {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.journey__sub { margin-top: 8px; padding-top: 8px; border-top: 4px solid var(--px-line); }
+
+.journey__stat strong {
+  display: block;
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: clamp(14px, 5vw, 22px);
+  font-weight: 400;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.journey__sub .journey__stat strong { font-size: clamp(10px, 3.4vw, 14px); }
+
+.journey__stat span { display: block; margin-top: 2px; color: var(--px-muted); font-size: 18px; }
+
+.journey__msg { margin: 8px 0 0; color: var(--px-muted); font-size: 20px; text-align: center; }
+
+.journey__note { margin: 4px 0 0; color: var(--px-bad); font-size: 18px; text-align: center; }
+
+.journey__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+
+/* "Close" is alone once the journey is over: let it use the full width */
+.journey__buttons .btn { margin-top: 0; padding: 12px 8px; }
+.journey__buttons .btn[hidden] { display: none; }
+.journey__buttons #jPause[hidden] + #jFinish { grid-column: 1 / -1; }
+
 /* ---------- treasure pins ---------- */
 
 /* Leaflet moves .pin around with its own transform, so the grow effect goes
