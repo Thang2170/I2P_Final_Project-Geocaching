@@ -46,6 +46,8 @@
       <p class="board__eyebrow">Treasure</p>
       <h2 id="boardName"></h2>
       <p id="boardHint" class="board__hint"></p>
+      <!-- The photo the hider took of the spot (loads only if the treasure has one) -->
+      <img id="boardPhoto" class="board__photo" alt="Photo of the spot" hidden>
       <div class="board__stats">
         <div class="board__stat"><span>Walk</span><strong id="boardKm">–</strong></div>
         <div class="board__stat"><span>Time</span><strong id="boardMin">–</strong></div>
@@ -164,6 +166,7 @@
 
       document.getElementById("boardName").textContent = t.name;
       document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
+      showBoardPhoto(t.id);
       boardKm.textContent = "–";
       boardMin.textContent = "–";
       boardSteps.textContent = "–";
@@ -181,6 +184,18 @@
       } else {
         boardNote.textContent = "Waiting for your location…";
       }
+    }
+
+    // Ask for the treasure's photo; Python answers 404 when there is none, and the
+    // picture stays hidden. Only reload when it is a different treasure.
+    const boardPhoto = document.getElementById("boardPhoto");
+    boardPhoto.addEventListener("load", () => { boardPhoto.hidden = false; });
+    boardPhoto.addEventListener("error", () => { boardPhoto.hidden = true; });
+    function showBoardPhoto(treasureId) {
+      const url = `/api/treasures/${treasureId}/photo`;
+      if (boardPhoto.getAttribute("src") === url) return;
+      boardPhoto.hidden = true;
+      boardPhoto.src = url;
     }
 
     function closeBoard() {

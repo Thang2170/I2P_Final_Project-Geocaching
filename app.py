@@ -5,9 +5,12 @@ from flask import Flask, jsonify, redirect, render_template, request, url_for
 from location import FOUND_RADIUS_M, haversine_m
 from models import Treasure, db, seed_demo_data, seed_demo_hunt
 
+from admin_api import admin_api
 from auth_api import auth_api, current_user
 from coin_api import coin_api
 from hunt_api import hunt_api
+from leaderboard_api import leaderboard_api
+from photo_api import photo_api
 from route_api import route_api
 from shop_api import shop_api
 from treasure_api import treasure_api
@@ -35,6 +38,9 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(coin_api)
     app.register_blueprint(shop_api)
     app.register_blueprint(hunt_api)
+    app.register_blueprint(photo_api)
+    app.register_blueprint(leaderboard_api)
+    app.register_blueprint(admin_api)
     # Login sessions are signed with this key. For the real deployment, set a SECRET_KEY
     # environment variable (never commit a real key); the fallback is for local testing only.
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
