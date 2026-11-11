@@ -74,7 +74,7 @@ class TestAdminApi(unittest.TestCase):
         whats = [e["what"] for e in data["events"]]
         self.assertIn('found "National Tsing Hua University" (+10 coins)', whats)
         self.assertIn('hid "Pond"', whats)
-        self.assertEqual(whats.count("joined the club"), 2)
+        self.assertEqual(whats.count("joined StepQuest"), 2)
         whens = [e["when"] for e in data["events"]]
         self.assertEqual(whens, sorted(whens, reverse=True))
         self.assertTrue(whens[0].endswith("+00:00"))  # times are marked as UTC for the browser

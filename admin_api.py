@@ -53,7 +53,7 @@ def recent_events():
     events = []
     rows = db.session.execute(
         db.select(User.created_at, User.username).order_by(User.id.desc()).limit(EVENTS_SHOWN)).all()
-    events += [_event(when, who, "joined the club") for when, who in rows]
+    events += [_event(when, who, "joined StepQuest") for when, who in rows]
 
     rows = db.session.execute(
         db.select(Treasure.created_at, User.username, Treasure.name)
