@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Admin · Treasure Hunt Club</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  {% set active = "admin" %}
+  {% include "_topbar.html" %}
+
+  {% if not allowed %}
+  <main class="card">
+    <h1>Admins only</h1>
+    <p class="muted">You are logged in as {{ username }}, which is not an admin name.
+      Add it to the ADMIN_USERS environment variable and restart the app.</p>
+    <a class="btn btn--ghost" href="/login">Account</a>
+  </main>
+  {% else %}
+  <main class="admin">
+    <div class="admin__head">
+      <h1>Live board</h1>
+      <p id="updated" class="muted">Loading…</p>
+    </div>
+
+    <!-- The numbers: Python counts, the page shows -->
+    <section class="admin__stats" aria-live="polite">
+      <div class="tile"><span>Players</span><strong id="sPlayers">–</strong></div>
+      <div class="tile"><span>Treasures</span><strong id="sTreasures">–</strong></div>
+      <div class="tile"><span>Finds</span><strong id="sFinds">–</strong></div>
+      <div class="tile"><span>Coins paid</span><strong id="sCoins">–</strong></div>
+      <div class="tile"><span>Hunts</span><strong id="sHunts">–</strong></div>
+    </section>
+
+    <div class="admin__grid">
+      <section class="admin__map">
+        <div id="map" aria-label="Map of every treasure"></div>
+      </section>
+
+      <section class="admin__feed">
+        <h2>Latest</h2>
+        <ol id="feed" class="feed"></ol>
+        <p id="feedEmpty" class="muted" hidden>Nothing has happened yet.</p>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Python gathers everything (/api/admin/summary) and the page redraws it every 3 seconds,
+    // so the audience sees what the player on stage does as it happens.
+    const REFRESH_MS = 3000;
+
+    const map = L.map("map").setView([24.795324, 120.994796], 16);
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19,
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(map);
+
+    const pinIcon = L.divIcon({
+      className: "pin pin--treasure",
+      html: '<div class="pin__grow"><div class="pin__shape"></div></div>',
+      iconSize: [30, 36],
+      iconAnchor: [15, 34]
+    });
+    const pins = L.layerGroup().addTo(map);
+    let pinCount = -1;
+
+    // Redraw the pins only when a treasure was added, so open popups stay open
+    function drawPins(treasures) {
+      if (treasures.length === pinCount) return;
+      pinCount = treasures.length;
+      pins.clearLayers();
+      for (const t of treasures) {
+        const popup = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = t.name;
+        const who = document.createElement("div");
+        who.textContent = `hidden by ${t.creator}`;
+        popup.append(title, who);
+        if (t.photo_url) {
+          const img = document.createElement("img");
+          img.src = t.photo_url;
+          img.alt = `Photo of ${t.name}`;
+          img.className = "popup-photo";
+          popup.append(img);
+        }
+        L.marker([t.lat, t.lon], { icon: pinIcon, title: t.name }).bindPopup(popup).addTo(pins);
+      }
+      if (treasures.length) map.fitBounds(pins.getBounds(), { padding: [40, 40], maxZoom: 17 });
+    }
+
+    function drawFeed(events) {
+      const feed = document.getElementById("feed");
+      feed.replaceChildren();
+      document.getElementById("feedEmpty").hidden = events.length > 0;
+      for (const e of events) {
+        const li = document.createElement("li");
+        const time = document.createElement("time");
+        time.textContent = new Date(e.when).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        const who = document.createElement("b");
+        who.textContent = e.who;
+        li.append(time, " ", who, " " + e.what);
+        feed.append(li);
+      }
+    }
+
+    function setText(id, value) { document.getElementById(id).textContent = value; }
+
+    async function refresh() {
+      try {
+        const res = await fetch("/api/admin/summary");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not load the summary");
+        setText("sPlayers", data.players);
+        setText("sTreasures", data.treasures);
+        setText("sFinds", data.finds);
+        setText("sCoins", data.coins_paid);
+        setText("sHunts", data.hunts);
+        drawPins(data.treasure_list);
+        drawFeed(data.events);
+        setText("updated", "Updated " + new Date().toLocaleTimeString());
+      } catch (error) {
+        setText("updated", error.message);
+      }
+    }
+
+    refresh();
+    setInterval(refresh, REFRESH_MS);
+  </script>
+  {% endif %}
+</body>
+</html>
