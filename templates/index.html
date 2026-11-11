@@ -26,43 +26,50 @@
         <span class="brand__words">Treasure<br>Hunt Club</span>
       </a>
 
-      <div class="sidebar__label">Your adventure</div>
+      <div class="sidebar__label">Pages</div>
 
       <nav class="side-nav">
         <a class="side-nav__link is-active" href="#discover">
           <span class="px-icon px-icon--gps"></span> Discover
         </a>
         <a class="side-nav__link" href="/">
-          <span class="px-icon px-icon--map"></span> My quests
+          <span class="px-icon px-icon--map"></span> Map
         </a>
-        <a class="side-nav__link" href="#rewards">
-          <span class="px-icon px-icon--trophy"></span> Rewards
+        <a class="side-nav__link" href="/upload">
+          <span class="px-icon px-icon--flag"></span> Hide a treasure
         </a>
-        <a class="side-nav__link" href="#leaderboard">
+        <a class="side-nav__link" href="/hunts">
+          <span class="px-icon px-icon--users"></span> Hunts
+        </a>
+        <a class="side-nav__link" href="/leaderboard">
           <span class="px-icon px-icon--chart"></span> Leaderboard
+        </a>
+        <a class="side-nav__link" href="/shop">
+          <span class="px-icon px-icon--bag"></span> Shop
         </a>
       </nav>
 
-      <div class="sidebar__label">Your collection</div>
+      <div class="sidebar__label">You</div>
 
-      <div class="collection-card">
-        <span class="collection-card__icon"><span class="px-icon px-icon--trophy"></span></span>
+      <!-- Filled in by Python's /api/me and /api/coins; shows "Log in" until then -->
+      <a class="collection-card" href="/login">
+        <span class="collection-card__icon"><span class="px-icon px-icon--coin"></span></span>
         <div>
-          <strong>Explorer level 4</strong>
-          <span>Trail seeker</span>
+          <strong id="sideName">Not logged in</strong>
+          <span id="sideCoins">Log in to collect coins</span>
         </div>
         <span class="px-arrow-right collection-card__chevron"></span>
-      </div>
+      </a>
 
       <div class="sidebar__bottom">
         <div class="help-card">
           <strong>New to the club</strong>
-          <p>Every corner could hide a story. Here is how a hunt works.</p>
+          <p>Three steps from the map to your first coins.</p>
           <a href="#how-it-works">How it works <span class="px-arrow-right"></span></a>
         </div>
 
-        <a class="side-nav__link" href="#settings">
-          <span class="px-icon px-icon--sliders"></span> Settings
+        <a class="side-nav__link" href="/login">
+          <span class="px-icon px-icon--sliders"></span> Account
         </a>
       </div>
     </aside>
@@ -73,28 +80,19 @@
       <!-- TOP BAR -->
       <header class="topbar">
         <div class="breadcrumb">
-          <span>Explorer's journal</span>
+          <span>Treasure Hunt Club</span>
           <b>/</b> Discover
         </div>
 
         <div class="topbar__right">
-          <div class="streak">
-            <span class="px-icon px-icon--zap"></span>
-            <strong>3 day streak</strong>
-          </div>
-
-          <button class="icon-button" aria-label="Notifications">
-            <span class="px-icon px-icon--bell"></span>
-          </button>
-
-          <button class="profile">
-            <span class="profile__avatar">E</span>
+          <a class="profile" href="/login">
+            <span class="profile__avatar" id="avatar">?</span>
             <span class="profile__name">
-              <strong>Explorer</strong>
-              <small>Level 4</small>
+              <strong id="topName">Log in</strong>
+              <small id="topCoins">or create an account</small>
             </span>
-            <span class="px-icon px-icon--down profile__chevron"></span>
-          </button>
+            <span class="px-arrow-right profile__chevron"></span>
+          </a>
         </div>
       </header>
 
@@ -126,8 +124,6 @@
         </div>
 
         <div class="welcome-banner__content">
-          <div class="eyebrow">Your next story starts here</div>
-
           <h1>Hidden treasure,<br>a short walk away</h1>
 
           <p>
@@ -137,7 +133,7 @@
 
           <a class="button button--gold" href="/">
             <span class="px-arrow-right button__cursor"></span>
-            Find your next quest
+            Open the map
           </a>
         </div>
 
@@ -148,9 +144,8 @@
 
         <div class="section-heading">
           <div>
-            <div class="eyebrow eyebrow--dark">A quick tour of the app</div>
-            <h2>Your adventure at a glance</h2>
-            <p>Everything you need to find treasures, hide your own and spend your coins.</p>
+            <h2>What you can do</h2>
+            <p>Find treasures, hide your own and spend your coins.</p>
           </div>
 
           <a class="text-link" href="/">
@@ -160,83 +155,82 @@
 
         <div class="feature-list">
 
-          <article class="feature-list__item">
+          <a class="feature-list__item" href="/">
             <span class="feature-list__icon"><span class="px-icon px-icon--map"></span></span>
             <div>
               <h3>Walking map</h3>
               <p>See every hidden treasure and a walking route to the one you pick.</p>
             </div>
-          </article>
+          </a>
 
-          <article class="feature-list__item">
+          <a class="feature-list__item" href="/upload">
             <span class="feature-list__icon"><span class="px-icon px-icon--flag"></span></span>
             <div>
               <h3>Hide a treasure</h3>
-              <p>Stand somewhere you like and leave a treasure with a hint for others.</p>
+              <p>Pin a spot on the map, add a photo and leave a hint for others.</p>
             </div>
-          </article>
+          </a>
 
-          <article class="feature-list__item">
+          <a class="feature-list__item" href="/hunts">
             <span class="feature-list__icon"><span class="px-icon px-icon--users"></span></span>
             <div>
               <h3>Hunts</h3>
               <p>Join a hunt with other players. When it is full, you wait in line.</p>
             </div>
-          </article>
+          </a>
 
-          <article class="feature-list__item">
+          <a class="feature-list__item" href="/leaderboard">
             <span class="feature-list__icon"><span class="px-icon px-icon--coin"></span></span>
             <div>
               <h3>Coins</h3>
-              <p>Get within 20 m of a treasure and its coins go to you.</p>
+              <p>Get within 20 m of a treasure and 10 coins go to you.</p>
             </div>
-          </article>
+          </a>
 
-          <article class="feature-list__item">
+          <a class="feature-list__item" href="/shop">
             <span class="feature-list__icon"><span class="px-icon px-icon--bag"></span></span>
             <div>
               <h3>Shop</h3>
               <p>Spend your coins on vouchers and items for your profile.</p>
             </div>
-          </article>
+          </a>
 
-          <article class="feature-list__item">
+          <a class="feature-list__item" href="/">
             <span class="feature-list__icon"><span class="px-icon px-icon--run"></span></span>
             <div>
               <h3>Steps and calories</h3>
               <p>Every route shows the steps and calories the walk will take.</p>
             </div>
-          </article>
+          </a>
 
         </div>
       </section>
 
-      <!-- STATISTICS -->
+      <!-- LIVE NUMBERS: Python counts them, the page only shows them -->
       <section class="stats-row">
 
         <article class="stat-card">
-          <small>Coins collected</small>
-          <strong><span class="sprite sprite--coin"></span>1,280</strong>
-          <span class="stat-note">+140 vs last week</span>
+          <small>Your coins</small>
+          <strong><span class="sprite sprite--coin"></span><span id="statCoins">–</span></strong>
+          <span class="stat-note" id="statCoinsNote">Log in to see them</span>
         </article>
 
         <article class="stat-card">
-          <small>Quests completed</small>
-          <strong>8 <i>of 12</i></strong>
-          <span class="stat-note">4 left nearby</span>
+          <small>Treasures you found</small>
+          <strong id="statFound">–</strong>
+          <span class="stat-note" id="statFoundNote">10 coins each</span>
         </article>
 
         <article class="stat-card">
-          <small>Places discovered</small>
-          <strong>14</strong>
-          <span class="stat-note">3 this week</span>
+          <small>Treasures on the map</small>
+          <strong id="statTreasures">–</strong>
+          <span class="stat-note">Hidden by players</span>
         </article>
 
-        <article class="stat-card stat-card--level">
-          <small>Current rank</small>
-          <strong>Trail seeker</strong>
-          <span class="level-progress" aria-label="72% to level 5"><i></i></span>
-          <span class="stat-note">72% to level 5</span>
+        <article class="stat-card">
+          <small>Players in the club</small>
+          <strong id="statPlayers">–</strong>
+          <span class="stat-note" id="statLeader">–</span>
         </article>
 
       </section>
@@ -244,30 +238,22 @@
       <!-- MAIN CONTENT GRID -->
       <div class="content-grid">
 
-        <!-- QUESTS -->
-        <section class="quests-panel" id="quests">
+        <!-- TREASURES -->
+        <section class="quests-panel" id="treasures">
 
           <div class="section-heading">
             <div>
-              <div class="eyebrow eyebrow--dark">Pick your adventure</div>
-              <h2>Quests near you</h2>
-              <p>Secrets are waiting just around the corner.</p>
+              <h2>Treasures to find</h2>
+              <p>Tap one to open it on the map.</p>
             </div>
 
-            <a class="text-link" href="#all-quests">
-              View all quests <span class="px-arrow-right"></span>
+            <a class="text-link" href="/">
+              Open the map <span class="px-arrow-right"></span>
             </a>
           </div>
 
-          <div class="filter-row">
-            <button class="filter-chip filter-chip--active">All quests <span>6</span></button>
-            <button class="filter-chip">Nature</button>
-            <button class="filter-chip">Landmarks</button>
-            <button class="filter-chip">Hidden gems</button>
-          </div>
-
-          <!-- FEATURED QUEST -->
-          <article class="quest-card">
+          <!-- THE FIRST TREASURE on the map, drawn as a little scene -->
+          <article class="quest-card" style="margin-top: 24px">
 
             <div class="quest-art" aria-hidden="true">
               <span class="quest-art__sun"></span>
@@ -279,103 +265,59 @@
               <span class="quest-art__fountain"></span>
               <span class="quest-art__coin"><span class="sprite sprite--coin"></span></span>
             </div>
-            <span class="art-distance"><span class="px-icon px-icon--gps"></span> 1.2 km away</span>
 
             <div class="quest-card__body">
               <div class="quest-meta">
-                <span class="difficulty"><i></i> Easy</span>
-                <span><span class="px-icon px-icon--clock"></span> 25–35 min</span>
-                <span>Outdoor</span>
+                <span class="difficulty"><i></i> Within 20 m counts</span>
               </div>
 
-              <h3>The Whispering Garden</h3>
+              <h3 id="firstName">Loading…</h3>
 
-              <p>Follow the old garden's secrets and uncover a story hidden in plain sight.</p>
+              <p id="firstHint"></p>
 
               <div class="quest-card__footer">
                 <div class="reward">
                   <span class="sprite sprite--coin"></span>
-                  <strong>+250</strong>
+                  <strong>+10</strong>
                   <small>coins</small>
                 </div>
 
-                <a class="button button--dark" href="#quest-details">Explore quest</a>
+                <a class="button button--dark" href="/">Walk there</a>
               </div>
             </div>
           </article>
 
-          <!-- OTHER QUESTS -->
+          <!-- THE OTHER TREASURES, from /api/treasures -->
           <div class="section-heading section-heading--compact">
             <div>
-              <div class="eyebrow eyebrow--dark">More to discover</div>
-              <h2>Other adventures</h2>
+              <h2>More treasures</h2>
             </div>
-            <span class="nearby-label"><i></i> Updated just now</span>
+            <span class="nearby-label" id="moreCount"></span>
           </div>
 
-          <div class="mini-quests">
+          <div class="mini-quests" id="moreTreasures"></div>
+          <p class="stat-note" id="moreEmpty" hidden>Only one so far. <a class="text-link" href="/upload">Hide the next one</a></p>
 
+          <template id="miniCard">
             <article class="mini-card">
-              <div class="mini-art mini-art--city" aria-hidden="true">
-                <span class="px-icon px-icon--buildings"></span>
-              </div>
-
+              <div class="mini-art" aria-hidden="true"><span class="sprite sprite--chest"></span></div>
               <div class="mini-card__body">
-                <div class="quest-meta">
-                  <span class="difficulty difficulty--medium"><i></i> Medium</span>
-                  <span><span class="px-icon px-icon--clock"></span> 45 min</span>
-                </div>
-
-                <h3>Echoes of the Old Town</h3>
-                <p>4 clues · History</p>
-
+                <h3></h3>
+                <p></p>
                 <div class="mini-card__bottom">
-                  <strong><span class="sprite sprite--coin-small"></span> 400 coins</strong>
-                  <a href="#quest-details" aria-label="Open Echoes of the Old Town"><span class="px-arrow-right"></span></a>
+                  <strong><span class="sprite sprite--coin-small"></span> 10 coins</strong>
+                  <a href="/"><span class="px-arrow-right"></span></a>
                 </div>
               </div>
             </article>
-
-            <article class="mini-card">
-              <div class="mini-art mini-art--lake" aria-hidden="true">
-                <span class="sprite sprite--tree"></span>
-              </div>
-
-              <div class="mini-card__body">
-                <div class="quest-meta">
-                  <span class="difficulty"><i></i> Easy</span>
-                  <span><span class="px-icon px-icon--clock"></span> 20 min</span>
-                </div>
-
-                <h3>The Lake's Secret</h3>
-                <p>3 clues · Nature</p>
-
-                <div class="mini-card__bottom">
-                  <strong><span class="sprite sprite--coin-small"></span> 180 coins</strong>
-                  <a href="#quest-details" aria-label="Open The Lake's Secret"><span class="px-arrow-right"></span></a>
-                </div>
-              </div>
-            </article>
-
-          </div>
+          </template>
         </section>
 
         <!-- RIGHT COLUMN -->
         <aside class="right-column">
 
-          <!-- MAP -->
+          <!-- MAP: a tiny overworld, like the map screen of an old game -->
           <section class="map-panel">
-            <div class="map-panel__heading">
-              <div>
-                <div class="eyebrow eyebrow--dark">Your exploration zone</div>
-                <h2>Around you</h2>
-              </div>
-              <a class="icon-button" href="/" aria-label="Open the full map">
-                <span class="px-icon px-icon--expand"></span>
-              </a>
-            </div>
-
-            <!-- A tiny overworld map, like the map screen of an old game -->
             <div class="map-illustration" aria-hidden="true">
               <span class="map-water"></span>
               <span class="map-park map-park--one"></span>
@@ -389,10 +331,6 @@
               <span class="map-block map-block--two"></span>
               <span class="map-block map-block--three"></span>
 
-              <span class="map-label map-label--one">Riverside walk</span>
-              <span class="map-label map-label--two">Old town</span>
-              <span class="map-label map-label--three">Central garden</span>
-
               <span class="map-pin map-pin--one"><span class="sprite sprite--coin"></span></span>
               <span class="map-pin map-pin--two"><span class="sprite sprite--coin"></span></span>
               <span class="map-pin map-pin--three map-pin--found"><span class="sprite sprite--chest"></span></span>
@@ -401,45 +339,33 @@
               <span class="map-compass">N</span>
             </div>
 
-            <div class="map-legend">
-              <span><i class="swatch swatch--gold"></i> Available</span>
-              <span><i class="swatch swatch--wood"></i> Found</span>
-              <span><i class="swatch swatch--stone"></i> Locked</span>
-            </div>
-
-            <a class="button button--map" href="/">Explore full map</a>
+            <a class="button button--map" href="/">Open the map</a>
           </section>
 
-          <!-- DAILY CHALLENGE -->
-          <section class="daily-card" id="rewards">
+          <!-- TOP PLAYERS, from /api/leaderboard -->
+          <section class="daily-card" id="top-players">
             <div class="daily-card__top">
-              <span class="px-icon px-icon--sun"></span>
-              <span>Daily challenge</span>
+              <span class="px-icon px-icon--trophy"></span>
+              <span>Leaderboard</span>
             </div>
 
-            <h3>A little detour, a big discovery</h3>
+            <h3>Top explorers</h3>
 
-            <p>Visit one new place today to earn a bonus reward.</p>
+            <ol class="top-list" id="topList"></ol>
+            <p class="top-list__empty" id="topEmpty" hidden>No players yet. Register to be the first.</p>
 
-            <div class="daily-progress">
-              <div>
-                <span>Your daily progress</span>
-                <strong>0 / 1</strong>
-              </div>
-              <i></i>
-            </div>
-
-            <a href="#daily-quest">Accept challenge <span class="px-arrow-right"></span></a>
+            <a href="/leaderboard">Full leaderboard <span class="px-arrow-right"></span></a>
           </section>
 
-          <!-- TIP -->
+          <!-- HOW IT WORKS -->
           <section class="tip-card" id="how-it-works">
             <span class="px-icon px-icon--bulb"></span>
             <div>
-              <strong>Explorer's tip</strong>
+              <strong>How it works</strong>
               <p>
-                Look closely at your surroundings. The smallest
-                details can lead to the greatest discoveries.
+                Pick a treasure on the map and walk there. Within 20 m, Python checks
+                your position and pays 10 coins. Each treasure pays once, and one you
+                hid yourself pays nothing.
               </p>
             </div>
           </section>
@@ -450,11 +376,87 @@
       <!-- FOOTER -->
       <footer class="footer">
         <span class="footer__brand"><span class="sprite sprite--coin-small"></span> Treasure Hunt Club</span>
-        <span>Make today a story worth telling</span>
         <a href="#discover">Back to top</a>
       </footer>
 
     </main>
   </div>
+
+  <script>
+    // Python has the facts (/api/me, /api/coins, /api/treasures, /api/leaderboard).
+    // The page only writes them into the boxes above, with textContent so nothing a
+    // player typed can inject HTML.
+    async function getJson(url) {
+      try {
+        const res = await fetch(url);
+        return res.ok ? await res.json() : null;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function setText(id, text) { document.getElementById(id).textContent = text; }
+
+    function showPlayer(me, coins) {
+      if (!me) return;  // logged out: the "Log in" words stay
+      setText("avatar", me.username[0].toUpperCase());
+      setText("topName", me.username);
+      setText("sideName", me.username);
+      const balance = coins ? coins.balance : 0;
+      setText("topCoins", `${balance} coins`);
+      setText("sideCoins", `${balance} coins`);
+      setText("statCoins", balance);
+      setText("statCoinsNote", "Spend them in the shop");
+      setText("statFound", coins ? coins.found_treasure_ids.length : 0);
+    }
+
+    function showTreasures(treasures) {
+      if (!treasures) return;
+      setText("statTreasures", treasures.length);
+      const [first, ...rest] = treasures;
+      if (first) {
+        setText("firstName", first.name);
+        setText("firstHint", first.description || "No hint for this one.");
+      }
+      const box = document.getElementById("moreTreasures");
+      const card = document.getElementById("miniCard");
+      for (const t of rest.slice(0, 6)) {
+        const node = card.content.cloneNode(true);
+        node.querySelector(".mini-art").classList.add(box.children.length % 2 ? "mini-art--city" : "mini-art--lake");
+        node.querySelector("h3").textContent = t.name;
+        node.querySelector("p").textContent = t.description || "No hint for this one.";
+        node.querySelector("a").setAttribute("aria-label", `Open ${t.name} on the map`);
+        box.append(node);
+      }
+      document.getElementById("moreEmpty").hidden = rest.length > 0;
+      setText("moreCount", rest.length > 6 ? `${rest.length - 6} more on the map` : "");
+    }
+
+    function showTopPlayers(players) {
+      if (!players) return;
+      setText("statPlayers", players.length);
+      setText("statLeader", players[0] ? `${players[0].username} leads with ${players[0].coins} coins` : "Be the first");
+      const list = document.getElementById("topList");
+      for (const p of players.slice(0, 3)) {
+        const li = document.createElement("li");
+        const name = document.createElement("span");
+        name.textContent = p.username;
+        const coins = document.createElement("strong");
+        coins.textContent = `${p.coins} coins`;
+        li.append(name, coins);
+        list.append(li);
+      }
+      document.getElementById("topEmpty").hidden = players.length > 0;
+    }
+
+    (async () => {
+      const [me, coins, treasures, players] = await Promise.all([
+        getJson("/api/me"), getJson("/api/coins"), getJson("/api/treasures"), getJson("/api/leaderboard")
+      ]);
+      showPlayer(me, coins);
+      showTreasures(treasures);
+      showTopPlayers(players);
+    })();
+  </script>
 </body>
 </html>

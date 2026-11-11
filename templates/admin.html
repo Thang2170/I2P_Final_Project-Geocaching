@@ -65,7 +65,7 @@
       iconSize: [30, 36],
       iconAnchor: [15, 34]
     });
-    const pins = L.layerGroup().addTo(map);
+    const pins = L.featureGroup().addTo(map);  // a feature group knows its bounds
     let pinCount = -1;
 
     // Redraw the pins only when a treasure was added, so open popups stay open
