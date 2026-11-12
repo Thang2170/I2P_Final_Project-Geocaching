@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
   {% include "_head.html" %}
-  <title>Hide a treasure · Treasure Hunt Club</title>
+  <title>Hide a treasure · StepQuest</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
   {% set active = "upload" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card card--wide">
     <h1>Hide a treasure</h1>
-    <p class="muted">Stand where you want to hide it, then tap "Use my location".
-      You need to be logged in, and a new treasure must be at least 10 m from any other.</p>
+    <p class="muted">Tap the map where the treasure is, or stand there and tap "Use my location".
+      A new treasure must be at least 10 m from any other.</p>
 
     <form id="form">
       <label for="name">Name</label>
@@ -20,47 +21,87 @@
       <label for="description">Hint for finders <span class="muted">(optional)</span></label>
       <textarea id="description" name="description" maxlength="300" rows="3"></textarea>
 
-      <div class="row">
-        <div>
-          <label for="lat">Latitude</label>
-          <input id="lat" name="lat" inputmode="decimal" required>
-        </div>
-        <div>
-          <label for="lon">Longitude</label>
-          <input id="lon" name="lon" inputmode="decimal" required>
-        </div>
-      </div>
-
+      <label for="pickMap">Where is it?</label>
+      <div id="pickMap" class="pick-map" aria-label="Map: tap to place the treasure"></div>
+      <p id="spot" class="muted spot">No spot chosen yet</p>
+      <!-- Filled in by the map, never typed -->
+      <input type="hidden" id="lat" name="lat">
+      <input type="hidden" id="lon" name="lon">
       <button type="button" id="locate" class="btn btn--ghost">Use my location</button>
+
+      <label for="photo">Photo of the spot <span class="muted">(optional, JPG, PNG or WebP, up to 5 MB)</span></label>
+      <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+
       <button type="submit" class="btn">Hide treasure</button>
     </form>
 
     <p id="message" class="message" role="status"></p>
   </main>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // The browser only collects the data. Python checks it and saves it.
     const form = document.getElementById("form");
     const message = document.getElementById("message");
+    const spot = document.getElementById("spot");
 
     function show(text, ok) {
       message.textContent = text;
       message.className = "message " + (ok ? "ok" : "bad");
     }
 
+    // ------------------------------------------------------------ the map picker
+
+    // Starts on the NTHU campus until we know where you are
+    const map = L.map("pickMap").setView([24.795324, 120.994796], 16);
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19,
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(map);
+
+    // The same pixel pin the map page uses (drawn in app.css)
+    const pinIcon = L.divIcon({
+      className: "pin pin--target",
+      html: '<div class="pin__grow"><div class="pin__shape"></div></div>',
+      iconSize: [30, 36],
+      iconAnchor: [15, 34]
+    });
+
+    let pin = null;
+    function placePin(lat, lon) {
+      form.lat.value = lat.toFixed(6);
+      form.lon.value = lon.toFixed(6);
+      spot.textContent = `Treasure spot: ${lat.toFixed(5)}, ${lon.toFixed(5)} (drag the pin to adjust)`;
+      if (pin) {
+        pin.setLatLng([lat, lon]);
+      } else {
+        pin = L.marker([lat, lon], { icon: pinIcon, draggable: true }).addTo(map);
+        pin.on("dragend", event => {
+          const where = event.target.getLatLng();
+          placePin(where.lat, where.lng);
+        });
+      }
+    }
+
+    map.on("click", event => placePin(event.latlng.lat, event.latlng.lng));
+
     document.getElementById("locate").addEventListener("click", () => {
       if (!navigator.geolocation) { show("Location is not supported by this browser.", false); return; }
       show("Finding you…", true);
       navigator.geolocation.getCurrentPosition(
         pos => {
-          form.lat.value = pos.coords.latitude.toFixed(6);
-          form.lon.value = pos.coords.longitude.toFixed(6);
-          show("Location filled in.", true);
+          placePin(pos.coords.latitude, pos.coords.longitude);
+          map.setView([pos.coords.latitude, pos.coords.longitude], 18);
+          show("Pin placed where you are.", true);
         },
         error => show("Could not get your location: " + error.message, false),
         { enableHighAccuracy: true, timeout: 30000 }
       );
     });
+
+    // ------------------------------------------------------------ saving
 
     // Hiding treasures needs a login: send visitors to the login page first,
     // and bring them back here afterwards.
@@ -69,11 +110,24 @@
 
     const submitButton = form.querySelector('button[type="submit"]');
 
+    // The photo goes up in a second request, after Python has saved the treasure.
+    async function uploadPhoto(treasureId, file) {
+      const body = new FormData();
+      body.append("photo", file);
+      const res = await fetch(`/api/treasures/${treasureId}/photo`, { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The photo upload failed.");
+    }
+
     form.addEventListener("submit", async event => {
       event.preventDefault();
       if (submitButton.disabled) return;  // a double tap must not hide the treasure twice
+      if (!form.lat.value) { show("Tap the map to choose where the treasure is.", false); return; }
       submitButton.disabled = true;
-      const body = Object.fromEntries(new FormData(form));
+      const body = {
+        name: form.name.value, description: form.description.value,
+        lat: form.lat.value, lon: form.lon.value
+      };
       try {
         const res = await fetch("/api/treasures", {
           method: "POST",
@@ -83,8 +137,20 @@
         if (res.status === 401) { location.href = LOGIN_URL; return; }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "The upload failed.");
+
+        const photo = form.photo.files[0];
+        if (photo) {
+          try {
+            await uploadPhoto(data.id, photo);
+          } catch (error) {
+            show(`Saved "${data.name}", but the photo was not saved: ${error.message}`, false);
+            return;
+          }
+        }
         show(`Saved "${data.name}". It is on the map now.`, true);
         form.reset();
+        if (pin) { pin.remove(); pin = null; }
+        spot.textContent = "No spot chosen yet";
       } catch (error) {
         show(error.message, false);
       } finally {
