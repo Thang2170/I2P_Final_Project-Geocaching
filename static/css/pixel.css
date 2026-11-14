@@ -626,6 +626,7 @@
 .px-icon--chart { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/chart-bar.svg"); }
 .px-icon--sliders { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/sliders.svg"); }
 .px-icon--users { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/users.svg"); }
+.px-icon--comment { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/comment.svg"); }
 .px-icon--coin { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/coin.svg"); }
 .px-icon--bag { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/shopping-bag.svg"); }
 .px-icon--run { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/human-run.svg"); }
