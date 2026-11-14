@@ -7,6 +7,7 @@ from models import Treasure, db, seed_demo_data, seed_demo_hunt
 
 from admin_api import admin_api
 from auth_api import auth_api, current_user
+from chat_api import chat_api
 from coin_api import coin_api
 from feed_api import feed_api
 from hunt_api import hunt_api
@@ -41,6 +42,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(coin_api)
     app.register_blueprint(shop_api)
     app.register_blueprint(hunt_api)
+    app.register_blueprint(chat_api)
     app.register_blueprint(journey_api)
     app.register_blueprint(feed_api)
     app.register_blueprint(photo_api)

@@ -10,6 +10,11 @@
     .hunt__text { margin: 4px 0 0; }
     .hunt .btn { width: auto; margin: 0 4px 0 0; padding: 12px; font-size: 10px; white-space: nowrap; }
     .hunt .btn[disabled] { opacity: .5; }
+    .hunt__buttons { display: flex; flex-direction: column; gap: 8px; }
+    .hunt__buttons .btn { margin: 0; text-align: center; text-decoration: none; }
+    .btn--chat { background: var(--px-gold); color: var(--px-ink); }
+    #message .btn--chat { display: inline-block; width: auto; margin: 8px 0 0; padding: 12px;
+                          font-size: 10px; text-decoration: none; }
     details { margin-top: 20px; }
   </style>
 </head>
@@ -75,12 +80,22 @@
         if (hunt.description) info.append(el("p", hunt.description, "muted hunt__text"));
         if (hunt.me) info.append(el("p", myStatus(hunt.me), "hunt__text"));
 
-        const button = el("button", hunt.me ? "Leave" : "Join", "btn");
+        const buttons = el("div", undefined, "hunt__buttons");
+        // Once you are in a hunt (playing or waiting), its group chat is one tap away.
+        if (hunt.me) buttons.append(chatLink(hunt));
+        const button = el("button", hunt.me ? "Leave" : "Join", hunt.me ? "btn btn--ghost" : "btn");
         button.type = "button";
         button.addEventListener("click", () => act(hunt, button));
-        row.append(info, button);
+        buttons.append(button);
+        row.append(info, buttons);
         box.append(row);
       }
+    }
+
+    function chatLink(hunt) {
+      const link = el("a", "Open group chat", "btn btn--chat");
+      link.href = `/hunts/${Number(hunt.id)}/chat`;
+      return link;
     }
 
     async function load() {
@@ -105,7 +120,13 @@
       button.disabled = true;
       try {
         const data = await post(`/api/hunts/${hunt.id}/${hunt.me ? "leave" : "join"}`);
-        show(data.me ? `Joined "${data.name}". ${myStatus(data.me)}.` : `Left "${data.name}".`, true);
+        if (data.me) {
+          // Joined: say so, and offer the group chat right there in the message too.
+          show(`Joined "${data.name}". ${myStatus(data.me)}. `, true);
+          message.append(chatLink(data));
+        } else {
+          show(`Left "${data.name}".`, true);
+        }
       } catch (error) {
         show(error.message, false);
       }

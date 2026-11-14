@@ -300,3 +300,17 @@ class TourSeen(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
     how = db.Column(db.String(10), nullable=False)  # "finished" or "skipped" (see onboarding.py)
     seen_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class HuntMessage(db.Model):
+    """One message in a hunt's group chat. The id order is the order they were sent."""
+
+    __tablename__ = "hunt_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    hunt_id = db.Column(db.Integer, db.ForeignKey("hunts.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship("User")
