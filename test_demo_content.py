@@ -1,7 +1,9 @@
 import unittest
 from itertools import combinations
 
-from demo_content import DEMO_FULL_HUNT, DEMO_PASSWORD, DEMO_TREASURES, DEMO_USERS, TREASURE_CREATOR
+from demo_content import (BUILT_IN_TREASURE_NAME, DEMO_FULL_HUNT, DEMO_JOURNEYS, DEMO_PASSWORD,
+                          DEMO_TREASURES, DEMO_USERS, TREASURE_CREATOR)
+from journey_log import speed_problem
 from hunt_input import parse_hunt
 from location import haversine_m
 from treasure_input import MIN_TREASURE_GAP_M, parse_treasure
@@ -54,6 +56,23 @@ class TestDemoContent(unittest.TestCase):
         from shop import ITEMS
         player = DEMO_USERS[0]
         self.assertGreaterEqual(player["coins"], min(item.price for item in ITEMS))
+
+    def test_demo_hunts_are_by_demo_users_on_real_treasures_that_are_not_their_own(self):
+        usernames = [spec["username"] for spec in DEMO_USERS]
+        treasure_names = [t["name"] for t in DEMO_TREASURES] + [BUILT_IN_TREASURE_NAME]
+        for spec in DEMO_JOURNEYS:
+            self.assertIn(spec["username"], usernames)
+            self.assertIn(spec["treasure"], treasure_names)
+            if spec["treasure"] != BUILT_IN_TREASURE_NAME:
+                self.assertNotEqual(spec["username"], TREASURE_CREATOR)  # nobody hunts their own treasure
+            self.assertIsNone(speed_problem(spec["distance_m"], spec["duration_s"]))
+
+    def test_each_player_hunts_a_treasure_only_once(self):
+        pairs = [(spec["username"], spec["treasure"]) for spec in DEMO_JOURNEYS]
+        self.assertEqual(len(pairs), len(set(pairs)))
+
+    def test_the_login_account_has_no_demo_hunt_so_the_presenter_can_finish_one_live(self):
+        self.assertNotIn(DEMO_USERS[0]["username"], [spec["username"] for spec in DEMO_JOURNEYS])
 
 
 if __name__ == "__main__":

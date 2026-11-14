@@ -34,6 +34,7 @@
       </div>
       <p id="jMsg" class="journey__msg"></p>
       <p id="jNote" class="journey__note" hidden></p>
+      <p id="jSaved" class="journey__saved" hidden></p>
       <div class="journey__buttons">
         <button type="button" id="jPause" class="btn btn--ghost">Pause</button>
         <button type="button" id="jFinish" class="btn">Finish</button>
@@ -305,6 +306,7 @@
     const jPause = document.getElementById("jPause");
     const jFinish = document.getElementById("jFinish");
     const jNote = document.getElementById("jNote");
+    const jSaved = document.getElementById("jSaved");
     const jEls = {
       time: document.getElementById("jTime"), pace: document.getElementById("jPace"),
       dist: document.getElementById("jDist"), steps: document.getElementById("jSteps"),
@@ -427,13 +429,14 @@
     function startJourney(t) {
       Object.assign(journey, {
         state: "running", targetId: t.id, name: t.name, target: [t.lat, t.lon],
-        elapsedMs: 0, meters: 0, steps: 0, calories: 0, statsAt: 0, statsMeters: 0,
+        elapsedMs: 0, meters: 0, steps: 0, calories: 0, statsAt: 0, statsMeters: 0, saveStarted: false,
         tickAt: Date.now(), last: currentPos ? { pos: currentPos, time: Date.now() } : null
       });
       closeBoard();
       document.body.classList.add("is-journey");
       journeyBox.hidden = false;
       jEls.msg.textContent = statusBox.textContent;
+      jSaved.hidden = true;
       clearInterval(journeyTimer);
       journeyTimer = setInterval(journeyTick, 1000);
       keepScreenOn(true);
@@ -452,7 +455,9 @@
       renderJourney();
     }
 
-    function finishJourney() {
+    // arrived = Python said you are within 20 m of the treasure. Only then is the hunt saved
+    // (the Finish button on its own just stops the clock).
+    function finishJourney(arrived = false) {
       if (!journeyActive()) return;
       journey.state = "finished";
       clearInterval(journeyTimer);
@@ -460,11 +465,45 @@
       loadJourneyStats();
       updateStartButton();
       renderJourney();
+      if (arrived) saveJourney();
+    }
+
+    // Save the finished hunt. Python checks it again (you must be within 20 m of the treasure,
+    // and the speed must be a walk or a run) and works out the steps and calories itself.
+    async function saveJourney() {
+      if (journey.saveStarted || !currentPos) return;
+      journey.saveStarted = true;
+      const body = {
+        treasure_id: journey.targetId, distance_m: Math.round(journey.meters),
+        duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
+        lat: currentPos[0], lon: currentPos[1]
+      };
+      let ok = false, text = "Could not save this hunt.";
+      try {
+        const res = await fetch("/api/journeys", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        ok = res.ok;
+        text = ok ? "Hunt saved." : (data.error || text);
+      } catch (err) {
+        console.error("Saving the hunt failed:", err);
+      }
+      jSaved.textContent = text;
+      jSaved.classList.toggle("is-bad", !ok);
+      if (ok) {
+        const link = document.createElement("a");
+        link.href = "/community";
+        link.textContent = " See the Community";
+        jSaved.append(link);
+      }
+      jSaved.hidden = false;
     }
 
     function closeJourney() {
       journey.state = "idle";
       journeyBox.hidden = true;
+      jSaved.hidden = true;
       document.body.classList.remove("is-journey");
       updateStartButton();
     }
@@ -473,7 +512,7 @@
       if (!journeyActive() && currentPos && selectedTreasure) startJourney(selectedTreasure);
     });
     jPause.addEventListener("click", pauseOrResume);
-    jFinish.addEventListener("click", () => (journey.state === "finished" ? closeJourney() : finishJourney()));
+    jFinish.addEventListener("click", () => (journey.state === "finished" ? closeJourney() : finishJourney(false)));
 
     // The status card is hidden during a journey, so its messages ("123 m to Library",
     // "You found it", the coins you got) are copied into the panel.
@@ -482,7 +521,7 @@
 
     // Python says you are within 20 m of the treasure (the status card turns gold): the journey is over.
     new MutationObserver(() => {
-      if (sheet.classList.contains("is-found") && journeyActive() && huntId === journey.targetId) finishJourney();
+      if (sheet.classList.contains("is-found") && journeyActive() && huntId === journey.targetId) finishJourney(true);
     }).observe(sheet, { attributes: true, attributeFilter: ["class"] });
 
     // Closing the tab in the middle of a walk would lose it, so ask first.

@@ -36,6 +36,15 @@ class TestJourneyPage(unittest.TestCase):
     def test_steps_and_calories_come_from_python(self):
         self.assertIn("/api/walk-stats?distance_m=", self.html)
 
+    def test_arriving_saves_the_hunt_and_the_finish_button_does_not(self):
+        self.assertIn('id="jSaved"', self.html)
+        self.assertIn("/api/journeys", self.html)
+        self.assertIn("finishJourney(true)", self.html)    # Python said you arrived
+        self.assertIn("finishJourney(false)", self.html)   # the button only stops the clock
+
+    def test_top_bar_links_to_the_community(self):
+        self.assertIn('href="/community"', self.html)
+
     def test_css_styles_the_panel(self):
         css = self.client.get("/static/css/app.css").get_data(as_text=True)
         self.assertIn(".journey", css)
