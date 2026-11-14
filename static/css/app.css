@@ -1178,3 +1178,113 @@ body.has-tour { overflow: hidden; }
 .quest-btn:active { transform: translateY(2px); }
 .quest-btn:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
 .quest-btn--page { position: fixed; top: auto; bottom: 20px; left: 20px; }
+
+/* ---------- hunt group chat (templates/chat.html) ---------- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, calc(100% - 32px));
+  height: calc(100dvh - 96px);  /* the screen minus the top bar, so only the messages scroll */
+  margin: 16px auto;
+  background: var(--px-paper);
+  box-shadow: var(--px-edge), var(--px-drop);
+}
+
+.chat__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 4px solid var(--px-line);
+}
+
+.chat__back { color: var(--px-green); font-size: 20px; text-decoration: none; white-space: nowrap; }
+.chat__back:hover { text-decoration: underline; }
+.chat__title { min-width: 0; }
+
+.chat__title h1 {
+  margin: 0;
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.chat__title p { margin: 0; font-size: 18px; }
+
+/* Who is in the hunt: a strip you can swipe sideways */
+.chat__members {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 16px;
+  overflow-x: auto;
+  list-style: none;
+  border-bottom: 4px solid var(--px-line);
+  scrollbar-width: thin;
+}
+
+.chat__members li { display: flex; flex: none; align-items: center; gap: 6px; font-size: 18px; }
+.chat__members .avatar { width: 28px; height: 28px; font-size: 10px; }
+.chat__members li.is-waiting { opacity: .55; }
+.chat__members li.is-waiting span:last-child::after { content: " (in line)"; color: var(--px-muted); }
+
+/* The messages */
+.chat__messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 16px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--px-bg);
+}
+
+.chat__empty { margin: 0; padding: 0 16px 16px; text-align: center; background: var(--px-bg); }
+
+.msg { display: flex; align-items: flex-end; gap: 8px; max-width: 80%; }
+.msg .avatar { width: 32px; height: 32px; font-size: 11px; }
+.msg--mine { align-self: flex-end; }
+
+.msg__body {
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--px-paper);
+  box-shadow: inset -4px -4px 0 0 #e8e3d3, 0 0 0 2px var(--px-line);
+}
+
+.msg--mine .msg__body {
+  background: var(--px-gold);
+  box-shadow: inset -4px -4px 0 0 var(--px-gold-dark);
+}
+
+.msg__author { display: block; color: var(--px-green); font-size: 16px; }
+.msg__text { margin: 0; font-size: 21px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg__time { display: block; color: var(--px-muted); font-size: 15px; text-align: right; }
+.msg--mine .msg__time { color: rgba(23, 51, 45, .7); }
+
+/* Writing a message */
+.chat__composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 4px solid var(--px-line);
+}
+
+.chat__composer[hidden] { display: none; }
+.chat__composer input { margin-top: 0; }
+.chat__composer .btn { width: auto; margin: 0; padding: 12px 20px; }
+.chat .message { margin: 0 16px 8px; min-height: 0; }
+
+.chat__locked { padding: 24px 16px; text-align: center; }
+.chat__locked .btn { display: inline-block; width: auto; text-decoration: none; }
+
+@media (max-width: 520px) {
+  .chat { width: 100%; height: calc(100dvh - 72px); margin: 0; }
+  .msg { max-width: 92%; }
+}

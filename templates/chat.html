@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Group chat · StepQuest</title>
+</head>
+<body class="chat-page">
+  {% set active = "hunts" %}
+  {% include "_topbar.html" %}
+
+  <main class="chat">
+    <header class="chat__head">
+      <a href="/hunts" class="chat__back">◂ Hunts</a>
+      <div class="chat__title">
+        <h1 id="huntName">Group chat</h1>
+        <p id="myStatus" class="muted"></p>
+      </div>
+    </header>
+
+    <!-- Who is in the hunt -->
+    <ul id="members" class="chat__members" aria-label="Players in this hunt"></ul>
+
+    <!-- The messages -->
+    <ol id="messages" class="chat__messages" aria-live="polite" aria-label="Messages"></ol>
+    <p id="empty" class="chat__empty muted" hidden>No messages yet. Say hi to your team!</p>
+
+    <!-- Shown when you are not in the hunt (any more) -->
+    <div id="locked" class="chat__locked" hidden>
+      <p id="lockedText"></p>
+      <a class="btn" href="/hunts">Back to Hunts</a>
+    </div>
+
+    <form id="composer" class="chat__composer">
+      <label class="visually-hidden" for="text">Message</label>
+      <input id="text" type="text" maxlength="300" autocomplete="off" placeholder="Write a message…" disabled>
+      <button id="send" type="submit" class="btn" disabled>Send</button>
+    </form>
+    <p id="message" class="message" role="status"></p>
+  </main>
+
+  <script>
+    // The browser only shows what Python sends and sends what the player typed.
+    // textContent (never innerHTML) is used everywhere, so a message can't inject HTML.
+    const HUNT_ID = {{ hunt_id | tojson }};
+    const POLL_MS = {{ poll_seconds | tojson }} * 1000;
+    const URL_MESSAGES = `/api/hunts/${HUNT_ID}/messages`;
+    const list = document.getElementById("messages");
+    const input = document.getElementById("text");
+    const sendBtn = document.getElementById("send");
+    const message = document.getElementById("message");
+    let lastId = 0;
+    let timer = null;
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    // Python picks the letter and the colour number; the number only chooses a CSS class.
+    function avatarEl(a) {
+      const node = el("span", a.letter, "avatar avatar--" + (Number(a.colour) || 0));
+      node.setAttribute("aria-hidden", "true");
+      return node;
+    }
+
+    function say(text) {
+      message.textContent = text;
+      message.className = "message bad";
+    }
+
+    function bubble(m) {
+      const row = el("li", undefined, m.mine ? "msg msg--mine" : "msg");
+      row.dataset.id = m.id;
+      const body = el("div", undefined, "msg__body");
+      if (!m.mine) body.append(el("span", m.author, "msg__author"));
+      body.append(el("p", m.text, "msg__text"), el("span", m.ago, "msg__time"));
+      if (!m.mine) row.append(avatarEl(m.avatar));
+      row.append(body);
+      return row;
+    }
+
+    function add(messages) {
+      // Only stick to the bottom if the player was already reading the newest messages.
+      const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+      for (const m of messages) {
+        if (list.querySelector(`[data-id="${Number(m.id)}"]`)) continue;  // already shown
+        list.append(bubble(m));
+        lastId = Math.max(lastId, m.id);
+      }
+      document.getElementById("empty").hidden = list.children.length > 0;
+      if (atBottom || messages.some(m => m.mine)) list.scrollTop = list.scrollHeight;
+    }
+
+    function drawMembers(members) {
+      document.getElementById("members").replaceChildren(...members.map(p => {
+        const item = el("li", undefined, p.state === "waiting" ? "is-waiting" : "");
+        item.append(avatarEl(p.avatar), el("span", p.username));
+        item.title = p.state === "waiting" ? `${p.username} (waiting in line)` : p.username;
+        return item;
+      }));
+    }
+
+    function lock(text) {
+      clearInterval(timer);
+      document.getElementById("lockedText").textContent = text;
+      document.getElementById("locked").hidden = false;
+      document.getElementById("composer").hidden = true;
+      input.disabled = sendBtn.disabled = true;
+    }
+
+    async function load() {
+      const res = await fetch(`${URL_MESSAGES}?after=${lastId}`);
+      if (res.status === 401) { location.href = `/login?next=/hunts/${HUNT_ID}/chat`; return; }
+      const data = await res.json();
+      if (res.status === 403) { lock(data.error); return; }
+      if (!res.ok) throw new Error(data.error || "Could not load the chat.");
+
+      document.getElementById("huntName").textContent = data.hunt.name;
+      document.title = `${data.hunt.name} · Group chat · StepQuest`;
+      const s = data.me.status;
+      document.getElementById("myStatus").textContent = s.state === "playing"
+        ? `You are playing · ${data.members.length} in this hunt`
+        : `You are #${s.position} in line · ${data.members.length} in this hunt`;
+      drawMembers(data.members);
+      add(data.messages);
+      input.disabled = sendBtn.disabled = false;
+    }
+
+    document.getElementById("composer").addEventListener("submit", async event => {
+      event.preventDefault();
+      if (sendBtn.disabled) return;  // a double tap must not send twice
+      sendBtn.disabled = true;
+      try {
+        const res = await fetch(URL_MESSAGES, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: input.value })
+        });
+        const data = await res.json();
+        if (res.status === 403) { lock(data.error); return; }
+        if (!res.ok) throw new Error(data.error || "Could not send.");
+        add([data]);
+        input.value = "";
+        message.textContent = "";
+      } catch (error) {
+        say(error.message);
+      } finally {
+        if (!document.getElementById("composer").hidden) sendBtn.disabled = false;
+        input.focus();
+      }
+    });
+
+    // Load, then keep asking for new messages. Pause while the tab is hidden, to save the phone's battery.
+    function poll() { load().catch(error => say(error.message)); }
+    poll();
+    timer = setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+  </script>
+</body>
+</html>
