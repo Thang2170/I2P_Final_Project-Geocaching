@@ -1151,3 +1151,30 @@ body.has-tour { overflow: hidden; }
 .tour__buttons { display: flex; gap: 12px; margin-top: 16px; }
 .tour__buttons .btn { margin-top: 0; padding: 12px 8px; }
 .tour__buttons .btn[hidden] { display: none; }
+
+/* The Quests button that reopens the first-quests board.
+   On the map it sits under Leaflet's zoom buttons; on other pages, top-left of the screen. */
+.quest-btn {
+  position: absolute;
+  top: 84px;
+  left: 10px;
+  z-index: 1000;  /* above the map tiles and Leaflet's controls (800) */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: var(--px-paper);
+  color: var(--px-ink);
+  box-shadow: var(--px-edge), var(--px-drop);
+  font-family: var(--font-body);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.quest-btn[hidden] { display: none; }
+.quest-btn:hover { background: #fff1c7; }
+.quest-btn:active { transform: translateY(2px); }
+.quest-btn:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+.quest-btn--page { position: fixed; top: auto; bottom: 20px; left: 20px; }
