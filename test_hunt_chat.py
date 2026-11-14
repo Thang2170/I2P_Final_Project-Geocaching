@@ -1,6 +1,6 @@
 import unittest
 
-from hunt_chat import MAX_MESSAGE_CHARS, can_chat, parse_after, parse_message
+from hunt_chat import MAX_MESSAGE_CHARS, can_chat, chat_access, parse_after, parse_message
 
 
 class TestParseMessage(unittest.TestCase):
@@ -35,12 +35,27 @@ class TestParseAfter(unittest.TestCase):
 
 
 class TestCanChat(unittest.TestCase):
-    def test_members_can_chat(self):
-        self.assertTrue(can_chat(2, [1, 2, 3]))
+    # members 1, 2, 3 joined in that order; capacity 2, so 3 waits in line
+    MEMBERS, CAPACITY = [1, 2, 3], 2
 
-    def test_others_cannot(self):
-        self.assertFalse(can_chat(9, [1, 2, 3]))
-        self.assertFalse(can_chat(1, []))
+    def test_playing_players_can_chat(self):
+        self.assertTrue(can_chat(1, self.MEMBERS, self.CAPACITY))
+        self.assertTrue(can_chat(2, self.MEMBERS, self.CAPACITY))
+
+    def test_players_in_line_cannot_yet(self):
+        allowed, reason = chat_access(3, self.MEMBERS, self.CAPACITY)
+        self.assertFalse(allowed)
+        self.assertIn("#1 in line", reason)
+
+    def test_moving_up_opens_the_chat(self):
+        # player 1 leaves, so 3 moves up and starts playing
+        self.assertTrue(can_chat(3, [2, 3], self.CAPACITY))
+
+    def test_people_outside_the_hunt_cannot(self):
+        allowed, reason = chat_access(9, self.MEMBERS, self.CAPACITY)
+        self.assertFalse(allowed)
+        self.assertIn("Join this hunt", reason)
+        self.assertFalse(can_chat(1, [], self.CAPACITY))
 
 
 if __name__ == "__main__":
