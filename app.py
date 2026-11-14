@@ -12,6 +12,7 @@ from feed_api import feed_api
 from hunt_api import hunt_api
 from journey_api import journey_api
 from leaderboard_api import leaderboard_api
+from onboarding_api import onboarding_api
 from photo_api import photo_api
 from route_api import route_api
 from shop_api import shop_api
@@ -45,6 +46,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(photo_api)
     app.register_blueprint(leaderboard_api)
     app.register_blueprint(admin_api)
+    app.register_blueprint(onboarding_api)
     # Login sessions are signed with this key. For the real deployment, set a SECRET_KEY
     # environment variable (never commit a real key); the fallback is for local testing only.
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
