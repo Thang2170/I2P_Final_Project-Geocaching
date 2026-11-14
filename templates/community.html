@@ -13,8 +13,10 @@
     <aside class="fb__left">
       <section class="panel me-card">
         <div class="me-card__who">
-          <span id="meAvatar" class="avatar avatar--big" aria-hidden="true"></span>
-          <strong id="meName" class="me-card__name"></strong>
+          <a id="meLink" class="player-link me-card__link" href="/community" title="See your profile">
+            <span id="meAvatar" class="avatar avatar--big" aria-hidden="true"></span>
+            <strong id="meName" class="me-card__name player-link__name"></strong>
+          </a>
         </div>
         <div class="me-card__stats">
           <div><strong id="tHunts">0</strong><span>Hunts</span></div>
@@ -90,6 +92,15 @@
       return node;
     }
 
+    // An avatar or name that opens the player's profile.
+    function playerLink(username, ...children) {
+      const link = el("a", undefined, "player-link");
+      link.href = `/players/${encodeURIComponent(username)}`;
+      link.title = `See ${username}'s profile`;
+      link.append(...children);
+      return link;
+    }
+
     function fillAvatar(node, a) {
       node.textContent = a.letter;
       node.className = node.className.replace(/avatar--\d+/g, "").trim() + " avatar--" + (Number(a.colour) || 0);
@@ -139,7 +150,7 @@
       const row = el("li", undefined, "comment");
       const body = el("div", undefined, "comment__body");
       const bubble = el("div", undefined, "comment__bubble");
-      bubble.append(el("strong", c.author), el("span", c.text, "comment__text"));
+      bubble.append(playerLink(c.author, el("strong", c.author, "player-link__name")), el("span", c.text, "comment__text"));
       const meta = el("div", c.ago, "comment__meta");
       if (c.mine) {
         const del = el("button", "Delete", "link-button");
@@ -155,7 +166,7 @@
         meta.append(" · ", del);
       }
       body.append(bubble, meta);
-      row.append(avatarEl(c.avatar), body);
+      row.append(playerLink(c.author, avatarEl(c.avatar)), body);
       return row;
     }
 
@@ -165,9 +176,9 @@
       // who and when
       const head = el("header", undefined, "post__head");
       const who = el("div", undefined, "post__who");
-      who.append(el("strong", p.author, "post__author"),
+      who.append(playerLink(p.author, el("strong", p.author, "post__author player-link__name")),
                  el("span", p.hunt ? `${p.ago} · finished a hunt` : p.ago, "post__meta"));
-      head.append(avatarEl(p.avatar), who);
+      head.append(playerLink(p.author, avatarEl(p.avatar)), who);
       if (p.can_delete) {
         const del = el("button", "Delete", "link-button post__delete");
         del.type = "button";
@@ -274,6 +285,7 @@
           fillAvatar(document.getElementById("meAvatar"), me.avatar);
           fillAvatar(document.getElementById("composerAvatar"), me.avatar);
           document.getElementById("meName").textContent = me.username;
+          document.getElementById("meLink").href = `/players/${encodeURIComponent(me.username)}`;
           document.getElementById("postText").placeholder = `What did you find today, ${me.username}?`;
           document.getElementById("postBtn").disabled = false;  // the composer needs to know who you are
         }
@@ -304,7 +316,7 @@
         document.getElementById("board").replaceChildren(...community.leaderboard.map(p => {
           const row = el("li", undefined, p.is_me ? "top__row is-me" : "top__row");
           const text = el("div", undefined, "top__text");
-          text.append(el("strong", p.username),
+          text.append(playerLink(p.username, el("strong", p.username, "player-link__name")),
                       el("span", `${p.hunts} ${p.hunts === 1 ? "hunt" : "hunts"} · ${p.distance_km} km`));
           row.append(el("span", `#${p.rank}`, "top__rank"), text);
           return row;

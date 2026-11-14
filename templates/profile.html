@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>{{ username }} · StepQuest</title>
+</head>
+<body>
+  {% set active = "" %}
+  {% include "_topbar.html" %}
+
+  <main class="profile">
+    <a href="javascript:history.back()" class="profile__back">◂ Back</a>
+
+    <section class="panel profile__head">
+      <span id="avatar" class="avatar avatar--huge" aria-hidden="true"></span>
+      <div class="profile__who">
+        <h1 id="name">{{ username }}</h1>
+        <p id="joined" class="muted"></p>
+        <p id="rank" class="profile__rank"></p>
+      </div>
+      <a id="editMine" class="btn btn--ghost profile__edit" href="/login" hidden>Your account</a>
+    </section>
+
+    <section class="panel">
+      <h2>Stats</h2>
+      <div class="profile__stats">
+        <div><strong id="sCoins">0</strong><span>coins</span></div>
+        <div><strong id="sFound">0</strong><span>found</span></div>
+        <div><strong id="sHidden">0</strong><span>hidden</span></div>
+        <div><strong id="sHunts">0</strong><span>hunts walked</span></div>
+        <div><strong id="sKm">0</strong><span>km</span></div>
+        <div><strong id="sSteps">0</strong><span>steps</span></div>
+      </div>
+    </section>
+
+    <div class="profile__cols">
+      <section class="panel">
+        <h2>Recent hunts</h2>
+        <ul id="hunts" class="profile__list"></ul>
+        <p id="noHunts" class="muted" hidden>No finished hunts yet.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Treasures hidden</h2>
+        <ul id="hidden" class="profile__list"></ul>
+        <p id="noHidden" class="muted" hidden>Hasn't hidden a treasure yet.</p>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Posts</h2>
+      <ul id="posts" class="profile__list"></ul>
+      <p id="noPosts" class="muted" hidden>No posts yet.</p>
+      <a href="/community">See the Community feed ▸</a>
+    </section>
+  </main>
+
+  <main id="missing" class="card" hidden>
+    <h1>No such player</h1>
+    <p class="muted">Nobody here goes by that name.</p>
+    <a class="btn" href="/community">Back to Community</a>
+  </main>
+
+  <script>
+    // The browser only shows what Python sends. textContent (never innerHTML) everywhere.
+    const USERNAME = {{ username | tojson }};
+    const $ = id => document.getElementById(id);
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function fillList(id, emptyId, items, makeRow) {
+      $(id).replaceChildren(...items.map(makeRow));
+      $(emptyId).hidden = items.length > 0;
+    }
+
+    async function load() {
+      const res = await fetch(`/api/players/${encodeURIComponent(USERNAME)}`);
+      if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
+      if (res.status === 404) {
+        document.querySelector(".profile").hidden = true;
+        $("missing").hidden = false;
+        return;
+      }
+      const p = await res.json();
+
+      $("avatar").textContent = p.avatar.letter;
+      $("avatar").classList.add("avatar--" + (Number(p.avatar.colour) || 0));
+      $("name").textContent = p.username;
+      $("joined").textContent = p.joined + (p.is_me ? " · This is you" : "");
+      $("rank").textContent = p.stats.rank ? `#${p.stats.rank} of ${p.stats.players} on the Leaderboard` : "";
+      $("editMine").hidden = !p.is_me;
+
+      $("sCoins").textContent = p.stats.coins;
+      $("sFound").textContent = p.stats.found;
+      $("sHidden").textContent = p.stats.hidden;
+      $("sHunts").textContent = p.stats.hunts;
+      $("sKm").textContent = p.stats.distance_km;
+      $("sSteps").textContent = p.stats.steps.toLocaleString();
+
+      fillList("hunts", "noHunts", p.recent_hunts, h => {
+        const row = el("li");
+        row.append(el("strong", h.treasure), el("span", `${h.distance_km} km · ${h.time} · ${h.ago}`, "muted"));
+        return row;
+      });
+      fillList("hidden", "noHidden", p.hidden_treasures, name => el("li", name));
+      fillList("posts", "noPosts", p.recent_posts, post => {
+        const row = el("li");
+        row.append(el("p", post.text, "profile__post"), el("span", post.ago, "muted"));
+        return row;
+      });
+    }
+
+    load().catch(error => console.error(error));
+  </script>
+</body>
+</html>
