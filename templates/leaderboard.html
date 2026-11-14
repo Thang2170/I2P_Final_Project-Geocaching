@@ -42,7 +42,14 @@
       document.getElementById("board").hidden = players.length === 0;
       for (const p of players) {
         const tr = document.createElement("tr");
-        tr.append(cell(p.rank), cell(p.username), cell(p.coins, "num"), cell(p.found, "num"), cell(p.hidden, "num"));
+        // B: the name opens the player's profile (/players/<name>)
+        const name = cell("");
+        const link = document.createElement("a");
+        link.className = "player-link player-link__name";
+        link.href = `/players/${encodeURIComponent(p.username)}`;
+        link.textContent = p.username;
+        name.append(link);
+        tr.append(cell(p.rank), name, cell(p.coins, "num"), cell(p.found, "num"), cell(p.hidden, "num"));
         rows.append(tr);
       }
     }

@@ -15,6 +15,7 @@ from journey_api import journey_api
 from leaderboard_api import leaderboard_api
 from onboarding_api import onboarding_api
 from photo_api import photo_api
+from profile_api import profile_api
 from route_api import route_api
 from shop_api import shop_api
 from treasure_api import treasure_api
@@ -43,6 +44,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(shop_api)
     app.register_blueprint(hunt_api)
     app.register_blueprint(chat_api)
+    app.register_blueprint(profile_api)
     app.register_blueprint(journey_api)
     app.register_blueprint(feed_api)
     app.register_blueprint(photo_api)
