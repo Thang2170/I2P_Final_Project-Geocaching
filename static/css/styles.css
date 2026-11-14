@@ -1047,6 +1047,47 @@ h1, h2 {
 
 .footer a { color: var(--px-green); text-decoration-color: var(--px-gold); text-underline-offset: 4px; }
 
+/* ---------- A: landing page shows live data (the old placeholder cards were buttons) ---------- */
+
+/* Cards that are now links keep their own colours */
+.profile,
+.collection-card,
+.feature-list__item { color: inherit; text-decoration: none; }
+
+.profile:hover .profile__avatar,
+.collection-card:hover { box-shadow: inset 0 0 0 2px var(--px-gold); }
+
+/* Top three players inside the dark card */
+.top-list {
+  margin: 16px 0 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: place;
+}
+
+.top-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 2px dashed rgba(255, 252, 242, .2);
+  counter-increment: place;
+}
+
+.top-list li::before {
+  content: counter(place);
+  width: 24px;
+  color: var(--px-gold);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+}
+
+.top-list li strong { margin-left: auto; font-weight: 400; color: var(--px-gold); font-variant-numeric: tabular-nums; }
+
+.top-list__empty { margin: 16px 0 20px; color: rgba(255, 252, 242, .75); }
+
+.mini-art--lake .sprite--chest { scale: 1.5; }
+
 /* ---------- smaller screens ---------- */
 
 @media (max-width: 1180px) {

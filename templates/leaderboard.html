@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Leaderboard · StepQuest</title>
+</head>
+<body>
+  {% set active = "leaderboard" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Leaderboard</h1>
+    <p class="muted">Every treasure you find pays 10 coins. The players with the most coins come first.</p>
+
+    <table class="table" id="board">
+      <thead>
+        <tr><th>#</th><th>Player</th><th class="num">Coins</th><th class="num">Found</th><th class="num">Hidden</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="muted" hidden>No players yet. Be the first to register.</p>
+    <p id="message" class="message" role="status"></p>
+  </main>
+
+  <script>
+    // Python ranks the players (/api/leaderboard); the browser only draws the rows.
+    // textContent (not innerHTML) because usernames come from players.
+    function cell(text, className) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (className) td.className = className;
+      return td;
+    }
+
+    async function load() {
+      const res = await fetch("/api/leaderboard");
+      const players = await res.json();
+      if (!res.ok) throw new Error(players.error || "Could not load the leaderboard.");
+      const rows = document.getElementById("rows");
+      rows.replaceChildren();
+      document.getElementById("empty").hidden = players.length > 0;
+      document.getElementById("board").hidden = players.length === 0;
+      for (const p of players) {
+        const tr = document.createElement("tr");
+        tr.append(cell(p.rank), cell(p.username), cell(p.coins, "num"), cell(p.found, "num"), cell(p.hidden, "num"));
+        rows.append(tr);
+      }
+    }
+
+    load().catch(error => {
+      const message = document.getElementById("message");
+      message.textContent = error.message;
+      message.className = "message bad";
+    });
+  </script>
+</body>
+</html>

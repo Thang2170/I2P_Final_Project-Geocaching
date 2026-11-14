@@ -31,14 +31,16 @@
         <div class="row">
           <div>
             <label for="lat">Latitude</label>
-            <input id="lat" name="lat" inputmode="decimal">
+            <input id="lat" name="lat">
           </div>
           <div>
             <label for="lon">Longitude</label>
-            <input id="lon" name="lon" inputmode="decimal">
+            <input id="lon" name="lon">
           </div>
         </div>
       </details>
+      <label for="photo">Photo of the spot <span class="muted">(optional, JPG, PNG or WebP, up to 5 MB)</span></label>
+      <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
 
       <button type="submit" class="btn">Hide treasure</button>
     </form>
@@ -173,6 +175,15 @@
 
     const submitButton = form.querySelector('button[type="submit"]');
 
+    // The photo goes up in a second request, after Python has saved the treasure.
+    async function uploadPhoto(treasureId, file) {
+      const body = new FormData();
+      body.append("photo", file);
+      const res = await fetch(`/api/treasures/${treasureId}/photo`, { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The photo upload failed.");
+    }
+
     form.addEventListener("submit", async event => {
       event.preventDefault();
       if (submitButton.disabled) return;  // a double tap must not hide the treasure twice
@@ -181,7 +192,10 @@
         return;
       }
       submitButton.disabled = true;
-      const body = Object.fromEntries(new FormData(form));
+      const body = {
+        name: form.name.value, description: form.description.value,
+        lat: form.lat.value, lon: form.lon.value
+      };
       try {
         const res = await fetch("/api/treasures", {
           method: "POST",
@@ -191,6 +205,16 @@
         if (res.status === 401) { location.href = LOGIN_URL; return; }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "The upload failed.");
+
+        const photo = form.photo.files[0];
+        if (photo) {
+          try {
+            await uploadPhoto(data.id, photo);
+          } catch (error) {
+            show(`Saved "${data.name}", but the photo was not saved: ${error.message}`, false);
+            return;
+          }
+        }
         show(`Saved "${data.name}". It is on the map now.`, true);
         // The new treasure becomes a chest like the others, and the form is ready for the next one.
         L.marker([data.lat, data.lon], { icon: pinIcon("treasure"), title: data.name, interactive: false }).addTo(map);
