@@ -68,7 +68,7 @@
         <div class="help-card">
           <strong>New to StepQuest</strong>
           <p>Three steps from the map to your first coins.</p>
-          <a href="#how-it-works">How it works <span class="px-arrow-right"></span></a>
+          <a href="/?tour">Take the tour <span class="px-arrow-right"></span></a>
         </div>
 
         <a class="side-nav__link" href="/login">
@@ -319,32 +319,6 @@
         <!-- RIGHT COLUMN -->
         <aside class="right-column">
 
-          <!-- MAP: a tiny overworld, like the map screen of an old game -->
-          <section class="map-panel">
-            <div class="map-illustration" aria-hidden="true">
-              <span class="map-water"></span>
-              <span class="map-park map-park--one"></span>
-              <span class="map-park map-park--two"></span>
-
-              <span class="map-road map-road--one"></span>
-              <span class="map-road map-road--two"></span>
-              <span class="map-road map-road--three"></span>
-
-              <span class="map-block map-block--one"></span>
-              <span class="map-block map-block--two"></span>
-              <span class="map-block map-block--three"></span>
-
-              <span class="map-pin map-pin--one"><span class="sprite sprite--coin"></span></span>
-              <span class="map-pin map-pin--two"><span class="sprite sprite--coin"></span></span>
-              <span class="map-pin map-pin--three map-pin--found"><span class="sprite sprite--chest"></span></span>
-
-              <span class="you-are-here"><span class="sprite sprite--hero"></span></span>
-              <span class="map-compass">N</span>
-            </div>
-
-            <a class="button button--map" href="/">Open the map</a>
-          </section>
-
           <!-- TOP PLAYERS, from /api/leaderboard -->
           <section class="daily-card" id="top-players">
             <div class="daily-card__top">
@@ -358,19 +332,6 @@
             <p class="top-list__empty" id="topEmpty" hidden>No players yet. Register to be the first.</p>
 
             <a href="/leaderboard">Full leaderboard <span class="px-arrow-right"></span></a>
-          </section>
-
-          <!-- HOW IT WORKS -->
-          <section class="tip-card" id="how-it-works">
-            <span class="px-icon px-icon--bulb"></span>
-            <div>
-              <strong>How it works</strong>
-              <p>
-                Pick a treasure on the map and walk there. Within 20 m, Python checks
-                your position and pays 10 coins. Each treasure pays once, and one you
-                hid yourself pays nothing.
-              </p>
-            </div>
           </section>
 
         </aside>
