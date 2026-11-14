@@ -34,3 +34,34 @@ DEMO_FULL_HUNT = {
 
 # Why the starting coins exist in the ledger.
 GIFT_REASON = "demo_gift"
+
+# The treasure saved by models.seed_demo_data (test_demo_data checks the two stay equal).
+BUILT_IN_TREASURE_NAME = "National Tsing Hua University"
+
+# Finished hunts, so the Community page is not empty. Nobody hunts their own treasure:
+# alice hid the three extra ones, so ben reaches those, and alice reaches the built-in one.
+DEMO_JOURNEYS = (
+    {"username": "ben", "treasure": "Pond bench", "distance_m": 180, "duration_s": 250},
+    {"username": "ben", "treasure": "Library steps", "distance_m": 260, "duration_s": 340},
+    {"username": "alice", "treasure": BUILT_IN_TREASURE_NAME, "distance_m": 420, "duration_s": 560},
+)
+
+# Posts on the Community feed. likes: who liked it; comments: (who, what), oldest first.
+DEMO_POSTS = (
+    {"username": "alice",
+     "text": "Just hid three new treasures around campus: by the pond, on the library steps and at the cafe corner. Good luck!",
+     "likes": ("ben", "demo_player"),
+     "comments": (("ben", "Found two of them already!"), ("alice", "Nice! The cafe one is the tricky one."))},
+    {"username": "ben",
+     "text": "Anyone up for an evening walk? The Full house hunt has a waiting line, but join anyway.",
+     "likes": ("alice",),
+     "comments": ()},
+)
+
+# Likes and comments on the posts that finished hunts make by themselves.
+# Each is found by the player who did the hunt and the treasure's name.
+DEMO_HUNT_REACTIONS = (
+    {"username": "ben", "treasure": "Pond bench",
+     "likes": ("alice", "demo_player"),
+     "comments": (("alice", "Under five minutes, wow."),)},
+)
