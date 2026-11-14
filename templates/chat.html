@@ -102,27 +102,45 @@
       }));
     }
 
+    // Not allowed in (yet): Python says why. We keep checking, so a player waiting
+    // in line is let in by itself as soon as they move up.
     function lock(text) {
-      clearInterval(timer);
       document.getElementById("lockedText").textContent = text;
       document.getElementById("locked").hidden = false;
       document.getElementById("composer").hidden = true;
+      document.getElementById("members").hidden = true;
+      list.hidden = true;
+      document.getElementById("empty").hidden = true;
       input.disabled = sendBtn.disabled = true;
+    }
+
+    function unlock() {
+      if (document.getElementById("locked").hidden) return;
+      document.getElementById("locked").hidden = true;
+      document.getElementById("composer").hidden = false;
+      document.getElementById("members").hidden = false;
+      list.hidden = false;
+      message.textContent = "";
     }
 
     async function load() {
       const res = await fetch(`${URL_MESSAGES}?after=${lastId}`);
       if (res.status === 401) { location.href = `/login?next=/hunts/${HUNT_ID}/chat`; return; }
       const data = await res.json();
-      if (res.status === 403) { lock(data.error); return; }
+      if (res.status === 403) {
+        lock(data.error);
+        document.getElementById("myStatus").textContent = "";
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Could not load the chat.");
 
       document.getElementById("huntName").textContent = data.hunt.name;
       document.title = `${data.hunt.name} · Group chat · StepQuest`;
-      const s = data.me.status;
-      document.getElementById("myStatus").textContent = s.state === "playing"
-        ? `You are playing · ${data.members.length} in this hunt`
-        : `You are #${s.position} in line · ${data.members.length} in this hunt`;
+      unlock();
+      const playing = data.members.filter(p => p.state === "playing").length;
+      const waiting = data.members.length - playing;
+      document.getElementById("myStatus").textContent =
+        `You are playing · ${playing} playing` + (waiting ? ` · ${waiting} in line` : "");
       drawMembers(data.members);
       add(data.messages);
       input.disabled = sendBtn.disabled = false;

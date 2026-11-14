@@ -9,7 +9,7 @@ from flask import Blueprint, abort, jsonify, render_template, request
 
 from auth_api import current_user
 from feed_rules import avatar, time_ago
-from hunt_chat import HISTORY_SIZE, POLL_SECONDS, can_chat, parse_after, parse_message
+from hunt_chat import HISTORY_SIZE, POLL_SECONDS, chat_access, parse_after, parse_message
 from models import Hunt, HuntMember, HuntMessage, User, db
 from queue_logic import queue_status
 
@@ -50,8 +50,9 @@ def _open_chat(hunt_id):
     if hunt is None:
         return None, (jsonify(error="No such hunt"), 404)
     member_ids = _member_ids(hunt_id)
-    if not can_chat(user.id, member_ids):
-        return None, (jsonify(error="Join this hunt to see its chat."), 403)
+    allowed, reason = chat_access(user.id, member_ids, hunt.capacity)
+    if not allowed:  # not in the hunt, or still waiting in line
+        return None, (jsonify(error=reason), 403)
     return (user, hunt, member_ids), None
 
 

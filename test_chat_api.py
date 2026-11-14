@@ -92,14 +92,32 @@ class TestChatApi(ChatTestCase):
         self.assertEqual(self.send(ann, hid, "a" * 301).status_code, 400)
         self.assertEqual(self.read(ann, hid, "-2").status_code, 400)
 
-    def test_players_waiting_in_line_can_chat_too(self):
+    def test_players_waiting_in_line_cannot_chat_yet(self):
         ann, bob = self.player("ann"), self.player("bob")
         hid = self.new_hunt(ann, capacity=1)
         bob.post(f"/api/hunts/{hid}/join")  # the hunt is full, so bob waits
-        self.assertEqual(self.send(bob, hid, "I'm in line").status_code, 201)
-        data = self.read(bob, hid).get_json()
-        self.assertEqual(data["me"]["status"], {"state": "waiting", "position": 1})
-        self.assertEqual([p["state"] for p in data["members"]], ["playing", "waiting"])
+        r = self.read(bob, hid)
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("in line", r.get_json()["error"])
+        self.assertEqual(self.send(bob, hid, "Can I come?").status_code, 403)
+        self.assertEqual(db.session.query(HuntMessage).count(), 0)
+
+    def test_moving_up_lets_you_in(self):
+        ann, bob, cyd = self.player("ann"), self.player("bob"), self.player("cyd")
+        hid = self.new_hunt(ann, capacity=2)
+        bob.post(f"/api/hunts/{hid}/join")
+        cyd.post(f"/api/hunts/{hid}/join")  # full: cyd waits
+        self.assertEqual(self.read(cyd, hid).status_code, 403)
+        bob.post(f"/api/hunts/{hid}/leave")  # cyd moves up
+        self.assertEqual(self.send(cyd, hid, "I'm in!").status_code, 201)
+
+    def test_the_member_strip_still_shows_who_is_in_line(self):
+        ann, bob = self.player("ann"), self.player("bob")
+        hid = self.new_hunt(ann, capacity=1)
+        bob.post(f"/api/hunts/{hid}/join")
+        data = self.read(ann, hid).get_json()
+        self.assertEqual([(p["username"], p["state"]) for p in data["members"]],
+                         [("ann", "playing"), ("bob", "waiting")])
 
     def test_leaving_the_hunt_closes_the_chat(self):
         ann, bob = self.player("ann"), self.player("bob")
@@ -135,6 +153,8 @@ class TestChatPages(ChatTestCase):
     def test_the_hunts_page_has_the_chat_button(self):
         html = self.app.test_client().get("/hunts").get_data(as_text=True)
         self.assertIn("Open group chat", html)
+        self.assertIn('hunt.me.state === "playing"', html)  # only players get the button
+        self.assertIn("Chat opens when you play", html)
         self.assertIn("/chat`", html)
 
     def test_css_styles_the_chat(self):

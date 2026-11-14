@@ -1276,7 +1276,10 @@ body.has-tour { overflow: hidden; }
   border-top: 4px solid var(--px-line);
 }
 
-.chat__composer[hidden] { display: none; }
+.chat__composer[hidden],
+.chat__messages[hidden],
+.chat__members[hidden] { display: none; }
+.chat__locked { margin: auto 0; }
 .chat__composer input { margin-top: 0; }
 .chat__composer .btn { width: auto; margin: 0; padding: 12px 20px; }
 .chat .message { margin: 0 16px 8px; min-height: 0; }
