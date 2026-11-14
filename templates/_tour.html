@@ -1,0 +1,125 @@
+{# First-time tour (owner: B). Include it near the end of a page's <body>:  {% include "_tour.html" %}
+   It asks Python (GET /api/onboarding) whether to play. Open any page with ?tour to replay it.
+   Words and steps come from onboarding.py; this file only shows them. #}
+<div id="tour" class="tour" hidden>
+  <div class="tour__box" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText">
+    <button type="button" id="tourSkip" class="tour__skip">Skip</button>
+    <div class="tour__art"><span id="tourSprite" class="sprite" aria-hidden="true"></span></div>
+    <p id="tourCount" class="tour__count"></p>
+    <h2 id="tourTitle" class="tour__title"></h2>
+    <p id="tourText" class="tour__text"></p>
+
+    <div id="tourQuests" class="tour__quests" hidden>
+      <p id="tourQuestCount" class="tour__quest-count"></p>
+      <ul id="tourQuestList"></ul>
+    </div>
+
+    <div id="tourDots" class="tour__dots" aria-hidden="true"></div>
+    <div class="tour__buttons">
+      <button type="button" id="tourBack" class="btn btn--ghost">Back</button>
+      <button type="button" id="tourNext" class="btn">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // textContent only (never innerHTML), and the sprite name only picks a CSS class.
+  (function () {
+    const SPRITES = ["hero", "chest", "coin", "tree", "sparkle"];
+    const $ = id => document.getElementById(id);
+    const box = $("tour");
+    let steps = [], quests = null, at = 0, lastFocus = null;
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function draw() {
+      const step = steps[at];
+      const last = at === steps.length - 1;
+      const sprite = SPRITES.includes(step.sprite) ? step.sprite : "coin";
+      $("tourSprite").className = `sprite sprite--${sprite}`;
+      $("tourCount").textContent = `${at + 1} / ${steps.length}`;
+      $("tourTitle").textContent = step.title;
+      $("tourText").textContent = step.text;
+      $("tourBack").hidden = at === 0;
+      $("tourNext").textContent = last ? "Let's go!" : "Next";
+      $("tourDots").replaceChildren(...steps.map((_, i) => el("span", undefined, i === at ? "is-on" : "")));
+
+      // The last slide shows the checklist that Python worked out.
+      $("tourQuests").hidden = !(last && quests);
+      if (last && quests) {
+        $("tourQuestCount").textContent = quests.all_done
+          ? "All done. You are a real explorer!"
+          : `${quests.done} of ${quests.total} done`;
+        $("tourQuestList").replaceChildren(...quests.items.map(q => {
+          const row = el("li", undefined, q.done ? "is-done" : "");
+          const link = el("a", q.text);
+          link.href = q.link;  // fixed paths from onboarding.py
+          link.addEventListener("click", () => close("finished"));
+          row.append(el("span", q.done ? "✓" : "□", "tour__tick"), link);
+          return row;
+        }));
+      }
+      box.querySelector(".tour__box").classList.remove("is-turning");
+      void box.offsetWidth;  // restart the little page-turn animation
+      box.querySelector(".tour__box").classList.add("is-turning");
+    }
+
+    function open() {
+      lastFocus = document.activeElement;
+      at = 0;
+      box.hidden = false;
+      document.body.classList.add("has-tour");
+      draw();
+      $("tourNext").focus();
+    }
+
+    function close(how) {
+      if (box.hidden) return;
+      box.hidden = true;
+      document.body.classList.remove("has-tour");
+      // Remember it, so the tour doesn't pop up again by itself.
+      fetch("/api/onboarding/seen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ how }),
+        keepalive: true  // still sent if a quest link takes the player to another page
+      }).catch(() => {});
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    $("tourNext").addEventListener("click", () => {
+      if (at === steps.length - 1) close("finished"); else { at += 1; draw(); }
+    });
+    $("tourBack").addEventListener("click", () => { if (at > 0) { at -= 1; draw(); } });
+    $("tourSkip").addEventListener("click", () => close("skipped"));
+
+    document.addEventListener("keydown", event => {
+      if (box.hidden) return;
+      if (event.key === "Escape") close("skipped");
+      else if (event.key === "ArrowRight") $("tourNext").click();
+      else if (event.key === "ArrowLeft") $("tourBack").click();
+      else if (event.key === "Tab") {  // keep the keyboard inside the tour
+        const items = [...box.querySelectorAll("button:not([hidden]), a[href]")];
+        const first = items[0], end = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); end.focus(); }
+        else if (!event.shiftKey && document.activeElement === end) { event.preventDefault(); first.focus(); }
+      }
+    });
+
+    const again = new URLSearchParams(location.search).has("tour");
+    fetch("/api/onboarding" + (again ? "?again=1" : ""))
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!data || !data.show || !data.steps.length) return;
+        steps = data.steps;
+        quests = data.quests;
+        open();
+      })
+      .catch(() => {});  // the page works fine without the tour
+  })();
+</script>

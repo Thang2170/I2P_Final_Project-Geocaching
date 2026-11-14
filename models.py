@@ -287,3 +287,16 @@ def add_missing_hunt_posts():
     if missing:
         db.session.commit()
     return len(missing)
+
+
+class TourSeen(db.Model):
+    """A player has seen the first-time tour, so it doesn't pop up again by itself.
+
+    A separate table (instead of a new User column) so existing databases pick it up.
+    """
+
+    __tablename__ = "tour_seen"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    how = db.Column(db.String(10), nullable=False)  # "finished" or "skipped" (see onboarding.py)
+    seen_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
