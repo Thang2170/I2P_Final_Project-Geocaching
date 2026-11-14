@@ -64,3 +64,15 @@ def find_too_close(lat, lon, existing, min_distance_m=MIN_TREASURE_GAP_M):
         if haversine_m(lat, lon, other_lat, other_lon) < min_distance_m:
             return name
     return None
+
+
+def spot_problem(lat, lon, existing, min_distance_m=MIN_TREASURE_GAP_M):
+    """A message a player can read if a new treasure can't go here, else None.
+
+    The upload page asks this as soon as a spot is chosen on the map, and the
+    upload itself asks it again before saving, so both always agree.
+    """
+    nearby = find_too_close(lat, lon, existing, min_distance_m)
+    if nearby is None:
+        return None
+    return f'"{nearby}" is already hidden within {min_distance_m} m of this spot. Choose a different place.'

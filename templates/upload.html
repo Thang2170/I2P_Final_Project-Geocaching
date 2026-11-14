@@ -2,16 +2,21 @@
 <html lang="en">
 <head>
   {% include "_head.html" %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <title>Hide a treasure · Treasure Hunt Club</title>
 </head>
 <body>
   {% set active = "upload" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card card--wide">
     <h1>Hide a treasure</h1>
-    <p class="muted">Stand where you want to hide it, then tap "Use my location".
-      You need to be logged in, and a new treasure must be at least 10 m from any other.</p>
+    <p class="muted">Tap the map where you want to hide it, or drag the coin to move it.
+      Chests are treasures that are already hidden: a new one must be at least 10 m away.</p>
+
+    <div id="pickMap" class="pick-map" role="application" aria-label="Map: tap to choose where to hide the treasure"></div>
+    <p id="spot" class="spot muted" role="status">No spot chosen yet.</p>
+    <button type="button" id="locate" class="btn btn--ghost">Use my location</button>
 
     <form id="form">
       <label for="name">Name</label>
@@ -20,47 +25,146 @@
       <label for="description">Hint for finders <span class="muted">(optional)</span></label>
       <textarea id="description" name="description" maxlength="300" rows="3"></textarea>
 
-      <div class="row">
-        <div>
-          <label for="lat">Latitude</label>
-          <input id="lat" name="lat" inputmode="decimal" required>
+      <!-- The map fills these in. Typing them by hand still works and moves the coin. -->
+      <details id="byHand">
+        <summary>Type the coordinates instead</summary>
+        <div class="row">
+          <div>
+            <label for="lat">Latitude</label>
+            <input id="lat" name="lat" inputmode="decimal">
+          </div>
+          <div>
+            <label for="lon">Longitude</label>
+            <input id="lon" name="lon" inputmode="decimal">
+          </div>
         </div>
-        <div>
-          <label for="lon">Longitude</label>
-          <input id="lon" name="lon" inputmode="decimal" required>
-        </div>
-      </div>
+      </details>
 
-      <button type="button" id="locate" class="btn btn--ghost">Use my location</button>
       <button type="submit" class="btn">Hide treasure</button>
     </form>
 
     <p id="message" class="message" role="status"></p>
   </main>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // The browser only collects the data. Python checks it and saves it.
+    // The browser only collects the spot. Python checks it (GET /api/treasures/spot)
+    // and checks everything again when the treasure is saved (POST /api/treasures).
     const form = document.getElementById("form");
     const message = document.getElementById("message");
+    const spotLine = document.getElementById("spot");
+    const NTHU = [24.795324, 120.994796];  // where the map starts if there are no treasures yet
 
     function show(text, ok) {
       message.textContent = text;
       message.className = "message " + (ok ? "ok" : "bad");
     }
 
+    // ------------------------------------------------------------ the map
+
+    const map = L.map("pickMap").setView(NTHU, 17);
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19,
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(map);
+
+    // The same pixel pins as the map page: chests for hidden treasures, a coin for the new one.
+    function pinIcon(kind) {
+      return L.divIcon({
+        className: `pin pin--${kind}`,
+        html: '<div class="pin__grow"><div class="pin__shape"></div></div>',
+        iconSize: [30, 36],
+        iconAnchor: [15, 34],
+      });
+    }
+
+    let existing = [];
+    async function showExisting() {
+      try {
+        const res = await fetch("/api/treasures");
+        existing = await res.json();
+        if (!res.ok) throw new Error("Could not load treasures");
+        for (const t of existing) {
+          L.marker([t.lat, t.lon], { icon: pinIcon("treasure"), title: t.name, interactive: false }).addTo(map);
+        }
+        if (existing.length && !newPin) {
+          map.fitBounds(existing.map(t => [t.lat, t.lon]), { padding: [40, 40], maxZoom: 18 });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // ------------------------------------------------------------ choosing a spot
+
+    let newPin = null;
+    let checkNumber = 0;  // only the answer to the latest spot is shown
+
+    async function chooseSpot(lat, lon, { fromTyping = false } = {}) {
+      if (!newPin) {
+        newPin = L.marker([lat, lon], { icon: pinIcon("target"), draggable: true, zIndexOffset: 500 }).addTo(map);
+        newPin.on("dragend", () => {
+          const p = newPin.getLatLng();
+          chooseSpot(p.lat, p.lng);
+        });
+      } else {
+        newPin.setLatLng([lat, lon]);
+      }
+      if (!fromTyping) {
+        form.lat.value = lat.toFixed(6);
+        form.lon.value = lon.toFixed(6);
+      }
+
+      const mine = ++checkNumber;
+      spotLine.textContent = "Checking this spot…";
+      spotLine.className = "spot muted";
+      try {
+        const res = await fetch(`/api/treasures/spot?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+        const data = await res.json();
+        if (mine !== checkNumber) return;  // the player already picked another spot
+        if (!res.ok) throw new Error(data.error || "Could not check this spot.");
+        spotLine.textContent = `${data.lat}, ${data.lon} · ${data.message}`;
+        spotLine.className = "spot " + (data.ok ? "is-ok" : "is-bad");
+        newPin.getElement()?.classList.toggle("is-blocked", !data.ok);
+      } catch (err) {
+        if (mine !== checkNumber) return;
+        spotLine.textContent = err.message;
+        spotLine.className = "spot is-bad";
+      }
+    }
+
+    map.on("click", e => chooseSpot(e.latlng.lat, e.latlng.lng));
+
+    // Typing coordinates by hand moves the coin too (Python still checks the numbers).
+    function typed() {
+      const lat = Number(form.lat.value), lon = Number(form.lon.value);
+      if (form.lat.value.trim() === "" || form.lon.value.trim() === "") return;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+      chooseSpot(lat, lon, { fromTyping: true });
+      map.panTo([lat, lon]);
+    }
+    form.lat.addEventListener("change", typed);
+    form.lon.addEventListener("change", typed);
+
     document.getElementById("locate").addEventListener("click", () => {
       if (!navigator.geolocation) { show("Location is not supported by this browser.", false); return; }
       show("Finding you…", true);
       navigator.geolocation.getCurrentPosition(
         pos => {
-          form.lat.value = pos.coords.latitude.toFixed(6);
-          form.lon.value = pos.coords.longitude.toFixed(6);
-          show("Location filled in.", true);
+          const { latitude, longitude } = pos.coords;
+          map.setView([latitude, longitude], 18);
+          chooseSpot(latitude, longitude);
+          show("The coin is where you stand. Drag it if you want it somewhere else.", true);
         },
         error => show("Could not get your location: " + error.message, false),
         { enableHighAccuracy: true, timeout: 30000 }
       );
     });
+
+    // ------------------------------------------------------------ saving
 
     // Hiding treasures needs a login: send visitors to the login page first,
     // and bring them back here afterwards.
@@ -72,6 +176,10 @@
     form.addEventListener("submit", async event => {
       event.preventDefault();
       if (submitButton.disabled) return;  // a double tap must not hide the treasure twice
+      if (!form.lat.value.trim() || !form.lon.value.trim()) {
+        show("Tap the map to choose where to hide it.", false);
+        return;
+      }
       submitButton.disabled = true;
       const body = Object.fromEntries(new FormData(form));
       try {
@@ -84,13 +192,21 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "The upload failed.");
         show(`Saved "${data.name}". It is on the map now.`, true);
+        // The new treasure becomes a chest like the others, and the form is ready for the next one.
+        L.marker([data.lat, data.lon], { icon: pinIcon("treasure"), title: data.name, interactive: false }).addTo(map);
+        map.removeLayer(newPin);
+        newPin = null;
         form.reset();
+        spotLine.textContent = "No spot chosen yet.";
+        spotLine.className = "spot muted";
       } catch (error) {
         show(error.message, false);
       } finally {
         submitButton.disabled = false;
       }
     });
+
+    showExisting();
   </script>
 </body>
 </html>
