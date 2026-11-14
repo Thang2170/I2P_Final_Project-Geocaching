@@ -105,6 +105,13 @@ class TestTourOnPages(unittest.TestCase):
             with self.subTest(part=part):
                 self.assertIn(part, html)
 
+    def test_the_map_has_a_quests_button_that_reopens_the_board(self):
+        with patch("app.current_user", return_value=object()):
+            html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="questBtn"', html)
+        self.assertIn("open(steps.length - 1)", html)       # opens at the quest board
+        self.assertIn('"/api/onboarding" + (again ? "?again=1" : "")', html)  # fresh progress
+
     def test_the_tour_never_uses_innerhtml(self):
         tour = open("templates/_tour.html", encoding="utf-8").read()
         self.assertNotIn(".innerHTML", tour)
@@ -115,6 +122,7 @@ class TestTourOnPages(unittest.TestCase):
     def test_css_styles_the_tour(self):
         css = self.client.get("/static/css/app.css").get_data(as_text=True)
         self.assertIn(".tour__box", css)
+        self.assertIn(".quest-btn", css)
 
 
 if __name__ == "__main__":

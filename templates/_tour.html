@@ -1,6 +1,13 @@
 {# First-time tour (owner: B). Include it near the end of a page's <body>:  {% include "_tour.html" %}
    It asks Python (GET /api/onboarding) whether to play. Open any page with ?tour to replay it.
+   It also adds a "Quests" button (on the map, under the zoom buttons) that reopens the
+   first-quests board at any time, with fresh progress from Python.
    Words and steps come from onboarding.py; this file only shows them. #}
+<button type="button" id="questBtn" class="quest-btn" hidden aria-haspopup="dialog">
+  <span class="sprite sprite--coin-small" aria-hidden="true"></span>
+  <span>Quests <span id="questBtnCount"></span></span>
+</button>
+
 <div id="tour" class="tour" hidden>
   <div class="tour__box" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText">
     <button type="button" id="tourSkip" class="tour__skip">Skip</button>
@@ -47,6 +54,7 @@
       $("tourText").textContent = step.text;
       $("tourBack").hidden = at === 0;
       $("tourNext").textContent = last ? "Let's go!" : "Next";
+      $("tourSkip").textContent = last ? "Close" : "Skip";
       $("tourDots").replaceChildren(...steps.map((_, i) => el("span", undefined, i === at ? "is-on" : "")));
 
       // The last slide shows the checklist that Python worked out.
@@ -69,9 +77,9 @@
       box.querySelector(".tour__box").classList.add("is-turning");
     }
 
-    function open() {
+    function open(startAt = 0) {
       lastFocus = document.activeElement;
-      at = 0;
+      at = startAt;
       box.hidden = false;
       document.body.classList.add("has-tour");
       draw();
@@ -111,14 +119,39 @@
       }
     });
 
-    const again = new URLSearchParams(location.search).has("tour");
-    fetch("/api/onboarding" + (again ? "?again=1" : ""))
-      .then(res => (res.ok ? res.json() : null))
+    // The Quests button sits on the map, under Leaflet's zoom buttons (or top-left of any other page).
+    const questBtn = $("questBtn");
+    const mapWrap = document.querySelector(".map-wrap");
+    if (mapWrap) mapWrap.append(questBtn); else questBtn.classList.add("quest-btn--page");
+
+    function showProgress(q) {
+      $("questBtnCount").textContent = q.all_done ? "✓" : `${q.done}/${q.total}`;
+      questBtn.setAttribute("aria-label", `Quests: ${q.done} of ${q.total} done`);
+      questBtn.hidden = false;
+    }
+
+    async function load(again) {
+      const res = await fetch("/api/onboarding" + (again ? "?again=1" : ""));
+      if (!res.ok) return null;  // logged out: no tour, no button
+      const data = await res.json();
+      steps = data.steps;
+      quests = data.quests;
+      showProgress(quests);
+      return data;
+    }
+
+    // Reopen the quest board (the last slide), with the progress as it is right now.
+    questBtn.addEventListener("click", async () => {
+      try { await load(true); } catch (err) { /* keep the last known progress */ }
+      if (steps.length) open(steps.length - 1);
+    });
+
+    const params = new URLSearchParams(location.search);
+    load(params.has("tour"))
       .then(data => {
-        if (!data || !data.show || !data.steps.length) return;
-        steps = data.steps;
-        quests = data.quests;
-        open();
+        if (!data || !steps.length) return;
+        if (params.has("quests")) open(steps.length - 1);  // ?quests opens the board directly
+        else if (data.show) open();
       })
       .catch(() => {});  // the page works fine without the tour
   })();
