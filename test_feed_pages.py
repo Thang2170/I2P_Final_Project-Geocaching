@@ -46,6 +46,12 @@ class TestFeedPage(unittest.TestCase):
             with self.subTest(rule=rule):
                 self.assertIn(rule, css)
 
+    def test_the_welcome_sidebar_links_to_the_community(self):
+        html = self.client.get("/welcome").get_data(as_text=True)
+        self.assertIn('class="side-nav__link" href="/community"', html)
+        css = self.client.get("/static/css/pixel.css").get_data(as_text=True)
+        self.assertIn(".px-icon--comment", css)
+
 
 if __name__ == "__main__":
     unittest.main()
