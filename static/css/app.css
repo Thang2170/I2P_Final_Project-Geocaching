@@ -926,3 +926,28 @@ body.is-journey .sheet { display: none; }
               background: var(--px-bg); text-align: center; }
   .hunt-card__stats { grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
 }
+
+/* ---------- hide a treasure: choose the spot on a map ---------- */
+
+.card--wide { max-width: 640px; }
+
+.pick-map {
+  height: 340px;
+  margin-top: 16px;
+  box-shadow: var(--px-edge);
+  cursor: crosshair;
+}
+
+@media (max-width: 520px) { .pick-map { height: 300px; } }
+
+/* The answer from Python about the chosen spot */
+.spot { margin: 12px 0 0; font-size: 20px; overflow-wrap: anywhere; }
+.spot.is-ok { color: var(--px-good); }
+.spot.is-bad { color: var(--px-bad); }
+.spot.is-ok::before { content: "✓ "; }
+.spot.is-bad::before { content: "✗ "; }
+
+#locate { margin-top: 12px; }
+
+/* A spot that is too close: the coin shakes and turns red-brown */
+.pin.is-blocked .pin__grow { animation: px-shake .3s steps(3) 2; filter: hue-rotate(-35deg) saturate(1.6); }
