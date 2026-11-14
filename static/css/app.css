@@ -754,3 +754,314 @@ input[type="file"] {
   .admin__grid { grid-template-columns: minmax(0, 1fr); }
   .admin__map { height: 320px; }
 }
+
+/* "Hunt saved." after you reach the treasure */
+.journey__saved { margin: 4px 0 0; color: var(--px-green); font-size: 20px; text-align: center; }
+.journey__saved[hidden] { display: none; }
+.journey__saved.is-bad { color: var(--px-bad); }
+.journey__saved a { color: var(--px-gold-dark); }
+
+/* ---------- community feed (a news feed in three columns) ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* You on the left, the feed in the middle, top hunters on the right */
+.fb {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 580px) 280px;
+  justify-content: center;
+  align-items: start;
+  gap: 24px;
+  max-width: 1220px;
+  margin: 24px auto 48px;
+  padding: 0 20px;
+}
+
+.fb__left,
+.fb__right {
+  position: sticky;  /* the side columns stay put while the feed scrolls */
+  top: 16px;
+  display: grid;
+  gap: 20px;
+}
+
+.fb__main { display: grid; gap: 20px; min-width: 0; }
+
+/* A box on the feed: same paper and pixel edge as .card, but no big margins */
+.panel {
+  margin: 0;
+  padding: 16px;
+  background: var(--px-paper);
+  box-shadow: var(--px-edge), var(--px-drop);
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  color: var(--px-green);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Square pixel avatars with the first letter. Python picks the colour number. */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  color: var(--px-paper);
+  background: var(--px-green);
+  box-shadow: inset -4px -4px 0 0 rgba(0, 0, 0, .25), inset 4px 4px 0 0 rgba(255, 255, 255, .2);
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.avatar--big { width: 56px; height: 56px; font-size: 20px; }
+.avatar--0 { background: var(--px-green); }
+.avatar--1 { background: var(--px-leaf); }
+.avatar--2 { background: var(--px-wood); }
+.avatar--3 { background: var(--px-water); }
+.avatar--4 { background: var(--px-orange); }
+.avatar--5 { background: var(--px-stone); }
+
+/* left column */
+.me-card__who { display: flex; align-items: center; gap: 12px; }
+.me-card__name { font-size: 26px; overflow-wrap: anywhere; }
+
+.me-card__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.me-card__stats div {
+  padding: 8px;
+  background: var(--px-green);
+  box-shadow: inset -4px -4px 0 0 rgba(0, 0, 0, .25);
+  color: var(--px-paper);
+  text-align: center;
+}
+
+.me-card__stats strong {
+  display: block;
+  color: var(--px-gold);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.me-card__stats span { display: block; color: rgba(255, 252, 242, .72); font-size: 18px; }
+.me-card p { margin: 12px 0 0; }
+
+.shortcuts { display: grid; gap: 4px; padding: 8px; }
+
+.shortcuts a {
+  padding: 8px 12px;
+  color: var(--px-ink);
+  font-size: 22px;
+  text-decoration: none;
+}
+
+.shortcuts a::before { content: "▸ "; color: var(--px-gold-dark); }
+.shortcuts a:hover { background: var(--px-bg); }
+.shortcuts a:focus-visible { outline: 4px solid var(--px-gold); outline-offset: -4px; }
+
+/* composer ("What's on your mind?") */
+.composer__row { display: flex; gap: 12px; align-items: flex-start; }
+.composer textarea { margin-top: 0; resize: vertical; min-height: 64px; }
+
+.composer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.composer__bar .btn { width: auto; margin: 0; padding: 12px 24px; }
+.composer .message { margin-top: 8px; min-height: 0; }
+
+/* one post */
+.news-feed { display: grid; gap: 20px; }
+
+.post { padding: 16px 16px 12px; animation: px-rise .3s steps(3) both; }
+
+.post__head { display: flex; align-items: center; gap: 12px; }
+.post__who { flex: 1; min-width: 0; }
+.post__author { display: block; font-size: 24px; overflow-wrap: anywhere; }
+.post__meta { display: block; color: var(--px-muted); font-size: 18px; }
+.post__delete { font-size: 18px; color: var(--px-bad); }
+
+.post__text {
+  margin: 12px 0 0;
+  font-size: 22px;
+  white-space: pre-wrap;  /* keep the line breaks the player typed */
+  overflow-wrap: anywhere;
+}
+
+/* The finished hunt inside a post, like a shared link preview */
+.hunt-card {
+  margin-top: 12px;
+  background: var(--px-green);
+  color: var(--px-paper);
+  box-shadow: inset -4px -4px 0 0 rgba(0, 0, 0, .25);
+}
+
+.hunt-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 4px solid rgba(0, 0, 0, .25);
+}
+
+.hunt-card__title {
+  color: var(--px-gold);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.hunt-card__stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.hunt-card__stats strong {
+  display: block;
+  font-family: var(--font-pixel);
+  font-size: clamp(9px, 2.4vw, 11px);
+  font-weight: 400;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.hunt-card__stats span { display: block; color: rgba(255, 252, 242, .72); font-size: 16px; }
+
+.post__counts {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--px-muted);
+  font-size: 18px;
+}
+
+.post__counts[hidden] { display: none; }
+.post__likes { color: var(--px-bad); }
+
+.post__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 0;
+  border-top: 4px solid var(--px-line);
+  border-bottom: 4px solid var(--px-line);
+}
+
+.post__action {
+  padding: 8px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--px-muted);
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.post__action:hover { background: var(--px-bg); }
+.post__action:focus-visible { outline: 4px solid var(--px-gold); outline-offset: -4px; }
+.post__action.is-on { color: var(--px-bad); }
+.post__action.is-on { animation: px-rise .2s steps(2) both; }
+
+/* comments */
+.comments { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.comments:empty { display: none; }
+.comment { display: flex; gap: 8px; align-items: flex-start; }
+.comment .avatar { width: 32px; height: 32px; font-size: 11px; }
+.comment__body { min-width: 0; }
+
+.comment__bubble {
+  padding: 6px 12px;
+  background: var(--px-bg);
+  box-shadow: inset 4px 4px 0 0 #e8e3d3;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.comment__bubble strong { margin-right: 8px; }
+.comment__meta { margin: 2px 0 0 12px; color: var(--px-muted); font-size: 16px; }
+.comment__meta .link-button { font-size: 16px; }
+
+.reply { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.reply .avatar { width: 32px; height: 32px; font-size: 11px; }
+.reply__input { margin-top: 0; padding: 4px 12px; font-size: 20px; }
+
+.reply__send {
+  flex: none;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--px-gold);
+  color: var(--px-ink);
+  box-shadow: inset -4px -4px 0 0 var(--px-gold-dark);
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.reply__send:active { transform: translateY(2px); }
+.reply__send[disabled], .post__action[disabled] { opacity: .5; cursor: default; }
+
+#more { margin-top: 0; }
+
+/* right column */
+.top__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.top__row { display: flex; gap: 12px; align-items: center; padding: 6px 4px; }
+.top__rank { min-width: 2.4em; color: var(--px-gold-dark); font-family: var(--font-pixel); font-size: 11px; }
+.top__text { min-width: 0; }
+.top__text strong { display: block; font-size: 22px; overflow-wrap: anywhere; }
+.top__text span { display: block; color: var(--px-muted); font-size: 18px; }
+.top__row.is-me { background: #fff1c7; }
+.top__row.is-me strong::after { content: " (you)"; color: var(--px-muted); font-weight: 400; }
+
+/* Medium screens: drop the left column; your numbers move to the top of the right one */
+@media (max-width: 1100px) {
+  .fb { grid-template-columns: minmax(0, 580px) 280px; }
+  .fb__left { grid-column: 2; grid-row: 1; position: static; }
+  .fb__main { grid-column: 1; grid-row: 1 / span 2; }
+  .fb__right { grid-column: 2; grid-row: 2; position: static; }
+  .shortcuts { display: none; }  /* the top bar already has these links */
+}
+
+/* Phones: one column. Top hunters become a strip you swipe sideways, like stories. */
+@media (max-width: 760px) {
+  .fb { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 16px; padding: 0 16px; }
+  .fb__left, .fb__right, .fb__main { grid-column: 1; grid-row: auto; }
+  .fb__left { display: none; }
+  .fb__right { order: -1; }
+  .top { padding: 12px; }
+  .top__list { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 4px; scrollbar-width: thin; }
+  .top__row { flex: none; flex-direction: column; gap: 2px; min-width: 120px; padding: 8px;
+              background: var(--px-bg); text-align: center; }
+  .hunt-card__stats { grid-template-columns: repeat(3, 1fr); row-gap: 8px; }
+}

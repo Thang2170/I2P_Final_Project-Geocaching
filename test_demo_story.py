@@ -1,7 +1,7 @@
 """The whole demo, played through the real app from a brand-new database.
 
 If this test passes, the story we show on presentation day works:
-register, hide a treasure, find it, buy a voucher, join a full hunt.
+register, hide a treasure, find it, buy a voucher, join a full hunt, save a finished hunt and see it in the Community.
 """
 
 import unittest
@@ -63,6 +63,16 @@ class TestDemoStory(unittest.TestCase):
         self.assertEqual(reply.status_code, 200)
         me_now = next(h for h in player.get("/api/hunts").get_json() if h["id"] == full["id"])["me"]
         self.assertEqual(me_now, {"state": "waiting", "position": 1})
+
+        # 7. they reach a treasure; the finished hunt is saved and they appear in the Community
+        pond = db.session.query(Treasure).filter_by(name="Pond bench").one()
+        reply = player.post("/api/journeys", json={"treasure_id": pond.id, "distance_m": 180, "duration_s": 250,
+                                                   "lat": pond.lat, "lon": pond.lon})
+        self.assertEqual(reply.status_code, 201)
+        community = player.get("/api/community").get_json()
+        self.assertEqual([p["username"] for p in community["leaderboard"]], ["ben", "alice", "demo_player"])
+        self.assertEqual(community["me"]["rank"], 3)
+        self.assertEqual(community["recent"][0]["username"], "demo_player")
 
 
 if __name__ == "__main__":

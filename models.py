@@ -199,3 +199,91 @@ def seed_demo_data():
     if first_treasure is None:
         db.session.add(Treasure(**DEMO_TREASURE))
         db.session.commit()
+
+
+class Journey(db.Model):
+    """A finished hunt: a player walked to a treasure and reached it.
+
+    Saved once per player and treasure. Steps and calories are worked out by Python from the
+    distance and the player's weight when the hunt is saved, never taken from the browser.
+    """
+
+    __tablename__ = "journeys"
+    __table_args__ = (db.UniqueConstraint("user_id", "treasure_id", name="one_journey_per_treasure"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False)
+    distance_m = db.Column(db.Float, nullable=False)
+    duration_s = db.Column(db.Integer, nullable=False)
+    steps = db.Column(db.Integer, nullable=False)
+    calories = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship("User")
+    treasure = db.relationship("Treasure")
+
+
+class Post(db.Model):
+    """One post on the Community feed.
+
+    A player writes it, or it is made automatically when a hunt is finished
+    (then journey_id points at that hunt and text may be empty).
+    """
+
+    __tablename__ = "posts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False, default="")
+    # A finished hunt gets exactly one post, so the unique rule stops doubles.
+    journey_id = db.Column(db.Integer, db.ForeignKey("journeys.id"), unique=True, nullable=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship("User")
+    journey = db.relationship("Journey")
+
+
+class PostLike(db.Model):
+    """A player liked a post. Liking again removes the like."""
+
+    __tablename__ = "post_likes"
+    __table_args__ = (db.UniqueConstraint("post_id", "user_id", name="one_like_per_player"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship("User")
+
+
+class PostComment(db.Model):
+    """A comment under a post."""
+
+    __tablename__ = "post_comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship("User")
+
+
+def add_missing_hunt_posts():
+    """Give every finished hunt its post on the Community feed. Returns how many were added.
+
+    Hunts saved before the feed existed get one too. The post keeps the time of the hunt,
+    so it sits in the right place in the feed. Safe to call every time.
+    """
+    query = (db.select(Journey).outerjoin(Post, Post.journey_id == Journey.id)
+             .where(Post.id.is_(None)))
+    missing = db.session.execute(query).scalars().all()
+    for journey in missing:
+        db.session.add(Post(user_id=journey.user_id, journey_id=journey.id, text="",
+                            created_at=journey.created_at))
+    if missing:
+        db.session.commit()
+    return len(missing)

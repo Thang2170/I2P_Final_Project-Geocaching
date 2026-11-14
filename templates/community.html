@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Community · StepQuest</title>
+</head>
+<body class="feed-page">
+  {% set active = "community" %}
+  {% include "_topbar.html" %}
+
+  <div class="fb">
+    <!-- Left column: you (like the profile shortcut on a news feed) -->
+    <aside class="fb__left">
+      <section class="panel me-card">
+        <div class="me-card__who">
+          <span id="meAvatar" class="avatar avatar--big" aria-hidden="true"></span>
+          <strong id="meName" class="me-card__name"></strong>
+        </div>
+        <div class="me-card__stats">
+          <div><strong id="tHunts">0</strong><span>Hunts</span></div>
+          <div><strong id="tKm">0</strong><span>km</span></div>
+          <div><strong id="tSteps">0</strong><span>Steps</span></div>
+          <div><strong id="tCal">0</strong><span>kcal</span></div>
+        </div>
+        <p id="meCoins" class="coin-line"></p>
+        <p id="myRank" class="muted"></p>
+      </section>
+      <nav class="panel shortcuts" aria-label="Shortcuts">
+        <a href="/">Map</a>
+        <a href="/upload">Hide a treasure</a>
+        <a href="/hunts">Group hunts</a>
+        <a href="/shop">Shop</a>
+      </nav>
+    </aside>
+
+    <!-- Middle column: the feed -->
+    <main class="fb__main">
+      <h1 class="visually-hidden">Community</h1>
+
+      <form id="composer" class="panel composer">
+        <div class="composer__row">
+          <span id="composerAvatar" class="avatar" aria-hidden="true"></span>
+          <label class="visually-hidden" for="postText">Write a post</label>
+          <textarea id="postText" rows="2" maxlength="500" placeholder="What did you find today?"></textarea>
+        </div>
+        <div class="composer__bar">
+          <span id="postCount" class="muted">0 / 500</span>
+          <button id="postBtn" type="submit" class="btn" disabled>Post</button>
+        </div>
+        <p id="message" class="message" role="status"></p>
+      </form>
+
+      <div id="feed" class="news-feed" aria-live="polite"></div>
+      <p id="empty" class="panel muted" hidden>Nothing here yet. Write the first post, or finish a hunt on the map.</p>
+      <button id="more" type="button" class="btn btn--ghost" hidden>Load more</button>
+    </main>
+
+    <!-- Right column: who is ahead -->
+    <aside class="fb__right">
+      <section class="panel top">
+        <h2>Top hunters</h2>
+        <ol id="board" class="top__list"></ol>
+        <p id="noBoard" class="muted" hidden>Nobody has finished a hunt yet. Be the first!</p>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    // The browser only shows what Python sends and sends what the player typed.
+    // textContent (never innerHTML) is used everywhere, so nothing from the server
+    // (a username, a post, a comment) can inject HTML.
+    const MAX_POST = 500;
+    const message = document.getElementById("message");
+    const feedBox = document.getElementById("feed");
+    const moreBtn = document.getElementById("more");
+    let nextOffset = 0;
+    let me = null;
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined && text !== null) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    // Python picks the letter and the colour number; the number only chooses a CSS class.
+    function avatarEl(a, big) {
+      const node = el("span", a.letter, "avatar avatar--" + (Number(a.colour) || 0) + (big ? " avatar--big" : ""));
+      node.setAttribute("aria-hidden", "true");
+      return node;
+    }
+
+    function fillAvatar(node, a) {
+      node.textContent = a.letter;
+      node.className = node.className.replace(/avatar--\d+/g, "").trim() + " avatar--" + (Number(a.colour) || 0);
+    }
+
+    function say(text, ok) {
+      message.textContent = text;
+      message.className = "message " + (ok ? "ok" : "bad");
+    }
+
+    async function api(url, options) {
+      const res = await fetch(url, options);
+      if (res.status === 401) { location.href = "/login?next=/community"; throw new Error("Log in first"); }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      return data;
+    }
+
+    function send(url, method, body) {
+      return api(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    }
+
+    // ---------- one post ----------
+
+    function huntCard(h) {
+      const box = el("div", undefined, "hunt-card");
+      const head = el("div", undefined, "hunt-card__head");
+      const chest = el("span", undefined, "sprite sprite--chest");
+      chest.setAttribute("aria-hidden", "true");
+      head.append(chest, el("span", "Found " + h.treasure, "hunt-card__title"));
+      const stats = el("div", undefined, "hunt-card__stats");
+      for (const [value, label] of [[h.distance_km, "km"], [h.time, "time"], [h.pace, "/km"],
+                                    [h.steps.toLocaleString(), "steps"], [h.calories, "kcal"]]) {
+        const cell = el("div");
+        cell.append(el("strong", value), el("span", label));
+        stats.append(cell);
+      }
+      box.append(head, stats);
+      return box;
+    }
+
+    function commentEl(c) {
+      const row = el("li", undefined, "comment");
+      const body = el("div", undefined, "comment__body");
+      const bubble = el("div", undefined, "comment__bubble");
+      bubble.append(el("strong", c.author), el("span", c.text, "comment__text"));
+      const meta = el("div", c.ago, "comment__meta");
+      if (c.mine) {
+        const del = el("button", "Delete", "link-button");
+        del.type = "button";
+        del.addEventListener("click", async () => {
+          try {
+            await send(`/api/comments/${c.id}`, "DELETE");
+            const list = row.parentElement;
+            row.remove();
+            list.dispatchEvent(new CustomEvent("changed"));
+          } catch (error) { say(error.message, false); }
+        });
+        meta.append(" · ", del);
+      }
+      body.append(bubble, meta);
+      row.append(avatarEl(c.avatar), body);
+      return row;
+    }
+
+    function postEl(p) {
+      const card = el("article", undefined, "panel post");
+
+      // who and when
+      const head = el("header", undefined, "post__head");
+      const who = el("div", undefined, "post__who");
+      who.append(el("strong", p.author, "post__author"),
+                 el("span", p.hunt ? `${p.ago} · finished a hunt` : p.ago, "post__meta"));
+      head.append(avatarEl(p.avatar), who);
+      if (p.can_delete) {
+        const del = el("button", "Delete", "link-button post__delete");
+        del.type = "button";
+        del.addEventListener("click", async () => {
+          if (!confirmDelete(del)) return;
+          try { await send(`/api/posts/${p.id}`, "DELETE"); card.remove(); showEmpty(); }
+          catch (error) { say(error.message, false); }
+        });
+        head.append(del);
+      }
+      card.append(head);
+
+      if (p.text) card.append(el("p", p.text, "post__text"));
+      if (p.hunt) card.append(huntCard(p.hunt));
+
+      // like and comment counts
+      const counts = el("div", undefined, "post__counts");
+      const likeLine = el("span", "", "post__likes");
+      const commentLine = el("span", "", "post__ncomments");
+      counts.append(likeLine, commentLine);
+
+      // Like / Comment buttons
+      const actions = el("div", undefined, "post__actions");
+      const likeBtn = el("button", "♥ Like", "post__action");
+      likeBtn.type = "button";
+      const commentBtn = el("button", "Comment", "post__action");
+      commentBtn.type = "button";
+      actions.append(likeBtn, commentBtn);
+
+      // comments and the reply box
+      const list = el("ul", undefined, "comments");
+      list.append(...p.comments.map(commentEl));
+      const reply = el("form", undefined, "reply");
+      const input = el("input", undefined, "reply__input");
+      input.type = "text";
+      input.maxLength = 300;
+      input.placeholder = "Write a comment…";
+      input.setAttribute("aria-label", "Write a comment");
+      const sendBtn = el("button", "Send", "reply__send");
+      sendBtn.type = "submit";
+      reply.append(avatarEl(me.avatar), input, sendBtn);
+
+      let likes = { likes: p.likes, liked_by_me: p.liked_by_me, like_summary: p.like_summary };
+      let commentCount = p.comment_count;
+
+      function draw() {
+        likeLine.textContent = likes.likes ? "♥ " + likes.like_summary : "";
+        commentLine.textContent = commentCount ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"}` : "";
+        counts.hidden = !likes.likes && !commentCount;
+        likeBtn.classList.toggle("is-on", likes.liked_by_me);
+        likeBtn.setAttribute("aria-pressed", likes.liked_by_me ? "true" : "false");
+      }
+
+      likeBtn.addEventListener("click", async () => {
+        likeBtn.disabled = true;
+        try { likes = await send(`/api/posts/${p.id}/like`, "POST"); draw(); }
+        catch (error) { say(error.message, false); }
+        finally { likeBtn.disabled = false; }
+      });
+
+      commentBtn.addEventListener("click", () => input.focus());
+
+      reply.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        sendBtn.disabled = true;
+        try {
+          const c = await send(`/api/posts/${p.id}/comments`, "POST", { text: input.value });
+          list.append(commentEl(c));
+          commentCount += 1;
+          input.value = "";
+          draw();
+        } catch (error) { say(error.message, false); }
+        finally { sendBtn.disabled = false; }
+      });
+
+      list.addEventListener("changed", () => { commentCount = list.children.length; draw(); });
+
+      card.append(counts, actions, list, reply);
+      draw();
+      return card;
+    }
+
+    // Two taps to delete: the first asks "Sure?", so a slip of the finger does nothing.
+    function confirmDelete(button) {
+      if (button.dataset.armed) return true;
+      button.dataset.armed = "1";
+      button.textContent = "Sure? Tap again";
+      setTimeout(() => { delete button.dataset.armed; button.textContent = "Delete"; }, 3000);
+      return false;
+    }
+
+    function showEmpty() {
+      document.getElementById("empty").hidden = feedBox.children.length > 0;
+    }
+
+    // ---------- loading ----------
+
+    async function loadFeed() {
+      moreBtn.disabled = true;
+      try {
+        const data = await api(`/api/feed?offset=${nextOffset}`);
+        if (!me) {
+          me = data.me;
+          fillAvatar(document.getElementById("meAvatar"), me.avatar);
+          fillAvatar(document.getElementById("composerAvatar"), me.avatar);
+          document.getElementById("meName").textContent = me.username;
+          document.getElementById("postText").placeholder = `What did you find today, ${me.username}?`;
+          document.getElementById("postBtn").disabled = false;  // the composer needs to know who you are
+        }
+        feedBox.append(...data.posts.map(postEl));
+        nextOffset = data.next_offset;
+        moreBtn.hidden = nextOffset === null;
+        showEmpty();
+      } catch (error) {
+        say(error.message, false);
+      } finally {
+        moreBtn.disabled = false;
+      }
+    }
+
+    async function loadSides() {
+      try {
+        const [mine, community, coins] = await Promise.all(
+          [api("/api/journeys/mine"), api("/api/community"), api("/api/coins")]);
+        document.getElementById("tHunts").textContent = mine.totals.hunts;
+        document.getElementById("tKm").textContent = mine.totals.distance_km;
+        document.getElementById("tSteps").textContent = mine.totals.steps.toLocaleString();
+        document.getElementById("tCal").textContent = mine.totals.calories;
+        document.getElementById("meCoins").textContent = `${coins.balance} coins`;
+        document.getElementById("myRank").textContent = community.me
+          ? `You are #${community.me.rank} of ${community.players} hunters.`
+          : "Finish a hunt to get a rank.";
+
+        document.getElementById("board").replaceChildren(...community.leaderboard.map(p => {
+          const row = el("li", undefined, p.is_me ? "top__row is-me" : "top__row");
+          const text = el("div", undefined, "top__text");
+          text.append(el("strong", p.username),
+                      el("span", `${p.hunts} ${p.hunts === 1 ? "hunt" : "hunts"} · ${p.distance_km} km`));
+          row.append(el("span", `#${p.rank}`, "top__rank"), text);
+          return row;
+        }));
+        document.getElementById("noBoard").hidden = community.leaderboard.length > 0;
+      } catch (error) {
+        say(error.message, false);
+      }
+    }
+
+    // ---------- writing a post ----------
+
+    const postText = document.getElementById("postText");
+    const postCount = document.getElementById("postCount");
+    postText.addEventListener("input", () => {
+      postCount.textContent = `${postText.value.length} / ${MAX_POST}`;
+    });
+
+    document.getElementById("composer").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("postBtn");
+      button.disabled = true;
+      try {
+        const post = await send("/api/posts", "POST", { text: postText.value });
+        feedBox.prepend(postEl(post));
+        postText.value = "";
+        postCount.textContent = `0 / ${MAX_POST}`;
+        say("Posted.", true);
+        showEmpty();
+      } catch (error) {
+        say(error.message, false);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    moreBtn.addEventListener("click", loadFeed);
+
+    loadFeed();
+    loadSides();
+  </script>
+</body>
+</html>

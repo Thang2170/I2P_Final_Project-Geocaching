@@ -2,9 +2,10 @@ import unittest
 
 from app import create_app
 from coin_api import get_balance
-from demo_content import DEMO_FULL_HUNT, DEMO_PASSWORD, DEMO_TREASURES, DEMO_USERS
+from demo_content import (BUILT_IN_TREASURE_NAME, DEMO_FULL_HUNT, DEMO_JOURNEYS, DEMO_PASSWORD, DEMO_POSTS,
+                          DEMO_TREASURES, DEMO_USERS)
 from demo_data import seed_demo_story
-from models import Hunt, HuntMember, Profile, Treasure, User, db
+from models import DEMO_TREASURE, Hunt, HuntMember, Journey, Post, PostComment, PostLike, Profile, Treasure, User, db
 from queue_logic import queue_status
 
 
@@ -51,7 +52,7 @@ class TestDemoData(unittest.TestCase):
         seed_demo_story()
         counts = [db.session.query(model).count() for model in (User, Treasure, Hunt, HuntMember)]
         again = seed_demo_story()
-        self.assertEqual(again, {"users": [], "treasures": [], "hunts": []})
+        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": []})
         self.assertEqual(counts, [db.session.query(m).count() for m in (User, Treasure, Hunt, HuntMember)])
         self.assertEqual(get_balance(self.user("demo_player").id), DEMO_USERS[0]["coins"])
 
@@ -62,6 +63,43 @@ class TestDemoData(unittest.TestCase):
         db.session.commit()
         seed_demo_story()
         self.assertTrue(self.user("demo_player").check_password("something-new"))
+
+    def test_the_built_in_treasure_name_matches_the_database_seed(self):
+        self.assertEqual(BUILT_IN_TREASURE_NAME, DEMO_TREASURE["name"])
+
+    def test_saves_the_demo_hunts_with_steps_and_calories_from_python(self):
+        seed_demo_story()
+        self.assertEqual(db.session.query(Journey).count(), len(DEMO_JOURNEYS))
+        ben = self.user("ben")
+        pond = db.session.query(Treasure).filter_by(name="Pond bench").one()
+        saved = db.session.query(Journey).filter_by(user_id=ben.id, treasure_id=pond.id).one()
+        self.assertEqual((saved.distance_m, saved.duration_s), (180, 250))
+        self.assertEqual(saved.steps, 240)                 # 180 m / 0.75 m per step
+        self.assertEqual(saved.calories, 6.3)              # 0.5 * 70 kg * 0.18 km
+
+    def test_running_it_twice_does_not_duplicate_the_hunts(self):
+        seed_demo_story()
+        seed_demo_story()
+        self.assertEqual(db.session.query(Journey).count(), len(DEMO_JOURNEYS))
+
+    def test_the_feed_has_posts_likes_and_comments(self):
+        seed_demo_story()
+        # the written posts, plus one post per finished hunt
+        self.assertEqual(db.session.query(Post).count(), len(DEMO_POSTS) + len(DEMO_JOURNEYS))
+        self.assertGreater(db.session.query(PostLike).count(), 0)
+        self.assertGreater(db.session.query(PostComment).count(), 0)
+        player = self.app.test_client()
+        player.post("/api/login", json={"username": "demo_player", "password": DEMO_PASSWORD})
+        posts = player.get("/api/feed").get_json()["posts"]
+        alice_post = next(p for p in posts if p["author"] == "alice" and p["hunt"] is None)
+        self.assertTrue(alice_post["liked_by_me"])
+        self.assertEqual(alice_post["comment_count"], 2)
+
+    def test_running_it_twice_does_not_duplicate_the_feed(self):
+        seed_demo_story()
+        counts = [db.session.query(m).count() for m in (Post, PostLike, PostComment)]
+        seed_demo_story()
+        self.assertEqual(counts, [db.session.query(m).count() for m in (Post, PostLike, PostComment)])
 
 
 if __name__ == "__main__":
