@@ -392,65 +392,134 @@ summary {
 /* It takes the place of the status card, whose messages are copied into it. */
 body.is-journey .sheet { display: none; }
 
+/* A low bar along the bottom of the map, so the route stays visible above it.
+   Wide screens: all six numbers in one row, buttons on the right.
+   Phones: two short rows. "▾ Less" folds it to time, distance left and the buttons. */
 .journey {
   position: absolute;
-  left: 20px;
-  right: 20px;
-  bottom: 36px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
   z-index: 1050;  /* above the status card, below the info board */
-  max-width: 520px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 12px 16px 16px;
+  padding: 8px 12px 10px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
   animation: px-boot .4s steps(5) both;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) 150px;
+  grid-template-areas:
+    "top  top  top"
+    "main sub  buttons"
+    "msg  msg  buttons";
+  column-gap: 12px;
+  align-items: center;
 }
 
 .journey[hidden] { display: none; }
 
+.journey__top { grid-area: top; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+
 .journey__title {
-  margin: 0 0 8px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   color: var(--px-gold-dark);
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.6;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+.journey__fold {
+  flex: none;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: var(--px-muted);
+  font-family: var(--font-body);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.journey__fold:hover { color: var(--px-ink); }
+.journey__fold:focus-visible { outline: 4px solid var(--px-gold); }
 
 .journey__main,
 .journey__sub {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 4px;
   text-align: center;
 }
 
-.journey__sub { margin-top: 8px; padding-top: 8px; border-top: 4px solid var(--px-line); }
+.journey__main { grid-area: main; }
+.journey__sub { grid-area: sub; padding-left: 12px; border-left: 4px solid var(--px-line); }
 
 .journey__stat strong {
   display: block;
   color: var(--px-green);
   font-family: var(--font-pixel);
-  font-size: clamp(14px, 5vw, 22px);
+  font-size: clamp(11px, 1.6vw, 16px);
   font-weight: 400;
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.journey__sub .journey__stat strong { font-size: clamp(10px, 3.4vw, 14px); }
+.journey__sub .journey__stat strong { font-size: clamp(10px, 1.2vw, 12px); }
 
-.journey__stat span { display: block; margin-top: 2px; color: var(--px-muted); font-size: 18px; }
+.journey__stat span { display: block; color: var(--px-muted); font-size: 15px; line-height: 1.1; }
 
-.journey__msg { margin: 8px 0 0; color: var(--px-muted); font-size: 20px; text-align: center; }
+.journey__msg,
+.journey__note,
+.journey__saved { grid-column: 1 / 3; }
 
-.journey__note { margin: 4px 0 0; color: var(--px-bad); font-size: 18px; text-align: center; }
+.journey__msg { margin: 4px 0 0; color: var(--px-muted); font-size: 17px; text-align: center; }
 
-.journey__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+.journey__note { margin: 2px 0 0; color: var(--px-bad); font-size: 16px; text-align: center; }
 
-/* "Close" is alone once the journey is over: let it use the full width */
-.journey__buttons .btn { margin-top: 0; padding: 12px 8px; }
+.journey__buttons { grid-area: buttons; display: grid; gap: 8px; align-self: stretch; align-content: center; }
+
+.journey__buttons .btn { margin-top: 0; padding: 10px 8px; font-size: 11px; }
 .journey__buttons .btn[hidden] { display: none; }
-.journey__buttons #jPause[hidden] + #jFinish { grid-column: 1 / -1; }
+
+/* Folded: just the time, the distance left and the buttons */
+.journey.is-folded .journey__sub .journey__stat:not(:last-child),
+.journey.is-folded .journey__main .journey__stat:not(:first-child),
+.journey.is-folded .journey__msg,
+.journey.is-folded .journey__note { display: none; }
+.journey.is-folded .journey__main { grid-template-columns: 1fr; }
+.journey.is-folded .journey__sub { grid-template-columns: 1fr; }
+.journey.is-folded { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 260px; }
+.journey.is-folded .journey__buttons { grid-template-columns: 1fr 1fr; }
+
+/* Phones: two short rows of numbers, the buttons side by side underneath */
+@media (max-width: 720px) {
+  .journey {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 6px 10px 8px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "top" "main" "sub" "msg" "buttons";
+  }
+
+  .journey__sub { margin-top: 4px; padding: 4px 0 0; border-left: 0; border-top: 4px solid var(--px-line); }
+  .journey__stat strong { font-size: clamp(12px, 4vw, 16px); }
+  .journey__sub .journey__stat strong { font-size: clamp(10px, 3vw, 12px); }
+  .journey__stat span { font-size: 14px; }
+  .journey__msg, .journey__note, .journey__saved { grid-column: 1; }
+  .journey__buttons { grid-template-columns: 1fr 1fr; margin-top: 6px; }
+  .journey__buttons #jPause[hidden] + #jFinish { grid-column: 1 / -1; }
+
+  /* Folded on a phone: time and distance left side by side, then the buttons */
+  .journey.is-folded { grid-template-columns: 1fr 1fr; grid-template-areas: "top top" "main sub" "buttons buttons"; }
+  .journey.is-folded .journey__sub { margin-top: 0; padding: 0; border-top: 0; }
+}
 
 /* ---------- treasure pins ---------- */
 
@@ -756,7 +825,7 @@ input[type="file"] {
 }
 
 /* "Hunt saved." after you reach the treasure */
-.journey__saved { margin: 4px 0 0; color: var(--px-green); font-size: 20px; text-align: center; }
+.journey__saved { margin: 2px 0 0; color: var(--px-green); font-size: 17px; text-align: center; }
 .journey__saved[hidden] { display: none; }
 .journey__saved.is-bad { color: var(--px-bad); }
 .journey__saved a { color: var(--px-gold-dark); }
