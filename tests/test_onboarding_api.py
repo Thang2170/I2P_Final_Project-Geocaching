@@ -1,9 +1,11 @@
+import os
 import unittest
 from unittest.mock import patch
 
 from app import create_app
 from models import DEMO_TREASURE, Hunt, Treasure, TourSeen, db
 from onboarding import TOUR_STEPS
+from tests import PROJECT_ROOT
 
 
 class TestOnboardingApi(unittest.TestCase):
@@ -113,7 +115,8 @@ class TestTourOnPages(unittest.TestCase):
         self.assertIn('"/api/onboarding" + (again ? "?again=1" : "")', html)  # fresh progress
 
     def test_the_tour_never_uses_innerhtml(self):
-        tour = open("templates/_tour.html", encoding="utf-8").read()
+        with open(os.path.join(PROJECT_ROOT, "templates", "_tour.html"), encoding="utf-8") as f:
+            tour = f.read()
         self.assertNotIn(".innerHTML", tour)
 
     def test_account_page_can_replay_it(self):

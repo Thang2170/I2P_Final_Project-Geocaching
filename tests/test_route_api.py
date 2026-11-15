@@ -5,6 +5,7 @@ from unittest.mock import patch
 from flask import Flask
 
 from route_api import route_api
+from tests import PROJECT_ROOT
 
 
 class TestRouteApi(unittest.TestCase):
@@ -15,7 +16,7 @@ class TestRouteApi(unittest.TestCase):
         os.environ.pop("ORS_API_KEY", None)
         self.addCleanup(patcher.stop)
 
-        app = Flask(__name__)
+        app = Flask(__name__, root_path=PROJECT_ROOT)
         app.register_blueprint(route_api)
         self.client = app.test_client()
 

@@ -6,11 +6,12 @@ from auth_api import auth_api
 from coin_api import FOUND_REASON
 from leaderboard_api import leaderboard_api
 from models import CoinTransaction, Treasure, User, db
+from tests import PROJECT_ROOT
 
 
 class TestLeaderboardApi(unittest.TestCase):
     def setUp(self):
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, root_path=PROJECT_ROOT)
         self.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         self.app.config["SECRET_KEY"] = "test-key"
         db.init_app(self.app)
