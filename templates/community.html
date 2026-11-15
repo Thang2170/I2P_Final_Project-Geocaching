@@ -146,7 +146,8 @@
       return box;
     }
 
-    function commentEl(c) {
+    // report: where errors go (the post's own message line, under its comment box).
+    function commentEl(c, report = say) {
       const row = el("li", undefined, "comment");
       const body = el("div", undefined, "comment__body");
       const bubble = el("div", undefined, "comment__bubble");
@@ -161,7 +162,7 @@
             const list = row.parentElement;
             row.remove();
             list.dispatchEvent(new CustomEvent("changed"));
-          } catch (error) { say(error.message, false); }
+          } catch (error) { report(error.message); }
         });
         meta.append(" · ", del);
       }
@@ -172,6 +173,17 @@
 
     function postEl(p) {
       const card = el("article", undefined, "panel post");
+
+      // This post's own message line, under its comment box. Errors about this post show here,
+      // next to what you just tapped, not up at the "write a post" box.
+      const postMsg = el("p", "", "message post__message");
+      postMsg.setAttribute("role", "status");
+      postMsg.hidden = true;
+      function postSay(text) {
+        postMsg.textContent = text;
+        postMsg.className = "message bad post__message";
+        postMsg.hidden = !text;
+      }
 
       // who and when
       const head = el("header", undefined, "post__head");
@@ -185,7 +197,7 @@
         del.addEventListener("click", async () => {
           if (!confirmDelete(del)) return;
           try { await send(`/api/posts/${p.id}`, "DELETE"); card.remove(); showEmpty(); }
-          catch (error) { say(error.message, false); }
+          catch (error) { postSay(error.message); }
         });
         head.append(del);
       }
@@ -210,7 +222,7 @@
 
       // comments and the reply box
       const list = el("ul", undefined, "comments");
-      list.append(...p.comments.map(commentEl));
+      list.append(...p.comments.map(c => commentEl(c, postSay)));
       const reply = el("form", undefined, "reply");
       const input = el("input", undefined, "reply__input");
       input.type = "text";
@@ -234,8 +246,8 @@
 
       likeBtn.addEventListener("click", async () => {
         likeBtn.disabled = true;
-        try { likes = await send(`/api/posts/${p.id}/like`, "POST"); draw(); }
-        catch (error) { say(error.message, false); }
+        try { likes = await send(`/api/posts/${p.id}/like`, "POST"); draw(); postSay(""); }
+        catch (error) { postSay(error.message); }
         finally { likeBtn.disabled = false; }
       });
 
@@ -246,17 +258,21 @@
         sendBtn.disabled = true;
         try {
           const c = await send(`/api/posts/${p.id}/comments`, "POST", { text: input.value });
-          list.append(commentEl(c));
+          list.append(commentEl(c, postSay));
           commentCount += 1;
           input.value = "";
+          postSay("");
           draw();
-        } catch (error) { say(error.message, false); }
+        } catch (error) { postSay(error.message); }
         finally { sendBtn.disabled = false; }
       });
 
       list.addEventListener("changed", () => { commentCount = list.children.length; draw(); });
 
-      card.append(counts, actions, list, reply);
+      // Typing again clears an old error such as "You can't post an empty message".
+      input.addEventListener("input", () => postSay(""));
+
+      card.append(counts, actions, list, reply, postMsg);
       draw();
       return card;
     }
