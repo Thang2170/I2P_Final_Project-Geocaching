@@ -108,6 +108,8 @@
       });
     }
 
+    const markersById = new Map();  // treasure id -> its pin, so a found one can be taken off the map
+
     function addTreasurePin(t, kind) {
       const marker = L.marker([t.lat, t.lon], {
         icon: pinIcon(kind),
@@ -115,6 +117,7 @@
         zIndexOffset: kind === "target" ? 500 : 0
       }).addTo(map);
       marker.on("click", () => selectTreasure(t, marker));
+      markersById.set(t.id, marker);
       return marker;
     }
 
@@ -124,7 +127,7 @@
     let huntMarker = addTreasurePin(treasure, "target");
 
     function setHunt(t, marker) {
-      huntMarker.getElement().classList.replace("pin--target", "pin--treasure");
+      huntMarker.getElement()?.classList.replace("pin--target", "pin--treasure");  // ?. : it may be collected
       marker.getElement().classList.replace("pin--treasure", "pin--target");
       huntMarker = marker;
       huntId = t.id;
@@ -137,7 +140,8 @@
         const list = await res.json();
         if (!res.ok) throw new Error(list.error || "Could not load treasures");
         for (const t of list) {
-          if (t.id !== treasure.id) addTreasurePin(t, "treasure");
+          // B: Python marks the ones you were already paid for (found_by_me); they stay off your map.
+          if (t.id !== treasure.id && !t.found_by_me) addTreasurePin(t, "treasure");
         }
       } catch (err) {
         console.error("Treasure markers failed:", err);
@@ -206,8 +210,29 @@
     function closeBoard() {
       board.classList.remove("is-open");
       board.setAttribute("aria-hidden", "true");
-      if (selectedMarker) selectedMarker.getElement().classList.remove("is-selected");
+      if (selectedMarker) selectedMarker.getElement()?.classList.remove("is-selected");
       selectedMarker = null;
+    }
+
+    // B: you found it and Python paid you (or says you already had): the pin plays a short
+    // "collected" animation, then leaves the map, and so does the route to it.
+    const COLLECT_DELAY_MS = 2500;  // long enough to read "You found ..." first
+    function collectPin(treasureId) {
+      const marker = markersById.get(treasureId);
+      if (!marker) return;
+      markersById.delete(treasureId);
+      setTimeout(() => {
+        marker.getElement()?.classList.add("is-collected");
+        setTimeout(() => {
+          if (selectedMarker === marker) closeBoard();
+          marker.remove();
+          if (treasureId === huntId) {
+            routeTarget = null;  // nothing to walk to until you tap another treasure
+            if (routeLine) { routeLine.remove(); routeLine = null; }
+          }
+          if (selectedTreasure && selectedTreasure.id === treasureId) selectedTreasure = null;
+        }, 600);  // the length of the animation in app.css
+      }, COLLECT_DELAY_MS);
     }
 
     document.getElementById("boardClose").addEventListener("click", closeBoard);
@@ -290,6 +315,7 @@
     // Ask Python for a walking route and draw it.
     // fit = true zooms the map to the whole route.
     async function drawRoute(from, to, fit = false) {
+      if (!to) return;  // the treasure was collected: no route until you pick another
       const requestId = ++routeRequestId;
       routeFrom = from;
       const points = `${from[0]},${from[1]};${to[0]},${to[1]}`;
@@ -604,7 +630,9 @@
         if (res.ok) {
           claimNotes.delete(treasureId);
           showBalance(data.balance, data.coins_earned);
+          collectPin(treasureId);
         } else {
+          if (res.status === 409) collectPin(treasureId);  // you had already found it
           // Refused: say why (you hid it yourself, you already found it, ...) instead of staying silent.
           claimNotes.set(treasureId, data.error || "No coins this time.");
           if (res.status === 400) triedClaim.delete(treasureId);  // e.g. too far: allow another try
