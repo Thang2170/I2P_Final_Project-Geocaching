@@ -16,12 +16,15 @@ Follow the story in `DEMO.md`. Time it. Keep each step short.
 - [ ] Find a treasure with `/?drag` (no walking needed): +10 coins
 - [ ] Shop: refused with too few coins; as `demo_player`, buy a voucher and read out the code
 - [ ] Hunts: join "Full house (demo)" and show "waiting, position 1"
+- [ ] Hunts: join "NTHU campus walk", open the group chat, send a message
 - [ ] Walk stats: enter a weight, see steps and calories
 
 ## 3. Things that go wrong on the day
 | Problem | Fix |
 |---|---|
 | The map is blank | Check the internet: the map tiles come from the web |
+| Routes are dashed straight lines | The routing key is missing or wrong: set `ORS_API_KEY` (a HeiGIT key from account.heigit.org), close all terminals, open a new one |
+| Everyone got logged out | Normal after deleting `instance/` (the login key lives there); just log in again |
 | "Log in first" everywhere | Log in again; the session may have been cleared |
 | The browser asks for your location and you can't walk | Use `/?drag` and drag the marker, or `/?fake=24.795324,120.994796` |
 | The demo went wrong halfway | Stop the app, delete `instance/geohunt.db`, run `python seed_demo.py`, start again |

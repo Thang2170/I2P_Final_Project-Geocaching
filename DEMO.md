@@ -8,8 +8,11 @@
 
 ## Accounts (all use password `demo1234`)
 - `demo_player`: 60 coins, ready to shop. Log in with this one on stage.
-- `alice`: hid the extra treasures.
-- `ben`: fills the demo hunt.
+- `alice`: hid the extra treasures. Chats in "NTHU campus walk".
+- `ben`: fills the demo hunt. Chats in "NTHU campus walk".
+
+`demo_player` has already "seen" the welcome tour, so it won't pop up mid-demo.
+To show it on purpose, open `/?tour`.
 
 ## The story (about 3 minutes)
 1. Register a new player. The map opens.
@@ -17,6 +20,7 @@
 3. Walk to a treasure (or use the drag mode) and tap "I found it": +10 coins.
 4. Shop: with too few coins the purchase is refused. Log in as `demo_player` and buy a voucher: you get a code.
 5. Hunts: join "Full house (demo)". It has 2 places and both are taken, so you wait in line (position 1).
+   Then join "NTHU campus walk" (there is room) and tap **Open group chat**: alice and ben are already talking.
 6. Walk stats: enter a weight to see steps and calories.
 
 `python -m unittest tests.test_demo_story` plays steps 1 to 5 automatically.

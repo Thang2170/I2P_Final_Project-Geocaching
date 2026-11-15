@@ -12,7 +12,8 @@ import requests
 
 from location import haversine_m
 
-ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
+# B: api.openrouteservice.org was shut down in Nov 2026. Same paths, same keys, new host.
+ORS_URL = "https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson"
 ORS_TIMEOUT_S = 10
 WALKING_SPEED_MPS = 1.4  # about 5 km/h
 MAX_POINTS = 10

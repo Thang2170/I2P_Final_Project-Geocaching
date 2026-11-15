@@ -1,5 +1,7 @@
 import os
 import unittest
+
+import routing
 from unittest.mock import Mock, patch
 
 import requests
@@ -172,6 +174,13 @@ class TestGetRoute(NoKeyMixin, unittest.TestCase):
     def test_bad_input_is_not_hidden_by_the_fallback(self):
         with self.assertRaises(ValueError):
             get_route([NTHU])
+
+
+class TestRoutingAddress(unittest.TestCase):
+    def test_uses_the_new_heigit_address(self):
+        # api.openrouteservice.org was shut down in November 2026; same paths, new host.
+        self.assertTrue(routing.ORS_URL.startswith("https://api.heigit.org/openrouteservice/v2/directions/"))
+        self.assertNotIn("api.openrouteservice.org", routing.ORS_URL)
 
 
 if __name__ == "__main__":
