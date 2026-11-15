@@ -5,7 +5,7 @@ Do this the day before, and again 30 minutes before presenting.
 ## 1. Set up (5 minutes)
 - [ ] `git checkout main` and `git pull` (everyone's work is merged)
 - [ ] Activate the venv, then `pip install -r requirements.txt`
-- [ ] `python -m unittest discover -p "test_*.py"` shows `OK`
+- [ ] `python -m unittest` shows `OK`
 - [ ] Stop the app, delete `instance/geohunt.db`, run `python seed_demo.py`, then `python app.py`
 - [ ] Open http://127.0.0.1:5000 in a fresh browser window (or a private window)
 

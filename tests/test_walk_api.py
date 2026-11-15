@@ -5,12 +5,13 @@ from flask import Flask
 from auth_api import auth_api
 from models import Profile, db
 from walk_api import walk_api
+from tests import PROJECT_ROOT
 
 
 class TestWalkApi(unittest.TestCase):
     def setUp(self):
         # A throwaway app with an in-memory database, so tests never touch geohunt.db.
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, root_path=PROJECT_ROOT)
         self.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         self.app.config["SECRET_KEY"] = "test-key"
         db.init_app(self.app)

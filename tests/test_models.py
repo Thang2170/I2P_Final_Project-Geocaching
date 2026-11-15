@@ -5,13 +5,14 @@ from sqlalchemy.exc import IntegrityError
 
 from models import (DEMO_TREASURE, CoinTransaction, Profile, Treasure, User, db,
                     seed_demo_data)
+from tests import PROJECT_ROOT
 
 
 class TestModels(unittest.TestCase):
     def setUp(self):
         # A throwaway app with a database that lives only in memory,
         # so the tests never touch the real geohunt.db file.
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, root_path=PROJECT_ROOT)
         self.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         db.init_app(self.app)
         self.context = self.app.app_context()

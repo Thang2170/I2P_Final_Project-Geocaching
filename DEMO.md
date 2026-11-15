@@ -19,4 +19,4 @@
 5. Hunts: join "Full house (demo)". It has 2 places and both are taken, so you wait in line (position 1).
 6. Walk stats: enter a weight to see steps and calories.
 
-`python -m unittest test_demo_story` plays steps 1 to 5 automatically.
+`python -m unittest tests.test_demo_story` plays steps 1 to 5 automatically.

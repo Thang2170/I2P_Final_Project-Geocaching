@@ -71,7 +71,7 @@ StepQuest turns everyday walking into an interactive adventure. Players can:
 | `calculator.py` | Steps and calories from distance |
 | `models.py` | Database tables for treasures |
 | `templates/` | HTML pages, including `map.html` |
-| `test_location.py`, `test_calculator.py` | Automatic tests |
+| `tests/` | Automatic tests (run `python -m unittest` from the project folder) |
 
 ## How the Game Works
  

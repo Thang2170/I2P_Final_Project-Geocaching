@@ -10,6 +10,7 @@ from auth_api import auth_api
 from models import db
 from photo_api import photo_api
 from treasure_api import treasure_api
+from tests import PROJECT_ROOT
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 20
@@ -20,7 +21,7 @@ class TestPhotoApi(unittest.TestCase):
         # A throwaway app: in-memory database, and photos go to a temporary folder
         # that is deleted afterwards, so tests never touch instance/photos.
         self.folder = tempfile.mkdtemp()
-        self.app = Flask(__name__, instance_path=self.folder)
+        self.app = Flask(__name__, root_path=PROJECT_ROOT, instance_path=self.folder)
         self.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         self.app.config["SECRET_KEY"] = "test-key"
         db.init_app(self.app)

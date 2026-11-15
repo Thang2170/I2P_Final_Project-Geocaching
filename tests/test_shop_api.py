@@ -6,12 +6,13 @@ from auth_api import auth_api
 from coin_api import coin_api, get_balance
 from models import CoinTransaction, Purchase, User, db
 from shop_api import shop_api
+from tests import PROJECT_ROOT
 
 
 class TestShopApi(unittest.TestCase):
     def setUp(self):
         # A throwaway app with an in-memory database, so tests never touch geohunt.db.
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, root_path=PROJECT_ROOT)
         self.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         self.app.config["SECRET_KEY"] = "test-key"
         db.init_app(self.app)
