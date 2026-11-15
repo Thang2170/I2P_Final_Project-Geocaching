@@ -8,7 +8,8 @@ from models import Treasure, db, seed_demo_data, seed_demo_hunt
 from admin_api import admin_api
 from auth_api import auth_api, current_user
 from chat_api import chat_api
-from coin_api import coin_api
+from coin_api import coin_api, found_treasure_ids
+from coins import first_to_find
 from feed_api import feed_api
 from hunt_api import hunt_api
 from journey_api import journey_api
@@ -23,10 +24,17 @@ from treasure_api import treasure_api
 from walk_api import walk_api
 
 
-def get_current_treasure():
-    """Return the treasure the map shows: the first one in the database."""
-    query = db.select(Treasure).order_by(Treasure.id)
-    return db.session.execute(query).scalars().first()
+def get_current_treasure(user=None):
+    """Return the treasure the map aims at first.
+
+    B: for a logged-in player, the oldest treasure they haven't found yet (see coins.first_to_find);
+    otherwise the first one in the database.
+    """
+    ids = db.session.execute(db.select(Treasure.id).order_by(Treasure.id)).scalars().all()
+    user_id = getattr(user, "id", None)  # some page tests log in with a stand-in object that has no id
+    found = found_treasure_ids(user_id) if user_id is not None else []
+    target = first_to_find(ids, found)
+    return db.session.get(Treasure, target) if target is not None else None
 
 
 def _secret_key(app, database_uri):
@@ -87,10 +95,11 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     def home():
         # A: the map is for logged-in players, so send everyone else to the login page first.
         # "next" remembers the full address (e.g. /?drag) so login can bring them back to it.
-        if current_user() is None:
+        user = current_user()
+        if user is None:
             return redirect(url_for("auth_api.login_page", next=request.full_path.rstrip("?")))
 
-        treasure = get_current_treasure()
+        treasure = get_current_treasure(user)
         if treasure is None:
             return "No treasures in the database yet.", 404
         return render_template("map.html", treasure=treasure.to_dict())

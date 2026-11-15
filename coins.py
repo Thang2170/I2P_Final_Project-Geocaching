@@ -28,3 +28,16 @@ def claim_problem(distance_m, user_id, treasure_creator_id, already_found):
     if distance_m > FOUND_RADIUS_M:
         return TOO_FAR
     return None
+
+
+def first_to_find(treasure_ids, found_ids):
+    """Which treasure the map should aim at first: the oldest one this player hasn't found.
+
+    treasure_ids: every treasure, oldest first. found_ids: the ones this player was paid for.
+    If they have found them all, it falls back to the oldest one. None if there are no treasures.
+    """
+    found = set(found_ids)
+    for treasure_id in treasure_ids:
+        if treasure_id not in found:
+            return treasure_id
+    return treasure_ids[0] if treasure_ids else None

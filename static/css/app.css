@@ -1469,3 +1469,12 @@ a.player-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset:
 .post__message { margin: 8px 0 0 40px; min-height: 0; font-size: 18px; }
 .post__message[hidden] { display: none; }
 #more[hidden] { display: none; }  /* "Load more" only when there are more posts (.btn would keep it visible) */
+
+/* A found treasure leaves the map: it hops up, sparkles and shrinks away (map.html, collectPin) */
+@keyframes pin-collected {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  40%  { transform: translateY(-14px) scale(1.25); opacity: 1; filter: brightness(1.4); }
+  100% { transform: translateY(-24px) scale(0); opacity: 0; }
+}
+
+.pin.is-collected .pin__grow { animation: pin-collected .6s steps(6) forwards; }

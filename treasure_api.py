@@ -55,7 +55,15 @@ def create_treasure():
 
 @treasure_api.route("/api/treasures", methods=["GET"])
 def list_treasures():
-    """Return every saved treasure, oldest first."""
+    """Return every saved treasure, oldest first.
+
+    B: each one says found_by_me, so the map can leave out the ones you were already paid for.
+    (Always False when you are logged out.)
+    """
+    from coin_api import found_treasure_ids  # here, not at the top, so the two files don't import each other
+
     query = db.select(Treasure).order_by(Treasure.id)
     treasures = db.session.execute(query).scalars().all()
-    return jsonify([t.to_dict() for t in treasures])
+    user = current_user()
+    found = set(found_treasure_ids(user.id)) if user else set()
+    return jsonify([{**t.to_dict(), "found_by_me": t.id in found} for t in treasures])
