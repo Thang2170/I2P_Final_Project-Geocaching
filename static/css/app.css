@@ -711,11 +711,35 @@ body.is-journey .sheet { display: none; }
 .spot { margin: 8px 0 0; font-size: 18px; }
 
 input[type="file"] {
-  padding: 8px;
+  padding: 14px;
   box-shadow: var(--px-edge);
   background: var(--px-paper);
   font-size: 18px;
+  cursor: pointer;
 }
+
+/* The "Choose File" button inside it, drawn like the other pixel buttons (.btn--ghost) */
+input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--px-paper);
+  color: var(--px-ink);
+  box-shadow: 0 0 0 4px var(--px-ink),
+              inset -4px -4px 0 0 #d8d1bd,
+              inset 4px 4px 0 0 #fff;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background-color .1s steps(2);
+}
+
+input[type="file"]::file-selector-button:hover { background: #fff1c7; }
+input[type="file"]::file-selector-button:active { box-shadow: 0 0 0 4px var(--px-ink), inset 4px 4px 0 0 #d8d1bd; }
+input[type="file"]:focus { background: var(--px-paper); }
+input[type="file"]:focus-visible::file-selector-button { outline: 4px solid var(--px-leaf); outline-offset: 4px; }
 
 /* ---------- leaderboard table ---------- */
 
