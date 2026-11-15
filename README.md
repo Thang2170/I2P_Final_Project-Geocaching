@@ -1,40 +1,55 @@
-# I2P Final Project Geocaching Treasure Hunt
+# 🗺️ StepQuest
+ 
+**Walk more. Meet People. Win Rewards.**
+ 
+StepQuest is a location-based treasure-hunting web app built with Python and Flask. Players explore the city, walk to hidden treasures, and earn coins when they reach a target location. It combines real-world movement with a simple game loop: discover treasures, complete hunts, hide your own, and climb the leaderboard.
+ 
+It is a mobile-first, geocaching-style game designed for students and local communities who want a fun way to explore their surroundings while completing quests and collecting rewards.
+ 
+---
 
-# Geocaching Treasure Hunt 
-Geocaching Treasure Hunt is a geocaching-style treasure hunt web app. Players open a map on their phone, see where a hidden treasure is, and walk to it. As they move, the app tells them how far away they are, and when they get within 20 meters, they have found it.
-
-The goal is to turn everyday walking into a small adventure: explore your neighborhood, find treasures other players have hidden, and see how far you walked and how many calories you burned along the way.
-
-## How it works
-
-1. The browser asks for your GPS location.
-2. The browser sends the raw latitude and longitude to the server.
-3. Python does the real work (distance, "are you near the treasure?", steps, calories) and sends the answer back.
-4. The map shows the treasure, your position, and the distance between you.
-
-We follow one design rule everywhere: **the browser only collects raw data, and Python does the work.** This keeps most of the code in Python.
-
+## Overview
+ 
+StepQuest asks for the player's GPS location, calculates how far they are from each treasure, and checks whether they have reached the hidden destination. When a player gets close enough, the treasure is marked as found and the player receives rewards such as points, coins, or unlockable progression.
+ 
+StepQuest turns everyday walking into an interactive adventure. Players can:
+ 
+- Find hidden treasures on a live map
+- Walk to a target using GPS proximity
+- Earn coins and climb the leaderboard
+- Hide their own treasure for others to discover
+- Join hunts and compete with other players
+- Track their progress, profile, and rewards
+---
+ 
 ## Features
 
-### Available now
 
-- **Interactive map**: a street map (Leaflet + OpenStreetMap) showing the treasure's location and your own position as a blue "You are here" dot.
-- **Live distance to the treasure**: the server calculates the distance in meters between you and the treasure using the haversine formula.
-- **"You found it" check**: the app knows when you are within 20 meters of the treasure.
-- **Test mode without GPS**: add `?fake=LAT,LON` to the URL to pretend you are at any coordinates, which is handy because laptops often cannot find their own location.
-- **Automatic tests** for the distance and nearness functions.
+### Gameplay
+ 
+| Feature | Description |
+| --- | --- |
+| **Live map** | Real-time GPS tracking with the player's position and treasure markers, powered by Leaflet and OpenStreetMap. |
+| **Distance calculation** | The server computes the distance between the player and each treasure from their coordinates. |
+| **Treasure found detection** | A treasure is counted as found once the player is within a set radius of its location. |
+| **Coin rewards** | Finding treasures and completing hunts earns coins and progression. |
+| **In-app shop** | Spend earned coins on rewards in the shop. |
+| **Leaderboard** | See how you rank against other players. |
+ 
+### Social and community
+ 
+| Feature | Description |
+| --- | --- |
+| **Hunt system** | Join hunts through queue/join logic and compete with other players. |
+| **Treasure upload** | Hide your own treasure and add hints and metadata for others to follow. |
+| **Community and journey sections** | Activity feeds showing what players around you are up to. |
+ 
+### Platform
+ 
+| Feature | Description |
+| --- | --- |
+| **Login and profiles** | Player accounts with a personal profile page. |
 
-### In progress / planned
-
-- **Treasure database**: treasures stored in a database (name, description, coordinates) instead of one fixed treasure in the code.
-- **Walking routes**: walking directions to a treasure, plus random routes for exploring.
-- **Street crossing warning**: a safety alert when your route crosses a street.
-- **Steps and calories calculator**: estimates how many steps and how many calories you used, based on distance walked and body weight.
-- **Coin system**: earn coins for finding treasures.
-- **Join a hunt**: a queue/list of hunts players can join.
-- **Upload treasure**: let players hide their own treasures for others to find.
-- **Shop**: spend the coins you earned.
-- **Mobile-first home page**: a simple home page designed for phone screens with three big buttons: *Start hunt*, *Upload treasure* and *Shop*.
 
 ## Tech stack
 
@@ -58,26 +73,100 @@ We follow one design rule everywhere: **the browser only collects raw data, and 
 | `templates/` | HTML pages, including `map.html` |
 | `test_location.py`, `test_calculator.py` | Automatic tests |
 
-## Project status
+## How the Game Works
+ 
+1. A player opens the app and logs in.
+2. The browser requests permission to access GPS location.
+3. The server calculates the distance to nearby treasures.
+4. The map shows the player's location and the treasure positions.
+5. The player walks toward the target, guided by hints and the distance readout.
+6. When the player is within range, the treasure is counted as found.
+7. Rewards, coins, and progression are updated in the app.
+---
 
-Geocaching Treasure Hunt is a class team project and is still under development. The map, distance calculation and nearness check work today; the database, calculator, home page and the rest of the game features are being added step by step.
-
-## Testing on a phone with GPS
-
-Phone browsers require HTTPS before they allow a web page opened over the local network to use GPS. Connect the phone and computer to the same Wi-Fi, then run:
-
+## Getting Started
+ 
+### Prerequisites
+ 
+- **Python 3.8 or newer** (with `pip`)
+- **Git**
+- A modern browser with geolocation support (Chrome, Firefox, Safari, Edge)
+### 1. Clone the repository
+ 
+```bash
+git clone https://github.com/Thang2170/I2P_Final_Project-Geocaching.git
+cd I2P_Final_Project-Geocaching
+```
+ 
+### 2. Create a virtual environment
+ 
+**Windows (PowerShell):**
+ 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+ 
+**macOS / Linux:**
+ 
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+ 
+### 3. Install dependencies
+ 
+```bash
+pip install -r requirements.txt
+```
+ 
+### 4. Run the app
+ 
+```bash
 python app.py
 ```
-
-Find the computer's Wi-Fi IPv4 address with `ipconfig`, then open this address on the phone:
-
+ 
+Then open the app in your browser:
+ 
 ```text
-https://COMPUTER_IP:5000/
+https://localhost:5000/
 ```
+ 
+> **Note:** If your browser shows a security warning about the local certificate, accept it to continue. The app uses a development certificate because browsers only allow GPS access on secure (HTTPS) pages.
+ 
+### 5. Run on a phone
+ 
+To test real GPS on a mobile device:
+ 
+1. Connect your phone and your computer to the **same Wi-Fi network**.
+2. Find your computer's local IP address.
+   - Windows: run `ipconfig` and look for the IPv4 address.
+   - macOS / Linux: run `ifconfig` or `ip addr`.
+3. Start the app on your computer with `python app.py`.
+4. On your phone, open:
+```text
+https://YOUR_COMPUTER_IP:5000/
+```
+ 
+5. Accept the certificate warning and **allow location access** when prompted.
+---
 
 The local development certificate is temporary and not trusted by the phone. Continue past the browser's certificate warning, then allow location access. This HTTPS setup is for local testing only; use a trusted certificate or HTTPS hosting for production.
 
+
+## Roadmap Ideas
+ 
+The modular design makes it straightforward to extend StepQuest with:
+ 
+- Additional hunt modes
+- Improved routing to treasures
+- Richer community features
+---
+
+
 ## Team
 
-Built by a team of three students Nguyen Cao Thang, Le Tran Vinh Hung, Luong Quoc Bao as a class project.
+Built by a team of three students 
+- Nguyen Cao Thang
+- Le Tran Vinh Hung
+- Luong Quoc Bao
