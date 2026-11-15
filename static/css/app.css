@@ -1430,3 +1430,13 @@ a.player-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset:
 .post__head > .player-link, .comment > .player-link { flex: none; line-height: 0; }
 .profile__edit[hidden] { display: none; }  /* .btn would otherwise keep showing it */
 .profile .panel > a:not(.btn) { display: inline-block; margin-top: 12px; color: var(--px-green); text-decoration-color: var(--px-gold); }
+
+/* ---------- Account page: settings under your own profile (templates/login.html) ---------- */
+
+.account-settings form { margin: 0; }
+.account-settings label { margin-top: 0; }
+.account-settings__row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+.account-settings__row input { flex: 1; min-width: 140px; margin-top: 0; }
+.account-settings__row .btn { width: auto; margin: 0; padding: 12px 16px; text-decoration: none; }
+.account-settings .message { margin-top: 12px; }
+#welcomeCard[hidden] { display: none; }

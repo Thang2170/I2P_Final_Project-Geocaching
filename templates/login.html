@@ -8,24 +8,10 @@
   {% set active = "account" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <!-- Logged out: log in or create an account -->
+  <main id="welcomeCard" class="card">
     <h1>Welcome, explorer</h1>
     <p id="who" class="muted">Checking who you are…</p>
-
-    <!-- Shown when you are already logged in -->
-    <div id="loggedIn" hidden>
-      <p id="coins" class="muted coin-line"></p>
-      <a id="toMap" class="btn" href="/">Go to the map</a>
-      <p class="switch"><a href="/?tour">Replay the tour</a> to see how StepQuest works.</p>
-
-      <form id="weightForm">
-        <label for="weight">Your weight in kg <span class="muted">(used to estimate calories)</span></label>
-        <input id="weight" name="weight_kg" inputmode="decimal" placeholder="for example 65">
-        <button type="submit" class="btn btn--ghost">Save weight</button>
-      </form>
-
-      <button type="button" id="logout" class="btn btn--ghost">Log out</button>
-    </div>
 
     <!-- Shown when you are logged out: one form at a time, so the page stays short -->
     <div id="forms" hidden>
@@ -51,6 +37,31 @@
     <p id="message" class="message" role="status"></p>
   </main>
 
+  <!-- Logged in: your own profile (the same view other players see), then your account settings -->
+  <main id="loggedIn" class="profile" hidden>
+    {% include "_profile_view.html" %}
+
+    <section class="panel account-settings">
+      <h2>Your account</h2>
+      <p id="coins" class="muted coin-line"></p>
+
+      <form id="weightForm">
+        <label for="weight">Your weight in kg <span class="muted">(used to estimate calories)</span></label>
+        <div class="account-settings__row">
+          <input id="weight" name="weight_kg" inputmode="decimal" placeholder="for example 65">
+          <button type="submit" class="btn btn--ghost">Save weight</button>
+        </div>
+      </form>
+
+      <div class="account-settings__row">
+        <a id="toMap" class="btn" href="/">Go to the map</a>
+        <a class="btn btn--ghost" href="/?tour">Replay the tour</a>
+        <button type="button" id="logout" class="btn btn--ghost">Log out</button>
+      </div>
+      <p id="accountMsg" class="message" role="status"></p>
+    </section>
+  </main>
+
   <script>
     // The browser only collects the details. Python checks them and keeps you logged in.
     const who = document.getElementById("who");
@@ -60,9 +71,11 @@
     const loginForm = document.getElementById("loginForm");
     const registerForm = document.getElementById("registerForm");
 
+    // Messages go under whichever part of the page is showing.
     function show(text, ok) {
-      message.textContent = text;
-      message.className = "message " + (ok ? "ok" : "bad");
+      const box = loggedIn.hidden ? message : document.getElementById("accountMsg");
+      box.textContent = text;
+      box.className = "message " + (ok ? "ok" : "bad");
     }
 
     function showLoggedIn(user) {
@@ -70,8 +83,17 @@
         ? `You are logged in as ${user.username}.`
         : "Log in to start hunting for treasure.";
       forms.hidden = Boolean(user);
+      document.getElementById("welcomeCard").hidden = Boolean(user);
       loggedIn.hidden = !user;
-      if (user) { loadWeight(); loadCoins(); }
+      if (user) {
+        document.title = `${user.username} · Account · StepQuest`;
+        loadWeight();
+        loadCoins();
+        // Your profile, exactly as other players see it on /players/<name>
+        loadProfile(user.username).then(() => {
+          document.getElementById("editMine").hidden = true;  // you are already on your account
+        }).catch(error => console.error(error));
+      }
     }
 
     async function loadCoins() {
