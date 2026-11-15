@@ -65,3 +65,19 @@ DEMO_HUNT_REACTIONS = (
      "likes": ("alice", "demo_player"),
      "comments": (("alice", "Under five minutes, wow."),)},
 )
+
+# A hunt chat, so the group chat isn't empty on demo day. alice and ben join the everyday demo hunt
+# (made by models.seed_demo_hunt, 5 places), so demo_player can still join it and read the chat.
+DEMO_CHAT_HUNT = "NTHU campus walk"
+DEMO_CHAT = {
+    "members": ("alice", "ben"),
+    "messages": (
+        ("alice", "Hi! Meet at the main gate at 5?"),
+        ("ben", "Sounds good. I found Pond bench already, it's right by the water."),
+        ("alice", "Nice! Let's try Library steps next."),
+    ),
+}
+
+# Players who have already "seen" the first-time tour, so it doesn't pop up in the middle of the demo.
+# To show the tour on purpose, open /?tour.
+DEMO_TOUR_SEEN = ("demo_player",)

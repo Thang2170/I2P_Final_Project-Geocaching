@@ -17,6 +17,7 @@ from onboarding_api import onboarding_api
 from photo_api import photo_api
 from profile_api import profile_api
 from route_api import route_api
+from secret_key import KEY_FILE, choose_secret_key, new_key
 from shop_api import shop_api
 from treasure_api import treasure_api
 from walk_api import walk_api
@@ -26,6 +27,24 @@ def get_current_treasure():
     """Return the treasure the map shows: the first one in the database."""
     query = db.select(Treasure).order_by(Treasure.id)
     return db.session.execute(query).scalars().first()
+
+
+def _secret_key(app, database_uri):
+    """SECRET_KEY from the environment, or a random one kept in instance/secret_key."""
+    if database_uri.startswith("sqlite:///:memory:"):
+        return new_key()  # tests: a throwaway key, and no file written
+    path = os.path.join(app.instance_path, KEY_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            saved = f.read()
+    except FileNotFoundError:
+        saved = None
+    key, must_save = choose_secret_key(os.environ.get("SECRET_KEY"), saved)
+    if must_save:
+        os.makedirs(app.instance_path, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(key)
+    return key
 
 
 def create_app(database_uri="sqlite:///geohunt.db"):
@@ -51,9 +70,9 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(leaderboard_api)
     app.register_blueprint(admin_api)
     app.register_blueprint(onboarding_api)
-    # Login sessions are signed with this key. For the real deployment, set a SECRET_KEY
-    # environment variable (never commit a real key); the fallback is for local testing only.
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
+    # B: login cookies are signed with this key. It is never a fixed text in the code any more
+    # (anyone could read that in the repo); see secret_key.py.
+    app.config["SECRET_KEY"] = _secret_key(app, database_uri)
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     db.init_app(app)

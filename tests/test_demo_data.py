@@ -2,10 +2,11 @@ import unittest
 
 from app import create_app
 from coin_api import get_balance
-from demo_content import (BUILT_IN_TREASURE_NAME, DEMO_FULL_HUNT, DEMO_JOURNEYS, DEMO_PASSWORD, DEMO_POSTS,
-                          DEMO_TREASURES, DEMO_USERS)
+from demo_content import (BUILT_IN_TREASURE_NAME, DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FULL_HUNT, DEMO_JOURNEYS,
+                          DEMO_PASSWORD, DEMO_POSTS, DEMO_TREASURES, DEMO_USERS)
 from demo_data import seed_demo_story
-from models import DEMO_TREASURE, Hunt, HuntMember, Journey, Post, PostComment, PostLike, Profile, Treasure, User, db
+from models import (DEMO_TREASURE, Hunt, HuntMember, HuntMessage, Journey, Post, PostComment, PostLike, Profile,
+                    Treasure, User, db)
 from queue_logic import queue_status
 
 
@@ -52,7 +53,7 @@ class TestDemoData(unittest.TestCase):
         seed_demo_story()
         counts = [db.session.query(model).count() for model in (User, Treasure, Hunt, HuntMember)]
         again = seed_demo_story()
-        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": []})
+        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": []})
         self.assertEqual(counts, [db.session.query(m).count() for m in (User, Treasure, Hunt, HuntMember)])
         self.assertEqual(get_balance(self.user("demo_player").id), DEMO_USERS[0]["coins"])
 
@@ -100,6 +101,29 @@ class TestDemoData(unittest.TestCase):
         counts = [db.session.query(m).count() for m in (Post, PostLike, PostComment)]
         seed_demo_story()
         self.assertEqual(counts, [db.session.query(m).count() for m in (Post, PostLike, PostComment)])
+
+    def test_the_demo_hunt_has_a_chat_demo_player_can_read(self):
+        seed_demo_story()
+        player = self.app.test_client()
+        player.post("/api/login", json={"username": "demo_player", "password": DEMO_PASSWORD})
+        hunts = player.get("/api/hunts").get_json()
+        walk = next(h for h in hunts if h["name"] == DEMO_CHAT_HUNT)
+        player.post(f"/api/hunts/{walk['id']}/join")  # 2 of 5 places taken: demo_player plays
+        data = player.get(f"/api/hunts/{walk['id']}/messages").get_json()
+        self.assertEqual([m["text"] for m in data["messages"]], [t for _, t in DEMO_CHAT["messages"]])
+
+    def test_demo_player_does_not_get_the_tour_mid_demo(self):
+        seed_demo_story()
+        player = self.app.test_client()
+        player.post("/api/login", json={"username": "demo_player", "password": DEMO_PASSWORD})
+        self.assertFalse(player.get("/api/onboarding").get_json()["show"])
+        self.assertTrue(player.get("/api/onboarding?again=1").get_json()["show"])  # /?tour still works
+
+    def test_running_it_twice_does_not_duplicate_the_chat(self):
+        seed_demo_story()
+        count = db.session.query(HuntMessage).count()
+        seed_demo_story()
+        self.assertEqual(db.session.query(HuntMessage).count(), count)
 
 
 if __name__ == "__main__":

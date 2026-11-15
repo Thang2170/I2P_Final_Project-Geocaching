@@ -5,10 +5,12 @@ What gets saved is listed in demo_content.py.
 """
 
 from calculator import calories_from_distance, steps_from_distance
-from demo_content import (DEMO_FULL_HUNT, DEMO_HUNT_REACTIONS, DEMO_JOURNEYS, DEMO_PASSWORD, DEMO_POSTS,
-                          DEMO_TREASURES, DEMO_USERS, GIFT_REASON, TREASURE_CREATOR)
-from models import (CoinTransaction, Hunt, HuntMember, Journey, Post, PostComment, PostLike, Profile, Treasure,
-                    User, add_missing_hunt_posts, db)
+from demo_content import (DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FULL_HUNT, DEMO_HUNT_REACTIONS, DEMO_JOURNEYS,
+                          DEMO_PASSWORD, DEMO_POSTS, DEMO_TOUR_SEEN, DEMO_TREASURES, DEMO_USERS, GIFT_REASON,
+                          TREASURE_CREATOR)
+from models import (CoinTransaction, Hunt, HuntMember, HuntMessage, Journey, Post, PostComment, PostLike, Profile,
+                    TourSeen, Treasure, User, add_missing_hunt_posts, db)
+from onboarding import SKIPPED
 from walk_input import DEFAULT_WEIGHT_KG
 
 
@@ -18,7 +20,7 @@ def _get_user(username):
 
 def seed_demo_story():
     """Add the demo users, treasures and hunt that are missing. Returns what was added."""
-    added = {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": []}
+    added = {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": []}
 
     for spec in DEMO_USERS:
         if _get_user(spec["username"]) is not None:
@@ -94,7 +96,40 @@ def seed_demo_story():
         _react(post, spec)
         added["posts"].append(f"reactions on {spec['username']} -> {spec['treasure']}")
 
+    added["chat"] = _seed_chat()
+
+    for username in DEMO_TOUR_SEEN:  # no tour popping up mid-demo
+        player = _get_user(username)
+        if player is not None and db.session.get(TourSeen, player.id) is None:
+            db.session.add(TourSeen(user_id=player.id, how=SKIPPED))
+
     db.session.commit()
+    return added
+
+
+def _seed_chat():
+    """alice and ben join the everyday demo hunt and say a few things. Returns what was added."""
+    added = []
+    hunt = db.session.execute(db.select(Hunt).where(Hunt.name == DEMO_CHAT_HUNT)).scalar_one_or_none()
+    if hunt is None:
+        return added
+    for username in DEMO_CHAT["members"]:
+        member = _get_user(username)
+        if member is None:
+            continue
+        joined = db.session.execute(db.select(HuntMember.id).where(
+            HuntMember.hunt_id == hunt.id, HuntMember.user_id == member.id)).first()
+        if joined is None:
+            db.session.add(HuntMember(hunt_id=hunt.id, user_id=member.id))
+            added.append(f"{username} joined {hunt.name}")
+    has_messages = db.session.execute(
+        db.select(HuntMessage.id).where(HuntMessage.hunt_id == hunt.id).limit(1)).first()
+    if has_messages is None:
+        for username, text in DEMO_CHAT["messages"]:
+            writer = _get_user(username)
+            if writer is not None:
+                db.session.add(HuntMessage(hunt_id=hunt.id, user_id=writer.id, text=text))
+        added.append(f"{len(DEMO_CHAT['messages'])} messages in {hunt.name}")
     return added
 
 
