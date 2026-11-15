@@ -6,11 +6,13 @@ for anything newer (GET /api/hunts/<id>/messages?after=<last id>).
 """
 
 from flask import Blueprint, abort, jsonify, render_template, request
+from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
+from feed_api import _last, too_soon
 from feed_rules import avatar, time_ago
-from hunt_chat import HISTORY_SIZE, POLL_SECONDS, chat_access, parse_after, parse_message
-from models import Hunt, HuntMember, HuntMessage, User, db
+from hunt_chat import HISTORY_SIZE, POLL_SECONDS, chat_access, parse_after, parse_message, unread_count
+from models import ChatRead, Hunt, HuntMember, HuntMessage, User, db
 from queue_logic import queue_status
 
 chat_api = Blueprint("chat_api", __name__)
@@ -31,6 +33,29 @@ def _message_dict(message, me):
         "ago": time_ago(message.created_at),
         "mine": message.user_id == me.id,
     }
+
+
+def mark_read(user_id, hunt_id, newest_id):
+    """Remember that this player has seen the chat up to message newest_id."""
+    mark = db.session.execute(db.select(ChatRead).where(
+        ChatRead.user_id == user_id, ChatRead.hunt_id == hunt_id)).scalar_one_or_none()
+    if mark is None:
+        db.session.add(ChatRead(user_id=user_id, hunt_id=hunt_id, last_read_id=newest_id))
+    elif newest_id > mark.last_read_id:
+        mark.last_read_id = newest_id
+    try:
+        db.session.commit()
+    except IntegrityError:  # two tabs at once: the other one saved it
+        db.session.rollback()
+
+
+def unread_for(user_id, hunt_id):
+    """How many messages in this hunt's chat the player hasn't seen (see hunt_chat.unread_count)."""
+    last_read = db.session.execute(db.select(ChatRead.last_read_id).where(
+        ChatRead.user_id == user_id, ChatRead.hunt_id == hunt_id)).scalar_one_or_none() or 0
+    rows = db.session.execute(db.select(HuntMessage.id, HuntMessage.user_id).where(
+        HuntMessage.hunt_id == hunt_id, HuntMessage.id > last_read)).all()
+    return unread_count(rows, last_read, user_id)
 
 
 def _members(hunt, member_ids):
@@ -83,6 +108,11 @@ def list_messages(hunt_id):
         newest = db.session.execute(query.order_by(HuntMessage.id.desc()).limit(HISTORY_SIZE)).scalars().all()
         messages = list(reversed(newest))
 
+    newest = db.session.execute(db.select(db.func.max(HuntMessage.id)).where(
+        HuntMessage.hunt_id == hunt_id)).scalar_one_or_none()
+    if newest:
+        mark_read(user.id, hunt_id, newest)  # you are looking at the chat: nothing is unread now
+
     return jsonify(
         hunt={"id": hunt.id, "name": hunt.name, "capacity": hunt.capacity},
         me={"username": user.username, "avatar": avatar(user.username),
@@ -102,6 +132,9 @@ def send_message(hunt_id):
         text = parse_message(request.get_json(silent=True))
     except ValueError as err:
         return jsonify(error=str(err)), 400
+    wait = too_soon("chat", _last(HuntMessage, user.id))
+    if wait:
+        return wait
     message = HuntMessage(hunt_id=hunt.id, user_id=user.id, text=text)
     db.session.add(message)
     db.session.commit()

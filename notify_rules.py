@@ -1,0 +1,63 @@
+"""Rules for notifications: the bell in the top bar (owner: B).
+
+Plain Python with no Flask and no database, so it is easy to test.
+notify_api.py saves a notification when something happens and uses these rules to show it.
+"""
+
+from queue_logic import PLAYING, queue_status
+
+LIKE = "like"            # someone liked your post
+COMMENT = "comment"      # someone commented on your post
+MOVED_UP = "moved_up"    # you moved up from a hunt's waiting line and can play now
+KINDS = (LIKE, COMMENT, MOVED_UP)
+
+SHOWN = 20  # how many notifications the bell lists
+
+
+def should_notify(actor_id, recipient_id):
+    """Nobody gets a notification about their own actions (liking your own post, ...)."""
+    return recipient_id is not None and actor_id != recipient_id
+
+
+def message(kind, actor_name, subject):
+    """What the notification says.
+
+    actor_name: who did it (None for MOVED_UP). subject: a few words about what it was about
+    (the start of the post, or the hunt's name).
+    """
+    if kind == LIKE:
+        return f'{actor_name} liked your post "{subject}"'
+    if kind == COMMENT:
+        return f'{actor_name} commented on your post "{subject}"'
+    if kind == MOVED_UP:
+        return f'You moved up in "{subject}": you can play now, and the group chat is open'
+    raise ValueError(f"Unknown notification kind: {kind}")
+
+
+def link(kind, post_id=None, hunt_id=None):
+    """Where tapping the notification takes you."""
+    if kind in (LIKE, COMMENT):
+        return "/community"
+    if kind == MOVED_UP:
+        return f"/hunts/{hunt_id}/chat"
+    raise ValueError(f"Unknown notification kind: {kind}")
+
+
+def short(text, limit=40):
+    """The start of a post, for the notification ("Found the pond treasure, it was…")."""
+    text = " ".join(text.split())  # one line
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+
+def moved_up(before_ids, after_ids, capacity):
+    """Who was waiting in line before and is playing now (after someone left).
+
+    before_ids / after_ids: the hunt's members in the order they joined, before and after.
+    """
+    risen = []
+    for user_id in after_ids:
+        was = queue_status(user_id, before_ids, capacity)
+        now = queue_status(user_id, after_ids, capacity)
+        if was is not None and was["state"] != PLAYING and now["state"] == PLAYING:
+            risen.append(user_id)
+    return risen

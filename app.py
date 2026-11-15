@@ -14,9 +14,11 @@ from feed_api import feed_api
 from hunt_api import hunt_api
 from journey_api import journey_api
 from leaderboard_api import leaderboard_api
+from notify_api import notify_api
 from onboarding_api import onboarding_api
 from photo_api import photo_api
 from profile_api import profile_api
+from rate_limit import MIN_GAP_S
 from route_api import route_api
 from secret_key import KEY_FILE, choose_secret_key, new_key
 from shop_api import shop_api
@@ -71,6 +73,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(shop_api)
     app.register_blueprint(hunt_api)
     app.register_blueprint(chat_api)
+    app.register_blueprint(notify_api)
     app.register_blueprint(profile_api)
     app.register_blueprint(journey_api)
     app.register_blueprint(feed_api)
@@ -83,6 +86,10 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.config["SECRET_KEY"] = _secret_key(app, database_uri)
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
+    # B: the anti-spam waits (rate_limit.py). Tests use a throwaway in-memory database and post
+    # many things quickly, so there the waits are off; tests of the waits switch them back on.
+    testing = database_uri.startswith("sqlite:///:memory:")
+    app.config["SPAM_GAPS"] = {kind: 0 for kind in MIN_GAP_S} if testing else dict(MIN_GAP_S)
     db.init_app(app)
 
     # Create the tables (if missing) and save the demo treasure on the first run.

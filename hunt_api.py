@@ -7,8 +7,11 @@ from flask import Blueprint, jsonify, render_template, request
 from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
+from hunt_chat import can_chat
 from hunt_input import parse_hunt
 from models import Hunt, HuntMember, db
+from notify_api import notify
+from notify_rules import MOVED_UP, moved_up
 from queue_logic import count_players, queue_status
 
 hunt_api = Blueprint("hunt_api", __name__)
@@ -31,7 +34,17 @@ def _hunt_dict(hunt, user):
         "playing": playing,
         "waiting": waiting,
         "me": queue_status(user.id, member_ids, hunt.capacity) if user else None,
+        # B: unread group-chat messages, only for players who can open the chat (playing, not in line)
+        "unread": _unread(user, hunt, member_ids),
     }
+
+
+def _unread(user, hunt, member_ids):
+    from chat_api import unread_for  # here, not at the top, so the two files don't import each other
+
+    if user is None or not can_chat(user.id, member_ids, hunt.capacity):
+        return 0
+    return unread_for(user.id, hunt.id)
 
 
 @hunt_api.route("/hunts")
@@ -106,6 +119,11 @@ def leave_hunt(hunt_id):
     if membership is None:
         return jsonify(error="You are not in this hunt."), 409
 
+    before = _member_ids(hunt_id)
     db.session.delete(membership)
+    db.session.flush()
+    # B: whoever moves up from the waiting line gets a notification (the bell in the top bar)
+    for risen in moved_up(before, _member_ids(hunt_id), hunt.capacity):
+        notify(risen, MOVED_UP, hunt_id=hunt.id)
     db.session.commit()
     return jsonify(_hunt_dict(hunt, user))

@@ -57,3 +57,14 @@ def chat_access(user_id, member_ids, capacity):
 def can_chat(user_id, member_ids, capacity):
     """Only players who are playing in the hunt can read and write its chat."""
     return chat_access(user_id, member_ids, capacity)[0]
+
+
+def unread_count(messages, last_read_id, user_id):
+    """How many messages in a hunt's chat this player hasn't seen yet.
+
+    messages: (message id, sender id) for the hunt's messages.
+    last_read_id: the newest message id they have seen (0 if they never opened the chat).
+    Your own messages never count as unread.
+    """
+    return sum(1 for message_id, sender_id in messages
+               if message_id > last_read_id and sender_id != user_id)
