@@ -21,7 +21,11 @@
 
     <!-- Journey panel: replaces the status card while you walk to a treasure (like a run tracker) -->
     <section id="journey" class="journey" hidden>
-      <p id="jTitle" class="journey__title"></p>
+      <div class="journey__top">
+        <p id="jTitle" class="journey__title"></p>
+        <!-- Fold the panel down to the essentials, so more of the route shows -->
+        <button type="button" id="jFold" class="journey__fold" aria-expanded="true" aria-controls="journey">▾ Less</button>
+      </div>
       <div class="journey__main">
         <div class="journey__stat"><strong id="jTime">00:00</strong><span>Time</span></div>
         <div class="journey__stat"><strong id="jPace">--:--</strong><span>Avg pace (/km)</span></div>
@@ -268,6 +272,8 @@
     // Space the map should keep free when zooming to a route: the status card
     // at the bottom, plus the open board. On a wide screen the board takes the
     // right side; on a phone it is almost full width, so it takes the top instead.
+    function statusCard() { return document.querySelector(".sheet"); }
+
     function routePadding() {
       let top = 40, right = 40;
       if (board.classList.contains("is-open")) {
@@ -275,7 +281,10 @@
         if (spaceLeft > 250) right = board.offsetWidth + 40;
         else top = board.offsetHeight + 30;
       }
-      return { paddingTopLeft: [40, top], paddingBottomRight: [right, 150] };
+      // Keep the route above whatever covers the bottom: the journey panel or the status card.
+      const bottomBox = !journeyBox.hidden ? journeyBox : statusCard();
+      const bottom = bottomBox ? bottomBox.offsetHeight + 40 : 150;
+      return { paddingTopLeft: [40, top], paddingBottomRight: [right, bottom] };
     }
 
     // Ask Python for a walking route and draw it.
@@ -457,7 +466,17 @@
       keepScreenOn(true);
       updateStartButton();
       renderJourney();
+      // Zoom so the whole route shows above the panel (the panel is now on screen to measure).
+      if (routeLine) map.fitBounds(routeLine.getBounds(), routePadding());
     }
+
+    // ▾ Less / ▴ More: hide the extra numbers and messages, or show them again.
+    const jFold = document.getElementById("jFold");
+    jFold.addEventListener("click", () => {
+      const folded = journeyBox.classList.toggle("is-folded");
+      jFold.textContent = folded ? "▴ More" : "▾ Less";
+      jFold.setAttribute("aria-expanded", folded ? "false" : "true");
+    });
 
     function pauseOrResume() {
       if (journey.state === "running") {
