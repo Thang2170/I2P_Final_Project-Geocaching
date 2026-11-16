@@ -75,5 +75,6 @@ def profile(username):
                        "time": format_duration(j.duration_s), "ago": time_ago(j.created_at)}
                       for j in journeys[:RECENT_HUNTS]],
         hidden_treasures=hidden,
-        recent_posts=[{"text": p.text, "ago": time_ago(p.created_at)} for p in posts],
+        # A share with no words of its own still shows up (B: shares, see shares.py).
+        recent_posts=[{"text": p.text or "Shared a post", "ago": time_ago(p.created_at)} for p in posts],
     )

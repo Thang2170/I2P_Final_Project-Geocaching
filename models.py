@@ -346,3 +346,68 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
     actor = db.relationship("User", foreign_keys=[actor_id])
+
+
+class TreasureRating(db.Model):
+    """A player's 1-5 star rating of a treasure they found. One per player and treasure; can be changed."""
+
+    __tablename__ = "treasure_ratings"
+    __table_args__ = (db.UniqueConstraint("user_id", "treasure_id", name="one_rating_per_treasure"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False, index=True)
+    stars = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+
+class Friendship(db.Model):
+    """Two players who are friends, or one asked the other (owner: B). Rules: friends.py.
+
+    One row per pair: whoever asked first is the requester. A new table (not new columns),
+    so nobody has to delete their database.
+    """
+
+    __tablename__ = "friendships"
+    __table_args__ = (db.UniqueConstraint("requester_id", "addressee_id", name="one_request_per_pair"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    requester_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    addressee_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False, default="pending")  # friends.PENDING / ACCEPTED
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    answered_at = db.Column(db.DateTime, nullable=True)
+
+
+class PostShare(db.Model):
+    """A post that shares another post (owner: B). Rules: shares.py.
+
+    The share is a normal Post (its own words, likes and comments); this row says which post
+    it shares. original_id becomes empty when the original is deleted: the feed then says
+    "This post was deleted". A new table (not a new column on posts).
+    """
+
+    __tablename__ = "post_shares"
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), unique=True, nullable=False)  # the share
+    original_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class CommentReply(db.Model):
+    """A reply to a comment, shown indented under it (owner: B).
+
+    A new table, not a new column on post_comments, so nobody has to delete their database.
+    """
+
+    __tablename__ = "comment_replies"
+
+    id = db.Column(db.Integer, primary_key=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey("post_comments.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship("User")

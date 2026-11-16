@@ -19,6 +19,8 @@ from onboarding_api import onboarding_api
 from photo_api import photo_api
 from profile_api import profile_api
 from rate_limit import MIN_GAP_S
+from friends_api import friends_api
+from rating_api import rating_api
 from route_api import route_api
 from secret_key import KEY_FILE, choose_secret_key, new_key
 from shop_api import shop_api
@@ -74,6 +76,8 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(hunt_api)
     app.register_blueprint(chat_api)
     app.register_blueprint(notify_api)
+    app.register_blueprint(rating_api)
+    app.register_blueprint(friends_api)
     app.register_blueprint(profile_api)
     app.register_blueprint(journey_api)
     app.register_blueprint(feed_api)

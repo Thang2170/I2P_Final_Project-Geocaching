@@ -64,6 +64,14 @@ def list_treasures():
 
     query = db.select(Treasure).order_by(Treasure.id)
     treasures = db.session.execute(query).scalars().all()
+    from rating_api import my_ratings, rating_summaries  # (same reason)
+
     user = current_user()
     found = set(found_treasure_ids(user.id)) if user else set()
-    return jsonify([{**t.to_dict(), "found_by_me": t.id in found} for t in treasures])
+    ratings = rating_summaries()
+    mine = my_ratings(user.id) if user else {}
+    none = {"average": None, "count": 0}
+    return jsonify([{**t.to_dict(), "found_by_me": t.id in found,
+                     # B: stars for the map's info board (see ratings.py)
+                     "rating": {k: ratings.get(t.id, none)[k] for k in ("average", "count")},
+                     "my_rating": mine.get(t.id)} for t in treasures])

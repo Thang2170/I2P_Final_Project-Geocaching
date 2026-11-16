@@ -52,8 +52,15 @@
         <p id="message" class="message" role="status"></p>
       </form>
 
+      <!-- B: Everyone, or only your friends (and you). Python picks the posts: /api/feed?only=friends -->
+      <div class="feed-switch" role="group" aria-label="Whose posts to show">
+        <button type="button" class="feed-switch__btn" data-only="everyone" aria-pressed="true">Everyone</button>
+        <button type="button" class="feed-switch__btn" data-only="friends" aria-pressed="false">Friends</button>
+      </div>
+
       <div id="feed" class="news-feed" aria-live="polite"></div>
       <p id="empty" class="panel muted" hidden>Nothing here yet. Write the first post, or finish a hunt on the map.</p>
+      <p id="emptyFriends" class="panel muted" hidden>No posts from friends yet. Open a player's profile and tap "Add friend".</p>
       <button id="more" type="button" class="btn btn--ghost" hidden>Load more</button>
     </main>
 
@@ -146,6 +153,58 @@
       return box;
     }
 
+    // B: the post a share shares, in a box. Python sends null once the original was deleted.
+    function sharedBox(o) {
+      const box = el("div", undefined, "shared");
+      if (!o) {
+        box.classList.add("shared--gone");
+        box.append(el("p", "This post was deleted.", "muted"));
+        return box;
+      }
+      const head = el("div", undefined, "shared__head");
+      const who = el("div", undefined, "post__who");
+      who.append(playerLink(o.author, el("strong", o.author, "post__author player-link__name")),
+                 el("span", o.hunt ? `${o.ago} · finished a hunt` : o.ago, "post__meta"));
+      head.append(playerLink(o.author, avatarEl(o.avatar)), who);
+      box.append(head);
+      if (o.text) box.append(el("p", o.text, "post__text"));
+      if (o.hunt) box.append(huntCard(o.hunt));
+      return box;
+    }
+
+    // One small "Delete" link that asks "Sure?" first. onGone runs after Python deleted it.
+    function deleteLink(url, row, report, onGone) {
+      const del = el("button", "Delete", "link-button");
+      del.type = "button";
+      del.addEventListener("click", async () => {
+        if (!confirmDelete(del)) return;
+        try {
+          await send(url, "DELETE");
+          const list = row.parentElement;
+          row.remove();
+          if (onGone) onGone(list);
+        } catch (error) { report(error.message); }
+      });
+      return del;
+    }
+
+    // B: one reply, indented under its comment. "Reply" on a reply answers in the same thread, with @name.
+    function replyEl(r, report, answer) {
+      const row = el("li", undefined, "comment comment--reply");
+      const body = el("div", undefined, "comment__body");
+      const bubble = el("div", undefined, "comment__bubble");
+      bubble.append(playerLink(r.author, el("strong", r.author, "player-link__name")), el("span", r.text, "comment__text"));
+      const meta = el("div", r.ago, "comment__meta");
+      const replyBtn = el("button", "Reply", "link-button");
+      replyBtn.type = "button";
+      replyBtn.addEventListener("click", () => answer(r.reply_start));
+      meta.append(" · ", replyBtn);
+      if (r.mine) meta.append(" · ", deleteLink(`/api/replies/${r.id}`, row, report));
+      body.append(bubble, meta);
+      row.append(playerLink(r.author, avatarEl(r.avatar)), body);
+      return row;
+    }
+
     // report: where errors go (the post's own message line, under its comment box).
     function commentEl(c, report = say) {
       const row = el("li", undefined, "comment");
@@ -153,22 +212,55 @@
       const bubble = el("div", undefined, "comment__bubble");
       bubble.append(playerLink(c.author, el("strong", c.author, "player-link__name")), el("span", c.text, "comment__text"));
       const meta = el("div", c.ago, "comment__meta");
-      if (c.mine) {
-        const del = el("button", "Delete", "link-button");
-        del.type = "button";
-        del.addEventListener("click", async () => {
-          try {
-            await send(`/api/comments/${c.id}`, "DELETE");
-            const list = row.parentElement;
-            row.remove();
-            list.dispatchEvent(new CustomEvent("changed"));
-          } catch (error) { report(error.message); }
-        });
-        meta.append(" · ", del);
+
+      // B: replies, and the box to write one (hidden until you tap Reply)
+      const replies = el("ul", undefined, "replies");
+      const form = el("form", undefined, "reply reply--nested");
+      form.hidden = true;
+      const input = el("input", undefined, "reply__input");
+      input.type = "text";
+      input.maxLength = 300;
+      input.placeholder = `Reply to ${c.author}…`;
+      input.setAttribute("aria-label", `Reply to ${c.author}`);
+      const sendBtn = el("button", "Send", "reply__send");
+      sendBtn.type = "submit";
+      form.append(avatarEl(me.avatar), input, sendBtn);
+
+      function answer(start) {
+        form.hidden = false;
+        if (start && !input.value.startsWith(start)) input.value = start + input.value;
+        input.focus();
       }
-      body.append(bubble, meta);
+      replies.append(...(c.replies || []).map(r => replyEl(r, report, answer)));
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        sendBtn.disabled = true;
+        try {
+          const r = await send(`/api/comments/${c.id}/replies`, "POST", { text: input.value });
+          replies.append(replyEl(r, report, answer));
+          input.value = "";
+          report("");
+        } catch (error) { report(error.message); }
+        finally { sendBtn.disabled = false; }
+      });
+
+      const replyBtn = el("button", "Reply", "link-button");
+      replyBtn.type = "button";
+      replyBtn.addEventListener("click", () => answer(""));
+      meta.append(" · ", replyBtn);
+      if (c.mine) {
+        meta.append(" · ", deleteLink(`/api/comments/${c.id}`, row, report,
+                                      list => list.dispatchEvent(new CustomEvent("changed"))));
+      }
+      body.append(bubble, meta, replies, form);
       row.append(playerLink(c.author, avatarEl(c.avatar)), body);
       return row;
+    }
+
+    // "shared bob's post", or "shared a post" once the original is gone
+    function sharedWhat(p) {
+      return p.shared ? `shared ${p.shared.author}'s post` : "shared a post";
     }
 
     function postEl(p) {
@@ -189,7 +281,8 @@
       const head = el("header", undefined, "post__head");
       const who = el("div", undefined, "post__who");
       who.append(playerLink(p.author, el("strong", p.author, "post__author player-link__name")),
-                 el("span", p.hunt ? `${p.ago} · finished a hunt` : p.ago, "post__meta"));
+                 el("span", p.is_share ? `${p.ago} · ${sharedWhat(p)}` : p.hunt ? `${p.ago} · finished a hunt` : p.ago,
+                    "post__meta"));
       head.append(playerLink(p.author, avatarEl(p.avatar)), who);
       if (p.can_delete) {
         const del = el("button", "Delete", "link-button post__delete");
@@ -205,12 +298,14 @@
 
       if (p.text) card.append(el("p", p.text, "post__text"));
       if (p.hunt) card.append(huntCard(p.hunt));
+      if (p.is_share) card.append(sharedBox(p.shared));
 
       // like and comment counts
       const counts = el("div", undefined, "post__counts");
       const likeLine = el("span", "", "post__likes");
       const commentLine = el("span", "", "post__ncomments");
-      counts.append(likeLine, commentLine);
+      const shareLine = el("span", "", "post__nshares");
+      counts.append(likeLine, commentLine, shareLine);
 
       // Like / Comment buttons
       const actions = el("div", undefined, "post__actions");
@@ -218,7 +313,27 @@
       likeBtn.type = "button";
       const commentBtn = el("button", "Comment", "post__action");
       commentBtn.type = "button";
-      actions.append(likeBtn, commentBtn);
+      const shareBtn = el("button", "↗ Share", "post__action");
+      shareBtn.type = "button";
+      // Sharing a share shares the original (Python decides); a deleted original can't be shared.
+      shareBtn.hidden = p.is_share && !p.shared;
+      actions.append(likeBtn, commentBtn, shareBtn);
+
+      // B: the share box: optional words, then "Share now". The new share goes to the top of the feed.
+      const shareForm = el("form", undefined, "share-form");
+      shareForm.hidden = true;
+      const shareText = el("textarea", undefined, "share-form__text");
+      shareText.rows = 2;
+      shareText.maxLength = MAX_POST;
+      shareText.placeholder = "Say something about this (optional)";
+      shareText.setAttribute("aria-label", "Say something about this post");
+      const shareBar = el("div", undefined, "share-form__bar");
+      const shareGo = el("button", "Share now", "btn btn--small");
+      shareGo.type = "submit";
+      const shareCancel = el("button", "Cancel", "btn btn--small btn--ghost");
+      shareCancel.type = "button";
+      shareBar.append(shareCancel, shareGo);
+      shareForm.append(shareText, shareBar);
 
       // comments and the reply box
       const list = el("ul", undefined, "comments");
@@ -235,11 +350,13 @@
 
       let likes = { likes: p.likes, liked_by_me: p.liked_by_me, like_summary: p.like_summary };
       let commentCount = p.comment_count;
+      let shareCount = p.share_count;
 
       function draw() {
         likeLine.textContent = likes.likes ? "♥ " + likes.like_summary : "";
         commentLine.textContent = commentCount ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"}` : "";
-        counts.hidden = !likes.likes && !commentCount;
+        shareLine.textContent = shareCount ? `${shareCount} ${shareCount === 1 ? "share" : "shares"}` : "";
+        counts.hidden = !likes.likes && !commentCount && !shareCount;
         likeBtn.classList.toggle("is-on", likes.liked_by_me);
         likeBtn.setAttribute("aria-pressed", likes.liked_by_me ? "true" : "false");
       }
@@ -252,6 +369,27 @@
       });
 
       commentBtn.addEventListener("click", () => input.focus());
+
+      shareBtn.addEventListener("click", () => {
+        shareForm.hidden = !shareForm.hidden;
+        if (!shareForm.hidden) shareText.focus();
+      });
+      shareCancel.addEventListener("click", () => { shareForm.hidden = true; shareText.value = ""; });
+      shareForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        shareGo.disabled = true;
+        try {
+          const shared = await send(`/api/posts/${p.id}/share`, "POST", { text: shareText.value });
+          feedBox.prepend(postEl(shared));
+          shareForm.hidden = true;
+          shareText.value = "";
+          if (!p.is_share) { shareCount += 1; draw(); }
+          postSay("");
+          say("Shared to the feed.", true);
+          showEmpty();
+        } catch (error) { postSay(error.message); }
+        finally { shareGo.disabled = false; }
+      });
 
       reply.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -272,7 +410,7 @@
       // Typing again clears an old error such as "You can't post an empty message".
       input.addEventListener("input", () => postSay(""));
 
-      card.append(counts, actions, list, reply, postMsg);
+      card.append(counts, actions, shareForm, list, reply, postMsg);
       draw();
       return card;
     }
@@ -287,15 +425,22 @@
     }
 
     function showEmpty() {
-      document.getElementById("empty").hidden = feedBox.children.length > 0;
+      const none = feedBox.children.length === 0;
+      document.getElementById("empty").hidden = !none || feedOnly === "friends";
+      document.getElementById("emptyFriends").hidden = !none || feedOnly !== "friends";
     }
 
     // ---------- loading ----------
 
+    let feedOnly = "everyone";
+    let feedRequest = 0;  // so an old answer can't land after you switched Everyone / Friends
+
     async function loadFeed() {
       moreBtn.disabled = true;
+      const requestId = ++feedRequest;
       try {
-        const data = await api(`/api/feed?offset=${nextOffset}`);
+        const data = await api(`/api/feed?offset=${nextOffset}&only=${feedOnly}`);
+        if (requestId !== feedRequest) return;
         if (!me) {
           me = data.me;
           fillAvatar(document.getElementById("meAvatar"), me.avatar);
@@ -370,6 +515,20 @@
     });
 
     moreBtn.addEventListener("click", loadFeed);
+
+    for (const button of document.querySelectorAll(".feed-switch__btn")) {
+      button.addEventListener("click", () => {
+        if (feedOnly === button.dataset.only) return;
+        feedOnly = button.dataset.only;
+        for (const b of document.querySelectorAll(".feed-switch__btn")) {
+          b.setAttribute("aria-pressed", String(b === button));
+        }
+        feedBox.replaceChildren();
+        nextOffset = 0;
+        moreBtn.hidden = true;
+        loadFeed();
+      });
+    }
 
     loadFeed();
     loadSides();

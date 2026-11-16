@@ -4,12 +4,18 @@ Plain Python with no Flask and no database, so it is easy to test.
 notify_api.py saves a notification when something happens and uses these rules to show it.
 """
 
+from urllib.parse import quote
+
 from queue_logic import PLAYING, queue_status
 
 LIKE = "like"            # someone liked your post
 COMMENT = "comment"      # someone commented on your post
 MOVED_UP = "moved_up"    # you moved up from a hunt's waiting line and can play now
-KINDS = (LIKE, COMMENT, MOVED_UP)
+FRIEND_REQUEST = "friend_request"    # someone wants to be your friend (the bell shows Accept / Decline)
+FRIEND_ACCEPTED = "friend_accepted"  # someone said yes to your friend request
+SHARE = "share"          # someone shared your post
+REPLY = "reply"          # someone replied to your comment
+KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY)
 
 SHOWN = 20  # how many notifications the bell lists
 
@@ -31,15 +37,25 @@ def message(kind, actor_name, subject):
         return f'{actor_name} commented on your post "{subject}"'
     if kind == MOVED_UP:
         return f'You moved up in "{subject}": you can play now, and the group chat is open'
+    if kind == SHARE:
+        return f'{actor_name} shared your post "{subject}"'
+    if kind == REPLY:
+        return f'{actor_name} replied to your comment on "{subject}"'
+    if kind == FRIEND_REQUEST:
+        return f"{actor_name} wants to be your friend"
+    if kind == FRIEND_ACCEPTED:
+        return f"{actor_name} accepted your friend request"
     raise ValueError(f"Unknown notification kind: {kind}")
 
 
-def link(kind, post_id=None, hunt_id=None):
+def link(kind, post_id=None, hunt_id=None, actor_name=None):
     """Where tapping the notification takes you."""
-    if kind in (LIKE, COMMENT):
+    if kind in (LIKE, COMMENT, SHARE, REPLY):
         return "/community"
     if kind == MOVED_UP:
         return f"/hunts/{hunt_id}/chat"
+    if kind in (FRIEND_REQUEST, FRIEND_ACCEPTED):
+        return f"/players/{quote(actor_name or '')}"
     raise ValueError(f"Unknown notification kind: {kind}")
 
 

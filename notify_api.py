@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify
 from auth_api import current_user
 from feed_rules import avatar, time_ago
 from models import Hunt, Notification, Post, db
-from notify_rules import SHOWN, link, message, short, should_notify
+from notify_rules import FRIEND_REQUEST, SHOWN, link, message, short, should_notify
 
 notify_api = Blueprint("notify_api", __name__)
 
@@ -29,7 +29,7 @@ def notify(recipient_id, kind, actor_id=None, post_id=None, hunt_id=None):
                                     post_id=post_id, hunt_id=hunt_id))
 
 
-def _item(n):
+def _item(n, me_id=None):
     subject = ""
     if n.post_id is not None:
         post = db.session.get(Post, n.post_id)
@@ -38,15 +38,23 @@ def _item(n):
         elif post.journey is not None:  # an automatic hunt post has no text of its own
             subject = short(f"Found {post.journey.treasure.name}")
         else:
-            subject = short(post.text)
+            subject = short(post.text) or "(your share)"  # a share with no words of its own
     elif n.hunt_id is not None:
         hunt = db.session.get(Hunt, n.hunt_id)
         subject = hunt.name if hunt else "a hunt"
     actor = n.actor.username if n.actor else None
+    friend_request = None
+    if n.kind == FRIEND_REQUEST and actor:
+        from friends import RECEIVED  # here, not at the top: friends_api imports this file
+        from friends_api import link_between
+        # The bell shows Accept / Decline only while the request is still waiting.
+        friend_request = {"username": actor, "waiting": link_between(me_id, n.actor_id) == RECEIVED}
     return {
         "id": n.id,
+        "kind": n.kind,
         "text": message(n.kind, actor, subject),
-        "link": link(n.kind, post_id=n.post_id, hunt_id=n.hunt_id),
+        "link": link(n.kind, post_id=n.post_id, hunt_id=n.hunt_id, actor_name=actor),
+        "friend_request": friend_request,
         "avatar": avatar(actor) if actor else None,
         "ago": time_ago(n.created_at),
         "seen": n.seen,
@@ -63,7 +71,7 @@ def notifications():
                                .order_by(Notification.id.desc()).limit(SHOWN)).scalars().all()
     unseen = db.session.execute(db.select(db.func.count()).select_from(Notification).where(
         Notification.user_id == user.id, Notification.seen.is_(False))).scalar_one()
-    return jsonify(unseen=unseen, items=[_item(n) for n in items])
+    return jsonify(unseen=unseen, items=[_item(n, user.id) for n in items])
 
 
 @notify_api.route("/api/notifications/seen", methods=["POST"])

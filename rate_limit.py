@@ -10,6 +10,7 @@ from datetime import timezone
 MIN_GAP_S = {
     "post": 10,      # a new post on the Community feed
     "comment": 3,    # a comment under a post
+    "reply": 3,      # a reply to a comment (B: replies)
     "chat": 1,       # a message in a hunt's group chat (short: chats are quick back-and-forth)
 }
 

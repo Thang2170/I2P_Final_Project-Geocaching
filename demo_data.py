@@ -5,11 +5,14 @@ What gets saved is listed in demo_content.py.
 """
 
 from calculator import calories_from_distance, steps_from_distance
-from demo_content import (DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FULL_HUNT, DEMO_HUNT_REACTIONS, DEMO_JOURNEYS,
-                          DEMO_PASSWORD, DEMO_POSTS, DEMO_TOUR_SEEN, DEMO_TREASURES, DEMO_USERS, GIFT_REASON,
-                          TREASURE_CREATOR)
-from models import (CoinTransaction, Hunt, HuntMember, HuntMessage, Journey, Post, PostComment, PostLike, Profile,
-                    TourSeen, Treasure, User, add_missing_hunt_posts, db)
+from demo_content import (DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FRIEND_REQUESTS, DEMO_FRIENDS, DEMO_FULL_HUNT,
+                          DEMO_HUNT_REACTIONS, DEMO_JOURNEYS, DEMO_PASSWORD, DEMO_POSTS, DEMO_RATINGS, DEMO_REPLIES,
+                          DEMO_SHARES, DEMO_TOUR_SEEN, DEMO_TREASURES, DEMO_USERS, GIFT_REASON, TREASURE_CREATOR)
+from friends import ACCEPTED, PENDING
+from models import (CoinTransaction, CommentReply, Friendship, Hunt, HuntMember, HuntMessage, Journey, Notification,
+                    Post, PostComment, PostLike, PostShare, Profile, TourSeen, Treasure, TreasureRating, User,
+                    add_missing_hunt_posts, db)
+from notify_rules import FRIEND_REQUEST
 from onboarding import SKIPPED
 from walk_input import DEFAULT_WEIGHT_KG
 
@@ -20,7 +23,7 @@ def _get_user(username):
 
 def seed_demo_story():
     """Add the demo users, treasures and hunt that are missing. Returns what was added."""
-    added = {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": []}
+    added = {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": [], "social": []}
 
     for spec in DEMO_USERS:
         if _get_user(spec["username"]) is not None:
@@ -97,6 +100,7 @@ def seed_demo_story():
         added["posts"].append(f"reactions on {spec['username']} -> {spec['treasure']}")
 
     added["chat"] = _seed_chat()
+    added["social"] = _seed_social()
 
     for username in DEMO_TOUR_SEEN:  # no tour popping up mid-demo
         player = _get_user(username)
@@ -105,6 +109,72 @@ def seed_demo_story():
 
     db.session.commit()
     return added
+
+
+def _seed_social():
+    """Ratings, friends, a share and a reply (B: social features). Returns what was added."""
+    added = []
+    for username, treasure_name, stars in DEMO_RATINGS:
+        player = _get_user(username)
+        treasure = db.session.execute(db.select(Treasure).where(Treasure.name == treasure_name)).scalar_one_or_none()
+        if player is None or treasure is None:
+            continue
+        rated = db.session.execute(db.select(TreasureRating.id).where(
+            TreasureRating.user_id == player.id, TreasureRating.treasure_id == treasure.id)).first()
+        if rated is None:
+            db.session.add(TreasureRating(user_id=player.id, treasure_id=treasure.id, stars=stars))
+            added.append(f"{username} rated {treasure_name} {stars} stars")
+
+    for pairs, status in ((DEMO_FRIENDS, ACCEPTED), (DEMO_FRIEND_REQUESTS, PENDING)):
+        for asker_name, other_name in pairs:
+            asker, other = _get_user(asker_name), _get_user(other_name)
+            if asker is None or other is None or _pair(asker.id, other.id) is not None:
+                continue
+            db.session.add(Friendship(requester_id=asker.id, addressee_id=other.id, status=status))
+            if status == PENDING:
+                db.session.add(Notification(user_id=other.id, kind=FRIEND_REQUEST, actor_id=asker.id))
+            added.append(f"{asker_name} {'and' if status == ACCEPTED else 'asked'} {other_name}")
+    db.session.flush()
+
+    for spec in DEMO_SHARES:
+        sharer, author = _get_user(spec["username"]), _get_user(spec["post_by"])
+        if sharer is None or author is None:
+            continue
+        original = db.session.execute(db.select(Post).where(
+            Post.user_id == author.id, Post.text.startswith(spec["post_starts"])).limit(1)).scalar_one_or_none()
+        if original is None:
+            continue
+        done = db.session.execute(db.select(PostShare.id).join(Post, PostShare.post_id == Post.id).where(
+            PostShare.original_id == original.id, Post.user_id == sharer.id)).first()
+        if done is not None:
+            continue
+        share = Post(user_id=sharer.id, text=spec["text"])
+        db.session.add(share)
+        db.session.flush()
+        db.session.add(PostShare(post_id=share.id, original_id=original.id))
+        added.append(f"{spec['username']} shared {spec['post_by']}'s post")
+
+    for replier_name, commenter_name, comment_starts, text in DEMO_REPLIES:
+        replier, commenter = _get_user(replier_name), _get_user(commenter_name)
+        if replier is None or commenter is None:
+            continue
+        comment = db.session.execute(db.select(PostComment).where(
+            PostComment.user_id == commenter.id, PostComment.text.startswith(comment_starts)).limit(1)
+        ).scalar_one_or_none()
+        if comment is None:
+            continue
+        done = db.session.execute(db.select(CommentReply.id).where(
+            CommentReply.comment_id == comment.id, CommentReply.user_id == replier.id)).first()
+        if done is None:
+            db.session.add(CommentReply(comment_id=comment.id, user_id=replier.id, text=text))
+            added.append(f"{replier_name} replied to {commenter_name}")
+    return added
+
+
+def _pair(a_id, b_id):
+    return db.session.execute(db.select(Friendship.id).where(db.or_(
+        db.and_(Friendship.requester_id == a_id, Friendship.addressee_id == b_id),
+        db.and_(Friendship.requester_id == b_id, Friendship.addressee_id == a_id)))).first()
 
 
 def _seed_chat():
