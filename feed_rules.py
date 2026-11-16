@@ -39,6 +39,20 @@ def parse_comment(data):
     return _clean_text(data, "text", MAX_COMMENT_CHARS)
 
 
+def parse_reply(data):
+    """The text of a reply to a comment, or raise ValueError. Same limits as a comment."""
+    return _clean_text(data, "text", MAX_COMMENT_CHARS)
+
+
+def reply_start(username):
+    """What the reply box starts with when you reply to a reply: "@bob ".
+
+    Replies are one level deep (like Facebook): replying to a reply adds to the same comment,
+    and the @name shows who you are answering.
+    """
+    return f"@{username} "
+
+
 def parse_offset(value):
     """Where the next page of the feed starts. Empty means the top."""
     if value is None or str(value).strip() == "":

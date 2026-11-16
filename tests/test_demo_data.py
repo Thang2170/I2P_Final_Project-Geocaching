@@ -3,7 +3,7 @@ import unittest
 from app import create_app
 from coin_api import get_balance
 from demo_content import (BUILT_IN_TREASURE_NAME, DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FULL_HUNT, DEMO_JOURNEYS,
-                          DEMO_PASSWORD, DEMO_POSTS, DEMO_TREASURES, DEMO_USERS)
+                          DEMO_PASSWORD, DEMO_POSTS, DEMO_RATINGS, DEMO_SHARES, DEMO_TREASURES, DEMO_USERS)
 from demo_data import seed_demo_story
 from models import (DEMO_TREASURE, Hunt, HuntMember, HuntMessage, Journey, Post, PostComment, PostLike, Profile,
                     Treasure, User, db)
@@ -53,7 +53,7 @@ class TestDemoData(unittest.TestCase):
         seed_demo_story()
         counts = [db.session.query(model).count() for model in (User, Treasure, Hunt, HuntMember)]
         again = seed_demo_story()
-        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": []})
+        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": [], "social": []})
         self.assertEqual(counts, [db.session.query(m).count() for m in (User, Treasure, Hunt, HuntMember)])
         self.assertEqual(get_balance(self.user("demo_player").id), DEMO_USERS[0]["coins"])
 
@@ -85,8 +85,8 @@ class TestDemoData(unittest.TestCase):
 
     def test_the_feed_has_posts_likes_and_comments(self):
         seed_demo_story()
-        # the written posts, plus one post per finished hunt
-        self.assertEqual(db.session.query(Post).count(), len(DEMO_POSTS) + len(DEMO_JOURNEYS))
+        # the written posts, one post per finished hunt, and the shares (a share is a post too)
+        self.assertEqual(db.session.query(Post).count(), len(DEMO_POSTS) + len(DEMO_JOURNEYS) + len(DEMO_SHARES))
         self.assertGreater(db.session.query(PostLike).count(), 0)
         self.assertGreater(db.session.query(PostComment).count(), 0)
         player = self.app.test_client()
@@ -95,6 +95,25 @@ class TestDemoData(unittest.TestCase):
         alice_post = next(p for p in posts if p["author"] == "alice" and p["hunt"] is None)
         self.assertTrue(alice_post["liked_by_me"])
         self.assertEqual(alice_post["comment_count"], 2)
+
+    def test_social_demo(self):
+        seed_demo_story()
+        seed_demo_story()  # twice: nothing doubles
+        player = self.app.test_client()
+        player.post("/api/login", json={"username": "demo_player", "password": DEMO_PASSWORD})
+        bell = player.get("/api/notifications").get_json()["items"]
+        self.assertEqual([n["friend_request"] for n in bell if n["friend_request"]],
+                         [{"username": "ben", "waiting": True}])
+        self.assertEqual(player.get("/api/players/alice/friends").get_json()["count"], 1)
+        ranks = player.get("/api/treasures/rankings").get_json()
+        self.assertEqual(len(ranks["top_rated"]), len(DEMO_RATINGS))
+        self.assertTrue(ranks["trending"])
+        posts = player.get("/api/feed").get_json()["posts"]
+        share = next(p for p in posts if p["is_share"])
+        self.assertEqual((share["author"], share["shared"]["author"]), ("ben", "alice"))
+        alice_post = next(p for p in posts if p["author"] == "alice" and p["hunt"] is None)
+        replies = [r for c in alice_post["comments"] for r in c["replies"]]
+        self.assertEqual([r["author"] for r in replies], ["demo_player"])
 
     def test_running_it_twice_does_not_duplicate_the_feed(self):
         seed_demo_story()

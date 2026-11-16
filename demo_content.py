@@ -81,3 +81,28 @@ DEMO_CHAT = {
 # Players who have already "seen" the first-time tour, so it doesn't pop up in the middle of the demo.
 # To show the tour on purpose, open /?tour.
 DEMO_TOUR_SEEN = ("demo_player",)
+
+# ---------- social (B): ratings, friends, a share and a reply ----------
+
+# Stars (1-5) from players who walked to that treasure (see DEMO_JOURNEYS), so the welcome page
+# has a Top rated row and a Trending this week row on demo day.
+DEMO_RATINGS = (
+    ("ben", "Pond bench", 5),
+    ("ben", "Library steps", 4),
+    ("alice", BUILT_IN_TREASURE_NAME, 5),
+)
+
+# alice and ben are friends. ben has asked demo_player, so the bell shows Accept / Decline.
+DEMO_FRIENDS = (("alice", "ben"),)
+DEMO_FRIEND_REQUESTS = (("ben", "demo_player"),)
+
+# ben shares alice's "Just hid three new treasures" post (found by its first words).
+DEMO_SHARES = (
+    {"username": "ben", "post_by": "alice", "post_starts": "Just hid three new treasures",
+     "text": "Go find these, they're fun!"},
+)
+
+# A reply under a comment: (who replies, whose comment, the comment's first words, the reply).
+DEMO_REPLIES = (
+    ("demo_player", "ben", "Found two of them already", "@ben which two? I'm still looking for all three."),
+)

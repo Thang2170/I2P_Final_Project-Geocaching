@@ -17,6 +17,18 @@
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
       <div id="coinInfo" class="sheet__route coin-line" hidden></div>
+      <!-- B: after a find, rate the treasure 1-5 stars (Python checks you really found it) -->
+      <div id="rateBox" class="rate-box" hidden>
+        <p class="rate-box__ask">How was <span id="rateName"></span>?</p>
+        <div class="rate-box__stars" role="group" aria-label="Rate this treasure">
+          <button type="button" class="rate-star" data-stars="1" aria-label="1 star">★</button>
+          <button type="button" class="rate-star" data-stars="2" aria-label="2 stars">★</button>
+          <button type="button" class="rate-star" data-stars="3" aria-label="3 stars">★</button>
+          <button type="button" class="rate-star" data-stars="4" aria-label="4 stars">★</button>
+          <button type="button" class="rate-star" data-stars="5" aria-label="5 stars">★</button>
+        </div>
+        <p id="rateMsg" class="rate-box__msg"></p>
+      </div>
     </section>
 
     <!-- Journey panel: replaces the status card while you walk to a treasure (like a run tracker) -->
@@ -51,6 +63,7 @@
       <p class="board__eyebrow">Treasure</p>
       <h2 id="boardName"></h2>
       <p id="boardHint" class="board__hint"></p>
+      <p id="boardStars" class="board__stars"></p>
       <!-- The photo the hider took of the spot (loads only if the treasure has one) -->
       <img id="boardPhoto" class="board__photo" alt="Photo of the spot" hidden>
       <div class="board__stats">
@@ -109,6 +122,7 @@
     }
 
     const markersById = new Map();  // treasure id -> its pin, so a found one can be taken off the map
+    const ratingsById = new Map();  // B: treasure id -> {rating: {average, count}, mine}, from /api/treasures
 
     function addTreasurePin(t, kind) {
       const marker = L.marker([t.lat, t.lon], {
@@ -140,9 +154,14 @@
         const list = await res.json();
         if (!res.ok) throw new Error(list.error || "Could not load treasures");
         for (const t of list) {
+          ratingsById.set(t.id, { rating: t.rating, mine: t.my_rating });
           // B: Python marks the ones you were already paid for (found_by_me); they stay off your map.
           if (t.id !== treasure.id && !t.found_by_me) addTreasurePin(t, "treasure");
         }
+        // B: /?treasure=<id> (from the welcome page) opens that treasure's board.
+        const wanted = Number(params.get("treasure"));
+        const wantedTreasure = list.find((t) => t.id === wanted);
+        if (wantedTreasure && markersById.has(wanted)) selectTreasure(wantedTreasure, markersById.get(wanted));
       } catch (err) {
         console.error("Treasure markers failed:", err);
       }
@@ -176,6 +195,7 @@
       document.getElementById("boardName").textContent = t.name;
       document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
       showBoardPhoto(t.id);
+      showBoardStars(t.id);
       boardKm.textContent = "–";
       boardMin.textContent = "–";
       boardSteps.textContent = "–";
@@ -205,6 +225,17 @@
       if (boardPhoto.getAttribute("src") === url) return;
       boardPhoto.hidden = true;
       boardPhoto.src = url;
+    }
+
+    // B: "★ 4.6 (12 ratings)" under the hint. Python works out the average.
+    const boardStars = document.getElementById("boardStars");
+    function starsText(rating) {
+      if (!rating || !rating.count) return "No ratings yet";
+      return `★ ${rating.average.toFixed(1)} (${rating.count} rating${rating.count === 1 ? "" : "s"})`;
+    }
+    function showBoardStars(treasureId) {
+      const info = ratingsById.get(treasureId);
+      boardStars.textContent = info ? starsText(info.rating) : "";
     }
 
     function closeBoard() {
@@ -617,6 +648,51 @@
     }
     loadBalance();
 
+    // ------------------------------------------------------------ rating (B)
+
+    const rateBox = document.getElementById("rateBox");
+    const rateMsg = document.getElementById("rateMsg");
+    const rateStars = [...rateBox.querySelectorAll(".rate-star")];
+    let rateId = null;
+
+    function paintStars(n) {
+      rateStars.forEach((b, i) => b.classList.toggle("is-on", i < n));
+    }
+
+    function showRateBox(treasureId, name) {
+      rateId = treasureId;
+      document.getElementById("rateName").textContent = name;
+      const mine = ratingsById.get(treasureId)?.mine;
+      paintStars(mine || 0);
+      rateMsg.textContent = mine ? `You gave it ${mine} ★. Tap to change.` : "Tap a star.";
+      rateBox.hidden = false;
+    }
+
+    rateStars.forEach((button) => {
+      button.addEventListener("mouseenter", () => paintStars(Number(button.dataset.stars)));
+      button.addEventListener("mouseleave", () => paintStars(ratingsById.get(rateId)?.mine || 0));
+      button.addEventListener("click", async () => {
+        if (rateId === null) return;
+        const stars = Number(button.dataset.stars);
+        rateMsg.textContent = "Saving…";
+        try {
+          const res = await fetch(`/api/treasures/${rateId}/rating`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stars })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not save your rating");
+          ratingsById.set(rateId, { rating: { average: data.average, count: data.count }, mine: data.mine });
+          paintStars(data.mine);
+          rateMsg.textContent = `Thanks! ${starsText(data)}`;
+          if (selectedTreasure && selectedTreasure.id === rateId) showBoardStars(rateId);
+        } catch (err) {
+          rateMsg.textContent = err.message;
+        }
+      });
+    });
+
     async function claimCoins(treasureId, name, lat, lon) {
       if (triedClaim.has(treasureId)) return;
       triedClaim.add(treasureId);
@@ -631,8 +707,12 @@
           claimNotes.delete(treasureId);
           showBalance(data.balance, data.coins_earned);
           collectPin(treasureId);
+          showRateBox(treasureId, name);
         } else {
-          if (res.status === 409) collectPin(treasureId);  // you had already found it
+          if (res.status === 409) {  // you had already found it
+            collectPin(treasureId);
+            showRateBox(treasureId, name);
+          }
           // Refused: say why (you hid it yourself, you already found it, ...) instead of staying silent.
           claimNotes.set(treasureId, data.error || "No coins this time.");
           if (res.status === 400) triedClaim.delete(treasureId);  // e.g. too far: allow another try

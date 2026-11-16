@@ -21,7 +21,7 @@ class TestPostMessages(unittest.TestCase):
 
     def test_each_post_has_its_own_message_line_after_the_comment_box(self):
         self.assertIn('el("p", "", "message post__message")', self.html)
-        self.assertIn("card.append(counts, actions, list, reply, postMsg)", self.html)
+        self.assertRegex(self.html, r"card\.append\(counts, actions, [\w, ]*reply, postMsg\)")  # last, under the box
 
     def test_comment_and_like_errors_go_there(self):
         self.assertIn("} catch (error) { postSay(error.message); }", self.html)   # sending a comment

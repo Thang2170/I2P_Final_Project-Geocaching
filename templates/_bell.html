@@ -11,7 +11,7 @@
   <div class="bell__panel" id="bellPanel" hidden>
     <p class="bell__title">Notifications</p>
     <ul class="bell__list" id="bellList"></ul>
-    <p class="bell__empty" id="bellEmpty" hidden>Nothing yet. Likes, comments and hunt news show up here.</p>
+    <p class="bell__empty" id="bellEmpty" hidden>Nothing yet. Likes, comments, friend requests and hunt news show up here.</p>
   </div>
 </div>
 <script>
@@ -25,6 +25,33 @@
       if (text !== undefined) node.textContent = text;
       if (className) node.className = className;
       return node;
+    }
+
+    // B: a friend request gets Accept / Decline right in the bell. Python checks it is still waiting.
+    function friendButtons(request) {
+      const box = el("div", undefined, "bell__actions");
+      if (!request.waiting) return box;  // already answered (here or on their profile)
+      const say = el("span", "", "bell__done");
+      const answer = async (what) => {
+        try {
+          const res = await fetch(`/api/friends/${encodeURIComponent(request.username)}/${what}`, { method: "POST" });
+          const data = await res.json();
+          say.textContent = !res.ok ? (data.error || "Something went wrong.")
+            : what === "accept" ? `You and ${request.username} are friends now.` : "Request declined.";
+          if (res.ok) box.replaceChildren(say);
+          else box.append(say);
+        } catch (err) {
+          say.textContent = "No connection. Try again.";
+          box.append(say);
+        }
+      };
+      const yes = el("button", "Accept", "btn btn--small");
+      const no = el("button", "Decline", "btn btn--small btn--ghost");
+      yes.type = no.type = "button";
+      yes.addEventListener("click", () => answer("accept"));
+      no.addEventListener("click", () => answer("decline"));
+      box.append(yes, no);
+      return box;
     }
 
     function draw(data) {
@@ -51,6 +78,7 @@
         words.append(el("span", n.text), el("span", n.ago, "bell__ago"));
         link.append(words);
         row.append(link);
+        if (n.friend_request) row.append(friendButtons(n.friend_request));
         return row;
       }));
       $("bellEmpty").hidden = items.length > 0;

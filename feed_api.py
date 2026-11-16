@@ -11,13 +11,17 @@ from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
-from feed_rules import (FEED_PAGE_SIZE, MAX_COMMENTS_SHOWN, avatar, like_summary, parse_comment,
-                        parse_offset, parse_post, time_ago)
+from feed_rules import (FEED_PAGE_SIZE, MAX_COMMENTS_SHOWN, avatar, like_summary, parse_comment, parse_offset,
+                        parse_post, parse_reply, reply_start, time_ago)
+from friends import parse_feed_filter
+from friends_api import friend_ids_of
 from journey_log import format_duration, format_pace
-from models import Notification, Post, PostComment, PostLike, add_missing_hunt_posts, db
+from models import (CommentReply, Notification, Post, PostComment, PostLike, PostShare, add_missing_hunt_posts,
+                    db)
 from notify_api import notify
-from notify_rules import COMMENT, LIKE
+from notify_rules import COMMENT, LIKE, REPLY, SHARE
 from rate_limit import slow_down_message, wait_left
+from shares import parse_share, share_target
 
 feed_api = Blueprint("feed_api", __name__)
 
@@ -44,7 +48,21 @@ def _hunt_dict(journey):
     }
 
 
+def _reply_dict(reply, me):
+    return {
+        "id": reply.id,
+        "author": reply.user.username,
+        "avatar": avatar(reply.user.username),
+        "text": reply.text,
+        "ago": time_ago(reply.created_at),
+        "mine": reply.user_id == me.id,
+        "reply_start": reply_start(reply.user.username),  # tapping Reply on a reply starts "@name "
+    }
+
+
 def _comment_dict(comment, me):
+    replies = db.session.execute(db.select(CommentReply).where(CommentReply.comment_id == comment.id)
+                                 .order_by(CommentReply.id)).scalars().all()
     return {
         "id": comment.id,
         "author": comment.user.username,
@@ -52,6 +70,7 @@ def _comment_dict(comment, me):
         "text": comment.text,
         "ago": time_ago(comment.created_at),
         "mine": comment.user_id == me.id,
+        "replies": [_reply_dict(r, me) for r in replies],  # B: shown indented under the comment
     }
 
 
@@ -61,6 +80,25 @@ def _likes_of(post_id, me):
     liked_by_me = any(like.user_id == me.id for like in likes)
     others = [like.user.username for like in likes if like.user_id != me.id]
     return {"likes": len(likes), "liked_by_me": liked_by_me, "like_summary": like_summary(others, liked_by_me)}
+
+
+def _share_link(post_id):
+    """The PostShare row if this post shares another post, else None."""
+    return db.session.execute(db.select(PostShare).where(PostShare.post_id == post_id)).scalar_one_or_none()
+
+
+def _original_dict(post):
+    """The shared post, boxed inside the share. None when it was deleted."""
+    if post is None:
+        return None
+    return {
+        "id": post.id,
+        "author": post.user.username,
+        "avatar": avatar(post.user.username),
+        "ago": time_ago(post.created_at),
+        "text": post.text,
+        "hunt": _hunt_dict(post.journey) if post.journey else None,
+    }
 
 
 def _post_dict(post, me):
@@ -81,6 +119,12 @@ def _post_dict(post, me):
         "comments": [_comment_dict(c, me) for c in comments[-MAX_COMMENTS_SHOWN:]],
     }
     data.update(_likes_of(post.id, me))
+    # B: shares. A share boxes the original inside it ("shared" is None once that was deleted).
+    link = _share_link(post.id)
+    data["is_share"] = link is not None
+    data["shared"] = _original_dict(_find_post(link.original_id)) if link and link.original_id else None
+    data["share_count"] = db.session.execute(db.select(db.func.count()).select_from(PostShare).where(
+        PostShare.original_id == post.id)).scalar_one()
     return data
 
 
@@ -104,23 +148,31 @@ def _find_post(post_id):
 
 @feed_api.route("/api/feed")
 def feed():
-    """Newest posts first, FEED_PAGE_SIZE at a time. ?offset= gets the next page."""
+    """Newest posts first, FEED_PAGE_SIZE at a time. ?offset= gets the next page.
+
+    ?only=friends shows only your friends' posts and your own (see friends.py).
+    """
     me = current_user()
     if me is None:
         return _login_needed()
     try:
         offset = parse_offset(request.args.get("offset"))
+        only = parse_feed_filter(request.args.get("only"))
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
     _add_missing_hunt_posts()
-    query = (db.select(Post).order_by(Post.created_at.desc(), Post.id.desc())
+    query = db.select(Post)
+    if only == "friends":
+        query = query.where(Post.user_id.in_([me.id, *friend_ids_of(me.id)]))
+    query = (query.order_by(Post.created_at.desc(), Post.id.desc())
              .offset(offset).limit(FEED_PAGE_SIZE + 1))  # one extra tells us if there is more
     posts = db.session.execute(query).scalars().all()
     more = len(posts) > FEED_PAGE_SIZE
     posts = posts[:FEED_PAGE_SIZE]
     return jsonify(
         me={"username": me.username, "avatar": avatar(me.username)},
+        only=only,
         posts=[_post_dict(p, me) for p in posts],
         next_offset=offset + FEED_PAGE_SIZE if more else None)
 
@@ -157,11 +209,44 @@ def delete_post(post_id):
     if post.journey_id is not None:
         return jsonify(error="Hunt posts can't be deleted"), 403
     db.session.execute(db.delete(PostLike).where(PostLike.post_id == post.id))
+    comment_ids = db.select(PostComment.id).where(PostComment.post_id == post.id)
+    db.session.execute(db.delete(CommentReply).where(CommentReply.comment_id.in_(comment_ids)))
     db.session.execute(db.delete(PostComment).where(PostComment.post_id == post.id))
     db.session.execute(db.delete(Notification).where(Notification.post_id == post.id))
+    # B: shares. If this was a share, its link goes; shares OF this post now say "This post was deleted".
+    db.session.execute(db.delete(PostShare).where(PostShare.post_id == post.id))
+    db.session.execute(db.update(PostShare).where(PostShare.original_id == post.id).values(original_id=None))
     db.session.delete(post)
     db.session.commit()
     return jsonify(ok=True)
+
+
+@feed_api.route("/api/posts/<int:post_id>/share", methods=["POST"])
+def share_post(post_id):
+    """Share a post to the feed, with your own words if you like. Send JSON: text (optional)."""
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    post = _find_post(post_id)
+    if post is None:
+        return jsonify(error="No such post"), 404
+    try:
+        text = parse_share(request.get_json(silent=True))
+        link = _share_link(post.id)
+        target_id = share_target(post.id, link is not None, link.original_id if link else None)
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    wait = too_soon("post", _last(Post, me.id, Post.journey_id.is_(None)))  # a share counts as a post
+    if wait:
+        return wait
+    original = _find_post(target_id)
+    share = Post(user_id=me.id, text=text)
+    db.session.add(share)
+    db.session.flush()  # gives the share its id
+    db.session.add(PostShare(post_id=share.id, original_id=original.id))
+    notify(original.user_id, SHARE, actor_id=me.id, post_id=original.id)
+    db.session.commit()
+    return jsonify(_post_dict(share, me)), 201
 
 
 @feed_api.route("/api/posts/<int:post_id>/like", methods=["POST"])
@@ -220,6 +305,45 @@ def delete_comment(comment_id):
         return jsonify(error="No such comment"), 404
     if comment.user_id != me.id:
         return jsonify(error="You can only delete your own comments"), 403
+    db.session.execute(db.delete(CommentReply).where(CommentReply.comment_id == comment.id))  # its replies go too
     db.session.delete(comment)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@feed_api.route("/api/comments/<int:comment_id>/replies", methods=["POST"])
+def add_reply(comment_id):
+    """Reply to a comment. Send JSON: text. The commenter gets a notification."""
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    comment = db.session.get(PostComment, comment_id)
+    if comment is None:
+        return jsonify(error="No such comment"), 404
+    try:
+        text = parse_reply(request.get_json(silent=True))
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    wait = too_soon("reply", _last(CommentReply, me.id))
+    if wait:
+        return wait
+    reply = CommentReply(comment_id=comment.id, user_id=me.id, text=text)
+    db.session.add(reply)
+    notify(comment.user_id, REPLY, actor_id=me.id, post_id=comment.post_id)
+    db.session.commit()
+    return jsonify(_reply_dict(reply, me)), 201
+
+
+@feed_api.route("/api/replies/<int:reply_id>", methods=["DELETE"])
+def delete_reply(reply_id):
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    reply = db.session.get(CommentReply, reply_id)
+    if reply is None:
+        return jsonify(error="No such reply"), 404
+    if reply.user_id != me.id:
+        return jsonify(error="You can only delete your own replies"), 403
+    db.session.delete(reply)
     db.session.commit()
     return jsonify(ok=True)

@@ -90,7 +90,8 @@ class TestMapPage(unittest.TestCase):
 
     def test_a_collected_pin_leaves_the_map(self):
         self.assertIn("collectPin(treasureId);", self.html)
-        self.assertIn("if (res.status === 409) collectPin(treasureId);", self.html)
+        after_409 = self.html.split("if (res.status === 409)", 1)[1][:120]  # you had already found it
+        self.assertIn("collectPin(treasureId);", after_409)
         self.assertIn(".pin.is-collected", self.css)
 
 

@@ -10,6 +10,8 @@
         <p id="rank" class="profile__rank"></p>
       </div>
       <a id="editMine" class="btn btn--ghost profile__edit" href="/login" hidden>Your account</a>
+      <!-- B: Add friend / Request sent / Accept + Decline / Friends. Python says which (friends.py). -->
+      <div id="friendActions" class="profile__friend" hidden></div>
     </section>
 
     <section class="panel">
@@ -37,6 +39,13 @@
         <p id="noHidden" class="muted" hidden>Hasn't hidden a treasure yet.</p>
       </section>
     </div>
+
+    <section class="panel">
+      <h2>Friends <span id="friendCount" class="muted"></span></h2>
+      <p id="friendWaiting" class="muted" hidden></p>
+      <ul id="friendList" class="friend-list"></ul>
+      <p id="noFriends" class="muted" hidden>No friends yet.</p>
+    </section>
 
     <section class="panel">
       <h2>Posts</h2>
@@ -92,6 +101,75 @@
         row.append(el("p", post.text, "profile__post"), el("span", post.ago, "muted"));
         return row;
       });
+      loadFriends(p.username);
       return p;
+    }
+
+    // ---------- friends (B) ----------
+
+    // What the button says and does, for each link Python reports (see friends.py).
+    const FRIEND_BUTTONS = {
+      none: [["Add friend", "request", ""]],
+      sent: [["Request sent · Cancel", "remove", "btn--ghost"]],
+      received: [["Accept", "accept", ""], ["Decline", "decline", "btn--ghost"]],
+      friends: [["Friends ✓ · Unfriend", "remove", "btn--ghost"]],
+    };
+
+    function friendButtons(username, state) {
+      const box = $("friendActions");
+      box.hidden = !(state in FRIEND_BUTTONS);
+      if (box.hidden) return;
+      const note = el("p", state === "received" ? `${username} wants to be your friend.` : "", "muted profile__friend-note");
+      const buttons = FRIEND_BUTTONS[state].map(([label, action, extra]) => {
+        const b = el("button", label, `btn btn--small ${extra}`.trim());
+        b.type = "button";
+        b.addEventListener("click", async () => {
+          // Unfriending asks first: two taps, like deleting a post.
+          if (action === "remove" && state === "friends" && !b.dataset.armed) {
+            b.dataset.armed = "1";
+            b.textContent = "Sure? Tap again";
+            setTimeout(() => { delete b.dataset.armed; b.textContent = label; }, 3000);
+            return;
+          }
+          b.disabled = true;
+          try {
+            const res = await fetch(`/api/friends/${encodeURIComponent(username)}/${action}`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Something went wrong.");
+            loadFriends(username);
+          } catch (err) {
+            note.textContent = err.message;
+            b.disabled = false;
+          }
+        });
+        return b;
+      });
+      box.replaceChildren(...buttons, note);
+    }
+
+    async function loadFriends(username) {
+      try {
+        const res = await fetch(`/api/players/${encodeURIComponent(username)}/friends`);
+        if (!res.ok) return;
+        const f = await res.json();
+        friendButtons(f.username, f.state);
+        $("friendCount").textContent = f.count ? `(${f.count})` : "";
+        $("friendWaiting").hidden = !f.requests_waiting;
+        $("friendWaiting").textContent = f.requests_waiting === 1
+          ? "1 friend request is waiting for you: open the 🔔 bell."
+          : `${f.requests_waiting} friend requests are waiting for you: open the 🔔 bell.`;
+        fillList("friendList", "noFriends", f.friends, friend => {
+          const row = el("li");
+          const a = el("a", undefined, "player-link friend-list__item");
+          a.href = `/players/${encodeURIComponent(friend.username)}`;
+          const pic = el("span", friend.avatar.letter, "avatar avatar--" + (Number(friend.avatar.colour) || 0));
+          pic.setAttribute("aria-hidden", "true");
+          a.append(pic, el("span", friend.username, "player-link__name"));
+          row.append(a);
+          return row;
+        });
+      } catch (err) {
+        console.error("Friends failed:", err);
+      }
     }
 </script>
