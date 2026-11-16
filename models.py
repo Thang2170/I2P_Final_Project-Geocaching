@@ -314,3 +314,35 @@ class HuntMessage(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
     user = db.relationship("User")
+
+
+class ChatRead(db.Model):
+    """The newest group-chat message a player has seen in a hunt, for the unread count."""
+
+    __tablename__ = "chat_reads"
+    __table_args__ = (db.UniqueConstraint("user_id", "hunt_id", name="one_read_mark_per_chat"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    hunt_id = db.Column(db.Integer, db.ForeignKey("hunts.id"), nullable=False)
+    last_read_id = db.Column(db.Integer, nullable=False, default=0)
+
+
+class Notification(db.Model):
+    """Something for the bell in the top bar: a like, a comment, or "you moved up".
+
+    The words are not stored; notify_rules.py writes them when the bell is opened.
+    """
+
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)  # who gets it
+    kind = db.Column(db.String(20), nullable=False)  # see notify_rules.KINDS
+    actor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # who did it
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True)
+    hunt_id = db.Column(db.Integer, db.ForeignKey("hunts.id"), nullable=True)
+    seen = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    actor = db.relationship("User", foreign_keys=[actor_id])

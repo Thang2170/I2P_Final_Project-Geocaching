@@ -5,14 +5,19 @@ Every finished hunt shows up as a post by itself; players can also write their o
 The page (/community) is served by journey_api.py.
 """
 
-from flask import Blueprint, jsonify, request
+from datetime import datetime, timezone
+
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
 from feed_rules import (FEED_PAGE_SIZE, MAX_COMMENTS_SHOWN, avatar, like_summary, parse_comment,
                         parse_offset, parse_post, time_ago)
 from journey_log import format_duration, format_pace
-from models import Post, PostComment, PostLike, add_missing_hunt_posts, db
+from models import Notification, Post, PostComment, PostLike, add_missing_hunt_posts, db
+from notify_api import notify
+from notify_rules import COMMENT, LIKE
+from rate_limit import slow_down_message, wait_left
 
 feed_api = Blueprint("feed_api", __name__)
 
@@ -79,6 +84,20 @@ def _post_dict(post, me):
     return data
 
 
+def too_soon(kind, last_sent):
+    """A 429 response if this player sent a `kind` too recently (see rate_limit.py), else None."""
+    left = wait_left(last_sent, datetime.now(timezone.utc), current_app.config["SPAM_GAPS"][kind])
+    if left:
+        return jsonify(error=slow_down_message(left), wait_seconds=left), 429
+    return None
+
+
+def _last(model, user_id, *extra):
+    """When this player last made a row of `model` (or None)."""
+    query = db.select(model.created_at).where(model.user_id == user_id, *extra).order_by(model.id.desc()).limit(1)
+    return db.session.execute(query).scalar_one_or_none()
+
+
 def _find_post(post_id):
     return db.session.get(Post, post_id)
 
@@ -116,6 +135,9 @@ def create_post():
         text = parse_post(request.get_json(silent=True))
     except ValueError as err:
         return jsonify(error=str(err)), 400
+    wait = too_soon("post", _last(Post, me.id, Post.journey_id.is_(None)))  # hunt posts don't count
+    if wait:
+        return wait
     post = Post(user_id=me.id, text=text)
     db.session.add(post)
     db.session.commit()
@@ -136,6 +158,7 @@ def delete_post(post_id):
         return jsonify(error="Hunt posts can't be deleted"), 403
     db.session.execute(db.delete(PostLike).where(PostLike.post_id == post.id))
     db.session.execute(db.delete(PostComment).where(PostComment.post_id == post.id))
+    db.session.execute(db.delete(Notification).where(Notification.post_id == post.id))
     db.session.delete(post)
     db.session.commit()
     return jsonify(ok=True)
@@ -147,12 +170,14 @@ def toggle_like(post_id):
     me = current_user()
     if me is None:
         return _login_needed()
-    if _find_post(post_id) is None:
+    post = _find_post(post_id)
+    if post is None:
         return jsonify(error="No such post"), 404
     existing = db.session.execute(db.select(PostLike).where(
         PostLike.post_id == post_id, PostLike.user_id == me.id)).scalar_one_or_none()
     if existing is None:
         db.session.add(PostLike(post_id=post_id, user_id=me.id))
+        notify(post.user_id, LIKE, actor_id=me.id, post_id=post_id)  # the bell for the post's author
     else:
         db.session.delete(existing)
     try:
@@ -168,14 +193,19 @@ def add_comment(post_id):
     me = current_user()
     if me is None:
         return _login_needed()
-    if _find_post(post_id) is None:
+    post = _find_post(post_id)
+    if post is None:
         return jsonify(error="No such post"), 404
     try:
         text = parse_comment(request.get_json(silent=True))
     except ValueError as err:
         return jsonify(error=str(err)), 400
+    wait = too_soon("comment", _last(PostComment, me.id))
+    if wait:
+        return wait
     comment = PostComment(post_id=post_id, user_id=me.id, text=text)
     db.session.add(comment)
+    notify(post.user_id, COMMENT, actor_id=me.id, post_id=post_id)
     db.session.commit()
     return jsonify(_comment_dict(comment, me)), 201
 

@@ -1,0 +1,91 @@
+{# The notifications bell (owner: B), shown in the top bar for logged-in players.
+   It asks GET /api/notifications; opening it sends POST /api/notifications/seen.
+   The words come from notify_rules.py. textContent only, never innerHTML. #}
+<div class="bell" id="bell" hidden>
+  <button type="button" class="bell__button" id="bellButton" aria-haspopup="true" aria-expanded="false"
+          aria-controls="bellPanel" title="Notifications">
+    <span class="bell__icon" aria-hidden="true"></span>
+    <span class="visually-hidden">Notifications</span>
+    <span class="bell__count" id="bellCount" hidden></span>
+  </button>
+  <div class="bell__panel" id="bellPanel" hidden>
+    <p class="bell__title">Notifications</p>
+    <ul class="bell__list" id="bellList"></ul>
+    <p class="bell__empty" id="bellEmpty" hidden>Nothing yet. Likes, comments and hunt news show up here.</p>
+  </div>
+</div>
+<script>
+  (function () {
+    const $ = id => document.getElementById(id);
+    const bell = $("bell"), button = $("bellButton"), panel = $("bellPanel");
+    let items = [];
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function draw(data) {
+      bell.hidden = false;  // logged in
+      items = data.items;
+      const count = $("bellCount");
+      count.textContent = data.unseen > 9 ? "9+" : String(data.unseen);
+      count.hidden = data.unseen === 0;
+      button.setAttribute("aria-label", data.unseen ? `Notifications, ${data.unseen} new` : "Notifications");
+      $("bellList").replaceChildren(...items.map(n => {
+        const row = el("li", undefined, n.seen ? "" : "is-new");
+        const link = el("a", undefined, "bell__item");
+        link.href = n.link;  // fixed paths from notify_rules.link()
+        if (n.avatar) {
+          const a = el("span", n.avatar.letter, "avatar avatar--" + (Number(n.avatar.colour) || 0));
+          a.setAttribute("aria-hidden", "true");
+          link.append(a);
+        } else {
+          const coin = el("span", undefined, "sprite sprite--coin-small");
+          coin.setAttribute("aria-hidden", "true");
+          link.append(coin);
+        }
+        const words = el("span", undefined, "bell__words");
+        words.append(el("span", n.text), el("span", n.ago, "bell__ago"));
+        link.append(words);
+        row.append(link);
+        return row;
+      }));
+      $("bellEmpty").hidden = items.length > 0;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch("/api/notifications");
+        if (!res.ok) return;  // logged out: no bell
+        draw(await res.json());
+      } catch (err) { /* the page works fine without the bell */ }
+    }
+
+    function close() {
+      panel.hidden = true;
+      button.setAttribute("aria-expanded", "false");
+    }
+
+    button.addEventListener("click", async () => {
+      if (!panel.hidden) { close(); return; }
+      panel.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+      if (!$("bellCount").hidden) {
+        // Opening the bell counts as seeing them all; the "new" marks stay until it closes.
+        $("bellCount").hidden = true;
+        fetch("/api/notifications/seen", { method: "POST" }).catch(() => {});
+      }
+    });
+    document.addEventListener("click", event => { if (!bell.contains(event.target)) close(); });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !panel.hidden) { close(); button.focus(); }
+    });
+
+    load();
+    // Check again every 30 s (not while the tab is hidden, or the panel is open).
+    setInterval(() => { if (!document.hidden && panel.hidden) load(); }, 30000);
+  })();
+</script>

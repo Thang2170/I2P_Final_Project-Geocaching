@@ -33,9 +33,7 @@ h1, h2 {
 .feature-showcase,
 .stat-card,
 .quests-panel,
-.map-panel,
-.daily-card,
-.tip-card {
+.daily-card {
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
 }
@@ -497,8 +495,7 @@ h1, h2 {
   gap: 24px;
 }
 
-.section-heading h2,
-.map-panel h2 {
+.section-heading h2 {
   color: var(--px-green);
   font-size: 16px;
 }
@@ -866,95 +863,6 @@ h1, h2 {
   gap: 32px;
 }
 
-.map-panel { padding: 24px; }
-
-.map-panel__heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-/* The tiny overworld: flat colour blocks on a grass field */
-.map-illustration {
-  position: relative;
-  height: 260px;
-  margin-top: 20px;
-  overflow: hidden;
-  background: #9bcf72;
-  box-shadow: var(--px-edge);
-  /* faint 16px grid, like map tiles */
-  background-image:
-    linear-gradient(rgba(20, 35, 31, .06) 2px, transparent 2px),
-    linear-gradient(90deg, rgba(20, 35, 31, .06) 2px, transparent 2px);
-  background-size: 16px 16px;
-}
-
-.map-illustration > * { position: absolute; }
-
-.map-water { left: 0; top: 0; width: 72px; height: 100%; background: var(--px-water); box-shadow: 4px 0 0 0 #3a86a8; }
-.map-park { background: var(--px-grass); }
-.map-park--one { left: 104px; top: 24px; width: 64px; height: 48px; }
-.map-park--two { right: 24px; bottom: 32px; width: 80px; height: 64px; }
-
-.map-road { background: #e8dcc0; }
-.map-road--one { left: 72px; right: 0; top: 112px; height: 16px; }
-.map-road--two { left: 192px; top: 0; bottom: 0; width: 16px; }
-.map-road--three { left: 72px; width: 120px; top: 192px; height: 12px; }
-
-.map-block { background: #c9c2ad; box-shadow: inset -4px -4px 0 0 #a39b84; }
-.map-block--one { left: 224px; top: 24px; width: 48px; height: 32px; }
-.map-block--two { left: 288px; top: 24px; width: 32px; height: 56px; }
-.map-block--three { left: 104px; top: 144px; width: 64px; height: 32px; }
-
-.map-label {
-  padding: 0 4px;
-  background: rgba(255, 252, 242, .85);
-  font-size: 16px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.map-label--one { left: 8px; bottom: 8px; }
-.map-label--two { left: 216px; top: 64px; }
-.map-label--three { right: 8px; bottom: 8px; }
-
-/* Coins bob, each a little out of step with the others */
-.map-pin--one { left: 124px; top: 36px; animation: px-bob 1s steps(2) infinite; }
-.map-pin--two { left: 274px; top: 176px; animation: px-bob 1s steps(2) .5s infinite; }
-.map-pin--three { left: 120px; top: 212px; }
-
-.you-are-here { left: 212px; top: 124px; }
-
-.map-compass {
-  right: 8px;
-  top: 8px;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  background: var(--px-paper);
-  box-shadow: var(--px-edge);
-  font-family: var(--font-pixel);
-  font-size: 10px;
-}
-
-.map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin-top: 16px;
-  color: var(--px-muted);
-  font-size: 18px;
-}
-
-.map-legend span { display: inline-flex; align-items: center; gap: 8px; }
-
-.swatch { width: 12px; height: 12px; box-shadow: 0 0 0 2px var(--px-ink); }
-.swatch--gold { background: var(--px-gold); }
-.swatch--wood { background: var(--px-wood); }
-.swatch--stone { background: #c9c2ad; }
-
 /* ---------- daily challenge ---------- */
 
 .daily-card {
@@ -1003,25 +911,6 @@ h1, h2 {
 }
 
 .daily-card > a { color: var(--px-gold); text-decoration-color: currentColor; }
-
-/* ---------- tip ---------- */
-
-.tip-card {
-  display: flex;
-  gap: 16px;
-  padding: 20px 24px;
-}
-
-.tip-card > .px-icon { color: var(--px-gold-dark); }
-
-.tip-card strong {
-  font-family: var(--font-pixel);
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-.tip-card p { margin-top: 8px; color: var(--px-muted); }
 
 /* ---------- footer ---------- */
 
