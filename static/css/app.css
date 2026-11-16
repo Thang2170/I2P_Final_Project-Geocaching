@@ -1678,3 +1678,10 @@ a.player-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset:
 .reply--nested { margin-top: 8px; }
 .reply--nested[hidden] { display: none; }
 .reply--nested .avatar { width: 26px; height: 26px; font-size: 10px; }
+
+/* B: a post on its own page (/posts/<id>), opened from a profile's Posts list */
+.back-link { display: inline-block; margin-bottom: 12px; color: var(--px-green); text-decoration-color: var(--px-gold); }
+.back-link[hidden], .composer[hidden], .feed-switch[hidden] { display: none; }
+.profile__post-link { display: block; color: inherit; text-decoration: none; }
+.profile__post-link:hover .profile__post { text-decoration: underline; text-decoration-color: var(--px-gold); }
+.profile__post-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }

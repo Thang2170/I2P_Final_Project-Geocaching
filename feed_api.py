@@ -177,6 +177,18 @@ def feed():
         next_offset=offset + FEED_PAGE_SIZE if more else None)
 
 
+@feed_api.route("/api/posts/<int:post_id>")
+def one_post(post_id):
+    """One post with all its comments and replies, for its own page (/posts/<id>)."""
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    post = _find_post(post_id)
+    if post is None:
+        return jsonify(error="This post was deleted, or it never existed."), 404
+    return jsonify(me={"username": me.username, "avatar": avatar(me.username)}, post=_post_dict(post, me))
+
+
 @feed_api.route("/api/posts", methods=["POST"])
 def create_post():
     """Write a post. Send JSON: text."""

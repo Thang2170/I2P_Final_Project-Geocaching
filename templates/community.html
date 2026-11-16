@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   {% include "_head.html" %}
-  <title>Community · StepQuest</title>
+  <title>{% if post_id %}Post{% else %}Community{% endif %} · StepQuest</title>
 </head>
 <body class="feed-page">
   {% set active = "community" %}
@@ -38,6 +38,9 @@
     <!-- Middle column: the feed -->
     <main class="fb__main">
       <h1 class="visually-hidden">Community</h1>
+
+      <!-- B: on /posts/<id> this page shows just that one post -->
+      <a id="backToFeed" class="back-link" href="/community" hidden>◂ Back to the Community feed</a>
 
       <form id="composer" class="panel composer">
         <div class="composer__row">
@@ -84,6 +87,7 @@
     const moreBtn = document.getElementById("more");
     let nextOffset = 0;
     let me = null;
+    const singlePost = {{ post_id | default(None) | tojson }};  // B: /posts/<id> shows one post
 
     function el(tag, text, className) {
       const node = document.createElement(tag);
@@ -380,7 +384,7 @@
         shareGo.disabled = true;
         try {
           const shared = await send(`/api/posts/${p.id}/share`, "POST", { text: shareText.value });
-          feedBox.prepend(postEl(shared));
+          if (singlePost === null) feedBox.prepend(postEl(shared));  // on a post's own page, stay on it
           shareForm.hidden = true;
           shareText.value = "";
           if (!p.is_share) { shareCount += 1; draw(); }
@@ -426,6 +430,11 @@
 
     function showEmpty() {
       const none = feedBox.children.length === 0;
+      if (singlePost !== null) {  // its own page: you just deleted it
+        document.getElementById("empty").textContent = "Post deleted.";
+        document.getElementById("empty").hidden = !none;
+        return;
+      }
       document.getElementById("empty").hidden = !none || feedOnly === "friends";
       document.getElementById("emptyFriends").hidden = !none || feedOnly !== "friends";
     }
@@ -441,15 +450,7 @@
       try {
         const data = await api(`/api/feed?offset=${nextOffset}&only=${feedOnly}`);
         if (requestId !== feedRequest) return;
-        if (!me) {
-          me = data.me;
-          fillAvatar(document.getElementById("meAvatar"), me.avatar);
-          fillAvatar(document.getElementById("composerAvatar"), me.avatar);
-          document.getElementById("meName").textContent = me.username;
-          document.getElementById("meLink").href = `/players/${encodeURIComponent(me.username)}`;
-          document.getElementById("postText").placeholder = `What did you find today, ${me.username}?`;
-          document.getElementById("postBtn").disabled = false;  // the composer needs to know who you are
-        }
+        if (!me) setMe(data.me);
         feedBox.append(...data.posts.map(postEl));
         nextOffset = data.next_offset;
         moreBtn.hidden = nextOffset === null;
@@ -458,6 +459,35 @@
         say(error.message, false);
       } finally {
         moreBtn.disabled = false;
+      }
+    }
+
+    function setMe(who) {
+      me = who;
+      fillAvatar(document.getElementById("meAvatar"), me.avatar);
+      fillAvatar(document.getElementById("composerAvatar"), me.avatar);
+      document.getElementById("meName").textContent = me.username;
+      document.getElementById("meLink").href = `/players/${encodeURIComponent(me.username)}`;
+      document.getElementById("postText").placeholder = `What did you find today, ${me.username}?`;
+      document.getElementById("postBtn").disabled = false;  // the composer needs to know who you are
+    }
+
+    // B: one post on its own page. No composer, no Everyone/Friends switch, no "Load more".
+    async function loadOnePost() {
+      document.getElementById("composer").hidden = true;
+      document.querySelector(".feed-switch").hidden = true;
+      document.getElementById("backToFeed").hidden = false;
+      const empty = document.getElementById("empty");
+      try {
+        const res = await fetch(`/api/posts/${encodeURIComponent(singlePost)}`);
+        if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
+        const data = await res.json();
+        if (!res.ok) { empty.textContent = data.error || "Could not load this post."; empty.hidden = false; return; }
+        setMe(data.me);
+        feedBox.replaceChildren(postEl(data.post));
+      } catch (error) {
+        empty.textContent = "No connection. Try again.";
+        empty.hidden = false;
       }
     }
 
@@ -530,7 +560,8 @@
       });
     }
 
-    loadFeed();
+    if (singlePost === null) loadFeed();
+    else loadOnePost();
     loadSides();
   </script>
 </body>
