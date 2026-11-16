@@ -366,7 +366,7 @@
         likeLine.hidden = !likes.likes;
         likeLine.title = "See who liked this";
         if (!likes.likes) likersBox.hidden = true;
-        else if (!likersBox.hidden) { likersBox.hidden = true; likeLine.setAttribute("aria-expanded", "false"); }  // out of date
+        else if (!likersBox.hidden) closeLikers();  // out of date
         commentLine.textContent = commentCount ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"}` : "";
         shareLine.textContent = shareCount ? `${shareCount} ${shareCount === 1 ? "share" : "shares"}` : "";
         counts.hidden = !likes.likes && !commentCount && !shareCount;
@@ -423,8 +423,17 @@
       // Typing again clears an old error such as "You can't post an empty message".
       input.addEventListener("input", () => postSay(""));
 
+      function closeLikers() {
+        likersBox.hidden = true;
+        likeLine.setAttribute("aria-expanded", "false");
+      }
+
+      likersBox.addEventListener("keydown", (event) => {  // Escape closes it too
+        if (event.key === "Escape") { closeLikers(); likeLine.focus(); }
+      });
+
       likeLine.addEventListener("click", async () => {
-        if (!likersBox.hidden) { likersBox.hidden = true; likeLine.setAttribute("aria-expanded", "false"); return; }
+        if (!likersBox.hidden) { closeLikers(); return; }
         try {
           const data = await api(`/api/posts/${p.id}/likes`);
           const title = el("p", `Liked by ${data.likes.length} ${data.likes.length === 1 ? "player" : "players"}`, "likers__title");
@@ -435,9 +444,21 @@
                                   el("span", l.is_me ? `${l.username} (you)` : l.username, "player-link__name")));
             return row;
           }));
-          likersBox.replaceChildren(title, people);
+          // B: a Close button, so a long list never hides the rest of the feed
+          const closeBtn = el("button", "✕ Close", "likers__close");
+          closeBtn.type = "button";
+          closeBtn.setAttribute("aria-label", "Close the list of likes");
+          closeBtn.addEventListener("click", () => {
+            closeLikers();
+            likeLine.focus();
+            likeLine.scrollIntoView({ block: "nearest" });  // back to where the list was
+          });
+          const top = el("div", undefined, "likers__top");
+          top.append(title, closeBtn);
+          likersBox.replaceChildren(top, people);
           likersBox.hidden = false;
           likeLine.setAttribute("aria-expanded", "true");
+          closeBtn.focus({ preventScroll: true });  // so Escape (or Enter) closes it straight away
         } catch (error) { postSay(error.message); }
       });
 
