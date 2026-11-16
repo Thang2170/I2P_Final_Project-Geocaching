@@ -306,7 +306,12 @@
 
       // like and comment counts
       const counts = el("div", undefined, "post__counts");
-      const likeLine = el("span", "", "post__likes");
+      // B: tap the likes line to see everyone who liked it
+      const likeLine = el("button", "", "post__likes");
+      likeLine.type = "button";
+      likeLine.setAttribute("aria-expanded", "false");
+      const likersBox = el("div", undefined, "likers");
+      likersBox.hidden = true;
       const commentLine = el("span", "", "post__ncomments");
       const shareLine = el("span", "", "post__nshares");
       counts.append(likeLine, commentLine, shareLine);
@@ -358,6 +363,10 @@
 
       function draw() {
         likeLine.textContent = likes.likes ? "♥ " + likes.like_summary : "";
+        likeLine.hidden = !likes.likes;
+        likeLine.title = "See who liked this";
+        if (!likes.likes) likersBox.hidden = true;
+        else if (!likersBox.hidden) { likersBox.hidden = true; likeLine.setAttribute("aria-expanded", "false"); }  // out of date
         commentLine.textContent = commentCount ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"}` : "";
         shareLine.textContent = shareCount ? `${shareCount} ${shareCount === 1 ? "share" : "shares"}` : "";
         counts.hidden = !likes.likes && !commentCount && !shareCount;
@@ -414,7 +423,25 @@
       // Typing again clears an old error such as "You can't post an empty message".
       input.addEventListener("input", () => postSay(""));
 
-      card.append(counts, actions, shareForm, list, reply, postMsg);
+      likeLine.addEventListener("click", async () => {
+        if (!likersBox.hidden) { likersBox.hidden = true; likeLine.setAttribute("aria-expanded", "false"); return; }
+        try {
+          const data = await api(`/api/posts/${p.id}/likes`);
+          const title = el("p", `Liked by ${data.likes.length} ${data.likes.length === 1 ? "player" : "players"}`, "likers__title");
+          const people = el("ul", undefined, "likers__list");
+          people.append(...data.likes.map(l => {
+            const row = el("li");
+            row.append(playerLink(l.username, avatarEl(l.avatar),
+                                  el("span", l.is_me ? `${l.username} (you)` : l.username, "player-link__name")));
+            return row;
+          }));
+          likersBox.replaceChildren(title, people);
+          likersBox.hidden = false;
+          likeLine.setAttribute("aria-expanded", "true");
+        } catch (error) { postSay(error.message); }
+      });
+
+      card.append(counts, likersBox, actions, shareForm, list, reply, postMsg);
       draw();
       return card;
     }

@@ -69,6 +69,8 @@ class TestShareApi(unittest.TestCase):
         self.share(self.ann, self.post_id)
         texts = [n["text"] for n in self.bob.get("/api/notifications").get_json()["items"]]
         self.assertEqual(texts, ['ann shared your post "Found the lake treasure"'])
+        link = self.bob.get("/api/notifications").get_json()["items"][0]["link"]
+        self.assertEqual(link, f"/posts/{self.post_id}")  # the shared post
         self.share(self.bob, self.post_id)  # sharing your own post: no notification
         self.assertEqual(db.session.query(Notification).filter_by(kind=SHARE).count(), 1)
 

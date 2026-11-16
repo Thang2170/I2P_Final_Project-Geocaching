@@ -261,6 +261,20 @@ def share_post(post_id):
     return jsonify(_post_dict(share, me)), 201
 
 
+@feed_api.route("/api/posts/<int:post_id>/likes")
+def who_liked(post_id):
+    """Everyone who liked a post, newest first (tap "♥ ann and 2 others" to see them)."""
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    if _find_post(post_id) is None:
+        return jsonify(error="No such post"), 404
+    likes = db.session.execute(db.select(PostLike).where(PostLike.post_id == post_id)
+                               .order_by(PostLike.id.desc())).scalars().all()
+    return jsonify(likes=[{"username": like.user.username, "avatar": avatar(like.user.username),
+                           "is_me": like.user_id == me.id} for like in likes])
+
+
 @feed_api.route("/api/posts/<int:post_id>/like", methods=["POST"])
 def toggle_like(post_id):
     """Like a post, or take the like back if you already liked it."""

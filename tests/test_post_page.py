@@ -37,6 +37,18 @@ class TestPostPage(unittest.TestCase):
         self.assertEqual(self.bob.get("/api/posts/999").status_code, 404)
         self.assertEqual(self.app.test_client().get(f"/api/posts/{self.post_id}").status_code, 401)
 
+    def test_who_liked(self):
+        self.bob.post(f"/api/posts/{self.post_id}/like")
+        self.ann.post(f"/api/posts/{self.post_id}/like")
+        likes = self.bob.get(f"/api/posts/{self.post_id}/likes").get_json()["likes"]
+        self.assertEqual([(l["username"], l["is_me"]) for l in likes], [("ann", False), ("bob", True)])  # newest first
+        self.assertEqual(likes[0]["avatar"]["letter"], "A")
+        self.assertEqual(self.bob.get("/api/posts/999/likes").status_code, 404)
+        self.assertEqual(self.app.test_client().get(f"/api/posts/{self.post_id}/likes").status_code, 401)
+        html = self.bob.get("/community").get_data(as_text=True)
+        self.assertIn("/likes`", html)
+        self.assertIn('el("button", "", "post__likes")', html)
+
     def test_page(self):
         html = self.bob.get(f"/posts/{self.post_id}").get_data(as_text=True)
         self.assertIn(f"const singlePost = {self.post_id};", html)
