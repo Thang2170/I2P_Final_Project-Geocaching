@@ -20,7 +20,8 @@ class TestRules(unittest.TestCase):
             message("party", "ann", "x")
 
     def test_links(self):
-        self.assertEqual(link(LIKE, post_id=3), "/community")
+        self.assertEqual(link(LIKE, post_id=3), "/posts/3")  # opens the post itself
+        self.assertEqual(link(LIKE), "/community")
         self.assertEqual(link(MOVED_UP, hunt_id=7), "/hunts/7/chat")
 
     def test_short(self):
@@ -71,7 +72,7 @@ class TestNotificationsApi(unittest.TestCase):
         self.assertEqual([n["text"] for n in data["items"]],
                          ['bob commented on your post "Found the pond treasure!"',
                           'bob liked your post "Found the pond treasure!"'])
-        self.assertEqual(data["items"][0]["link"], "/community")
+        self.assertEqual(data["items"][0]["link"], f"/posts/{pid}")
         self.assertEqual(self.bell(bob)["unseen"], 0)
 
     def test_your_own_like_or_comment_makes_no_notification(self):

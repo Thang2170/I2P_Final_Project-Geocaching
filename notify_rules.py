@@ -51,7 +51,8 @@ def message(kind, actor_name, subject):
 def link(kind, post_id=None, hunt_id=None, actor_name=None):
     """Where tapping the notification takes you."""
     if kind in (LIKE, COMMENT, SHARE, REPLY):
-        return "/community"
+        # B: straight to that post on its own page (the feed if the post isn't known)
+        return f"/posts/{post_id}" if post_id is not None else "/community"
     if kind == MOVED_UP:
         return f"/hunts/{hunt_id}/chat"
     if kind in (FRIEND_REQUEST, FRIEND_ACCEPTED):

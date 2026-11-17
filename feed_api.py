@@ -177,6 +177,18 @@ def feed():
         next_offset=offset + FEED_PAGE_SIZE if more else None)
 
 
+@feed_api.route("/api/posts/<int:post_id>")
+def one_post(post_id):
+    """One post with all its comments and replies, for its own page (/posts/<id>)."""
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    post = _find_post(post_id)
+    if post is None:
+        return jsonify(error="This post was deleted, or it never existed."), 404
+    return jsonify(me={"username": me.username, "avatar": avatar(me.username)}, post=_post_dict(post, me))
+
+
 @feed_api.route("/api/posts", methods=["POST"])
 def create_post():
     """Write a post. Send JSON: text."""
@@ -247,6 +259,20 @@ def share_post(post_id):
     notify(original.user_id, SHARE, actor_id=me.id, post_id=original.id)
     db.session.commit()
     return jsonify(_post_dict(share, me)), 201
+
+
+@feed_api.route("/api/posts/<int:post_id>/likes")
+def who_liked(post_id):
+    """Everyone who liked a post, newest first (tap "♥ ann and 2 others" to see them)."""
+    me = current_user()
+    if me is None:
+        return _login_needed()
+    if _find_post(post_id) is None:
+        return jsonify(error="No such post"), 404
+    likes = db.session.execute(db.select(PostLike).where(PostLike.post_id == post_id)
+                               .order_by(PostLike.id.desc())).scalars().all()
+    return jsonify(likes=[{"username": like.user.username, "avatar": avatar(like.user.username),
+                           "is_me": like.user_id == me.id} for like in likes])
 
 
 @feed_api.route("/api/posts/<int:post_id>/like", methods=["POST"])

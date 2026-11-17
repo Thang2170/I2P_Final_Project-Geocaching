@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   {% include "_head.html" %}
-  <title>Community · StepQuest</title>
+  <title>{% if post_id %}Post{% else %}Community{% endif %} · StepQuest</title>
 </head>
 <body class="feed-page">
   {% set active = "community" %}
@@ -38,6 +38,9 @@
     <!-- Middle column: the feed -->
     <main class="fb__main">
       <h1 class="visually-hidden">Community</h1>
+
+      <!-- B: on /posts/<id> this page shows just that one post -->
+      <a id="backToFeed" class="back-link" href="/community" hidden>◂ Back to the Community feed</a>
 
       <form id="composer" class="panel composer">
         <div class="composer__row">
@@ -84,6 +87,7 @@
     const moreBtn = document.getElementById("more");
     let nextOffset = 0;
     let me = null;
+    const singlePost = {{ post_id | default(None) | tojson }};  // B: /posts/<id> shows one post
 
     function el(tag, text, className) {
       const node = document.createElement(tag);
@@ -302,7 +306,12 @@
 
       // like and comment counts
       const counts = el("div", undefined, "post__counts");
-      const likeLine = el("span", "", "post__likes");
+      // B: tap the likes line to see everyone who liked it
+      const likeLine = el("button", "", "post__likes");
+      likeLine.type = "button";
+      likeLine.setAttribute("aria-expanded", "false");
+      const likersBox = el("div", undefined, "likers");
+      likersBox.hidden = true;
       const commentLine = el("span", "", "post__ncomments");
       const shareLine = el("span", "", "post__nshares");
       counts.append(likeLine, commentLine, shareLine);
@@ -354,6 +363,10 @@
 
       function draw() {
         likeLine.textContent = likes.likes ? "♥ " + likes.like_summary : "";
+        likeLine.hidden = !likes.likes;
+        likeLine.title = "See who liked this";
+        if (!likes.likes) likersBox.hidden = true;
+        else if (!likersBox.hidden) closeLikers();  // out of date
         commentLine.textContent = commentCount ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"}` : "";
         shareLine.textContent = shareCount ? `${shareCount} ${shareCount === 1 ? "share" : "shares"}` : "";
         counts.hidden = !likes.likes && !commentCount && !shareCount;
@@ -380,7 +393,7 @@
         shareGo.disabled = true;
         try {
           const shared = await send(`/api/posts/${p.id}/share`, "POST", { text: shareText.value });
-          feedBox.prepend(postEl(shared));
+          if (singlePost === null) feedBox.prepend(postEl(shared));  // on a post's own page, stay on it
           shareForm.hidden = true;
           shareText.value = "";
           if (!p.is_share) { shareCount += 1; draw(); }
@@ -410,7 +423,46 @@
       // Typing again clears an old error such as "You can't post an empty message".
       input.addEventListener("input", () => postSay(""));
 
-      card.append(counts, actions, shareForm, list, reply, postMsg);
+      function closeLikers() {
+        likersBox.hidden = true;
+        likeLine.setAttribute("aria-expanded", "false");
+      }
+
+      likersBox.addEventListener("keydown", (event) => {  // Escape closes it too
+        if (event.key === "Escape") { closeLikers(); likeLine.focus(); }
+      });
+
+      likeLine.addEventListener("click", async () => {
+        if (!likersBox.hidden) { closeLikers(); return; }
+        try {
+          const data = await api(`/api/posts/${p.id}/likes`);
+          const title = el("p", `Liked by ${data.likes.length} ${data.likes.length === 1 ? "player" : "players"}`, "likers__title");
+          const people = el("ul", undefined, "likers__list");
+          people.append(...data.likes.map(l => {
+            const row = el("li");
+            row.append(playerLink(l.username, avatarEl(l.avatar),
+                                  el("span", l.is_me ? `${l.username} (you)` : l.username, "player-link__name")));
+            return row;
+          }));
+          // B: a Close button, so a long list never hides the rest of the feed
+          const closeBtn = el("button", "✕ Close", "likers__close");
+          closeBtn.type = "button";
+          closeBtn.setAttribute("aria-label", "Close the list of likes");
+          closeBtn.addEventListener("click", () => {
+            closeLikers();
+            likeLine.focus();
+            likeLine.scrollIntoView({ block: "nearest" });  // back to where the list was
+          });
+          const top = el("div", undefined, "likers__top");
+          top.append(title, closeBtn);
+          likersBox.replaceChildren(top, people);
+          likersBox.hidden = false;
+          likeLine.setAttribute("aria-expanded", "true");
+          closeBtn.focus({ preventScroll: true });  // so Escape (or Enter) closes it straight away
+        } catch (error) { postSay(error.message); }
+      });
+
+      card.append(counts, likersBox, actions, shareForm, list, reply, postMsg);
       draw();
       return card;
     }
@@ -426,6 +478,11 @@
 
     function showEmpty() {
       const none = feedBox.children.length === 0;
+      if (singlePost !== null) {  // its own page: you just deleted it
+        document.getElementById("empty").textContent = "Post deleted.";
+        document.getElementById("empty").hidden = !none;
+        return;
+      }
       document.getElementById("empty").hidden = !none || feedOnly === "friends";
       document.getElementById("emptyFriends").hidden = !none || feedOnly !== "friends";
     }
@@ -441,15 +498,7 @@
       try {
         const data = await api(`/api/feed?offset=${nextOffset}&only=${feedOnly}`);
         if (requestId !== feedRequest) return;
-        if (!me) {
-          me = data.me;
-          fillAvatar(document.getElementById("meAvatar"), me.avatar);
-          fillAvatar(document.getElementById("composerAvatar"), me.avatar);
-          document.getElementById("meName").textContent = me.username;
-          document.getElementById("meLink").href = `/players/${encodeURIComponent(me.username)}`;
-          document.getElementById("postText").placeholder = `What did you find today, ${me.username}?`;
-          document.getElementById("postBtn").disabled = false;  // the composer needs to know who you are
-        }
+        if (!me) setMe(data.me);
         feedBox.append(...data.posts.map(postEl));
         nextOffset = data.next_offset;
         moreBtn.hidden = nextOffset === null;
@@ -458,6 +507,35 @@
         say(error.message, false);
       } finally {
         moreBtn.disabled = false;
+      }
+    }
+
+    function setMe(who) {
+      me = who;
+      fillAvatar(document.getElementById("meAvatar"), me.avatar);
+      fillAvatar(document.getElementById("composerAvatar"), me.avatar);
+      document.getElementById("meName").textContent = me.username;
+      document.getElementById("meLink").href = `/players/${encodeURIComponent(me.username)}`;
+      document.getElementById("postText").placeholder = `What did you find today, ${me.username}?`;
+      document.getElementById("postBtn").disabled = false;  // the composer needs to know who you are
+    }
+
+    // B: one post on its own page. No composer, no Everyone/Friends switch, no "Load more".
+    async function loadOnePost() {
+      document.getElementById("composer").hidden = true;
+      document.querySelector(".feed-switch").hidden = true;
+      document.getElementById("backToFeed").hidden = false;
+      const empty = document.getElementById("empty");
+      try {
+        const res = await fetch(`/api/posts/${encodeURIComponent(singlePost)}`);
+        if (res.status === 401) { location.href = `/login?next=${encodeURIComponent(location.pathname)}`; return; }
+        const data = await res.json();
+        if (!res.ok) { empty.textContent = data.error || "Could not load this post."; empty.hidden = false; return; }
+        setMe(data.me);
+        feedBox.replaceChildren(postEl(data.post));
+      } catch (error) {
+        empty.textContent = "No connection. Try again.";
+        empty.hidden = false;
       }
     }
 
@@ -530,7 +608,8 @@
       });
     }
 
-    loadFeed();
+    if (singlePost === null) loadFeed();
+    else loadOnePost();
     loadSides();
   </script>
 </body>

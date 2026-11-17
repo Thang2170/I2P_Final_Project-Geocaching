@@ -96,9 +96,13 @@
         return row;
       });
       fillList("hidden", "noHidden", p.hidden_treasures, name => el("li", name));
+      // B: each post opens on its own page, with its likes, comments and replies.
       fillList("posts", "noPosts", p.recent_posts, post => {
         const row = el("li");
-        row.append(el("p", post.text, "profile__post"), el("span", post.ago, "muted"));
+        const link = el("a", undefined, "profile__post-link");
+        link.href = `/posts/${encodeURIComponent(post.id)}`;
+        link.append(el("p", post.text, "profile__post"), el("span", `${post.ago} · Open post ▸`, "muted"));
+        row.append(link);
         return row;
       });
       loadFriends(p.username);
