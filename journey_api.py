@@ -54,6 +54,12 @@ def community_page():
     return render_template("community.html")
 
 
+@journey_api.route("/posts/<int:post_id>")
+def post_page(post_id):
+    # B: one post on its own page (from a profile's Posts list). The Community page shows just that post.
+    return render_template("community.html", post_id=post_id)
+
+
 @journey_api.route("/api/journeys", methods=["POST"])
 def save_journey():
     """Save a finished hunt. Send JSON: treasure_id, distance_m, duration_s, lat, lon.

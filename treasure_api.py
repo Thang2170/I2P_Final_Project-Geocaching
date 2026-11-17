@@ -57,7 +57,7 @@ def create_treasure():
 def list_treasures():
     """Return every saved treasure, oldest first.
 
-    B: each one says found_by_me, so the map can leave out the ones you were already paid for.
+    B: each one says found_by_me, so the map can show a tick on the ones you were already paid for.
     (Always False when you are logged out.)
     """
     from coin_api import found_treasure_ids  # here, not at the top, so the two files don't import each other

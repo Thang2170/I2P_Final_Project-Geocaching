@@ -1470,11 +1470,33 @@ a.player-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset:
 .post__message[hidden] { display: none; }
 #more[hidden] { display: none; }  /* "Load more" only when there are more posts (.btn would keep it visible) */
 
-/* A found treasure leaves the map: it hops up, sparkles and shrinks away (map.html, collectPin) */
+/* A found treasure hops up, sparkles and lands again as a tick (map.html, collectPin) */
 @keyframes pin-collected {
-  0%   { transform: translateY(0) scale(1); opacity: 1; }
-  40%  { transform: translateY(-14px) scale(1.25); opacity: 1; filter: brightness(1.4); }
-  100% { transform: translateY(-24px) scale(0); opacity: 0; }
+  0%   { transform: translateY(0) scale(1); }
+  40%  { transform: translateY(-14px) scale(1.25); filter: brightness(1.4); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* B: a treasure you found: a green pixel box with a white tick, on the same spot */
+.pin--found .pin__shape {
+  left: 4px;
+  top: 8px;
+  width: 22px;
+  height: 22px;
+  background: var(--px-grass);
+  box-shadow: 0 0 0 3px var(--px-ink), 3px 3px 0 3px rgba(20, 35, 31, .45);
+}
+.pin--found .pin__shape::before {
+  left: 7px;
+  top: 2px;
+  width: 6px;
+  height: 12px;
+  border: solid #fff;
+  border-width: 0 4px 4px 0;
+  box-shadow: none;
+  background: none;
+  transform: rotate(45deg);
+  animation: none;
 }
 
 .pin.is-collected .pin__grow { animation: pin-collected .6s steps(6) forwards; }
@@ -1678,3 +1700,45 @@ a.player-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset:
 .reply--nested { margin-top: 8px; }
 .reply--nested[hidden] { display: none; }
 .reply--nested .avatar { width: 26px; height: 26px; font-size: 10px; }
+
+/* B: a post on its own page (/posts/<id>), opened from a profile's Posts list */
+.back-link { display: inline-block; margin-bottom: 12px; color: var(--px-green); text-decoration-color: var(--px-gold); }
+.back-link[hidden], .composer[hidden], .feed-switch[hidden] { display: none; }
+.profile__post-link { display: block; color: inherit; text-decoration: none; }
+.profile__post-link:hover .profile__post { text-decoration: underline; text-decoration-color: var(--px-gold); }
+.profile__post-link:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+
+/* B: tap "♥ ann and 2 others" to see everyone who liked the post */
+button.post__likes {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--px-bad);
+  cursor: pointer;
+  text-align: left;
+}
+button.post__likes:hover { text-decoration: underline; }
+button.post__likes:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+button.post__likes[hidden] { display: none; }
+
+.likers { margin-top: 8px; padding: 10px 12px; background: var(--px-bg); box-shadow: inset 0 0 0 4px var(--px-line); }
+.likers[hidden] { display: none; }
+.likers__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.likers__title { margin: 0; color: var(--px-muted); font-size: 17px; }
+.likers__close {
+  flex: none;
+  padding: 6px 10px;
+  border: 0;
+  background: var(--px-paper);
+  color: var(--px-ink);
+  box-shadow: 0 0 0 2px var(--px-ink);
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  cursor: pointer;
+}
+.likers__close:hover { background: #fff; }
+.likers__close:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+.likers__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 240px; overflow-y: auto; }
+.likers__list .player-link { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.likers__list .avatar { width: 28px; height: 28px; font-size: 10px; }

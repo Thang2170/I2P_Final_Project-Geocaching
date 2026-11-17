@@ -70,6 +70,7 @@ class TestReplyApi(unittest.TestCase):
         self.reply(self.ann, "By the big rock")
         texts = [n["text"] for n in self.bob.get("/api/notifications").get_json()["items"]]
         self.assertIn('ann replied to your comment on "Found the lake treasure"', texts)
+        self.assertEqual(self.bob.get("/api/notifications").get_json()["items"][0]["link"], f"/posts/{self.post_id}")
         self.reply(self.bob, "ok")  # replying under your own comment: no notification for you
         self.assertEqual(len(self.bob.get("/api/notifications").get_json()["items"]), 1)
 

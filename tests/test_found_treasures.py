@@ -85,14 +85,18 @@ class TestMapPage(unittest.TestCase):
             db.drop_all()
             db.engine.dispose()
 
-    def test_found_treasures_are_not_drawn(self):
-        self.assertIn("!t.found_by_me", self.html)
+    def test_found_treasures_show_a_tick(self):
+        self.assertIn('t.found_by_me ? "found" : "treasure"', self.html)  # they stay on the map
+        self.assertIn(".pin--found .pin__shape", self.css)
 
-    def test_a_collected_pin_leaves_the_map(self):
+    def test_a_collected_pin_turns_into_a_tick(self):
         self.assertIn("collectPin(treasureId);", self.html)
         after_409 = self.html.split("if (res.status === 409)", 1)[1][:120]  # you had already found it
         self.assertIn("collectPin(treasureId);", after_409)
         self.assertIn(".pin.is-collected", self.css)
+        collect = self.html.split("function collectPin(", 1)[1].split("\n    }\n", 1)[0]
+        self.assertIn("showTick(marker)", collect)
+        self.assertNotIn("marker.remove()", collect)  # it no longer leaves the map
 
 
 if __name__ == "__main__":
