@@ -16,6 +16,8 @@
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
+      <!-- A: Feature 6, a different walking route to the same treasure -->
+      <button type="button" id="newRouteBtn" class="btn btn--ghost" style="margin-top:8px" hidden>New route</button>
       <div id="coinInfo" class="sheet__route coin-line" hidden></div>
       <!-- B: after a find, rate the treasure 1-5 stars (Python checks you really found it) -->
       <div id="rateBox" class="rate-box" hidden>
@@ -211,6 +213,7 @@
       setHunt(t, marker);
       updateStartButton();
       routeTarget = [t.lat, t.lon];
+      routeVia = null;  // a new treasure starts with the normal route
       if (currentPos) {
         boardNote.textContent = "Finding a walking route…";
         drawRoute(currentPos, routeTarget, true);
@@ -275,6 +278,8 @@
           if (selectedTreasure && selectedTreasure.id === treasureId) showBoardStars(treasureId);
           if (treasureId === huntId) {
             routeTarget = null;  // nothing to walk to until you tap another treasure
+            routeVia = null;
+            newRouteBtn.hidden = true;
             if (routeLine) { routeLine.remove(); routeLine = null; }
           }
         }, 600);  // the length of the animation in app.css
@@ -292,6 +297,8 @@
     let routeLine = null;
     let routeFrom = null;           // where the current route starts
     let routeTarget = [treasure.lat, treasure.lon];  // where it goes (changes when you tap a treasure)
+    let routeVia = null;            // the random side-step point of a "New route", if any
+    const newRouteBtn = document.getElementById("newRouteBtn");
     let routeRequestId = 0;         // so an old, slow answer can't replace a newer route
     const REROUTE_DISTANCE_M = 25;  // real GPS: ask for a new route after moving this far
 
@@ -301,7 +308,8 @@
       const km = (data.distance_m / 1000).toFixed(2);
       const min = Math.max(1, Math.round(data.duration_s / 60));
       const straight = data.warning ? " (straight line)" : "";
-      routeSummary = `${km} km walk, about ${min} min${straight}`;
+      const random = routeVia ? "New route: " : "";
+      routeSummary = `${random}${km} km walk, about ${min} min${straight}`;
       routeInfo.textContent = routeSummary;
       routeInfo.hidden = false;
       boardKm.textContent = `${km} km`;
@@ -360,16 +368,25 @@
 
     // Ask Python for a walking route and draw it.
     // fit = true zooms the map to the whole route.
-    async function drawRoute(from, to, fit = false) {
+    // newRandom = true asks Python for a NEW random route to the same treasure (Feature 6).
+    async function drawRoute(from, to, fit = false, newRandom = false) {
       if (!to) return;  // the treasure was collected: no route until you pick another
       const requestId = ++routeRequestId;
       routeFrom = from;
-      const points = `${from[0]},${from[1]};${to[0]},${to[1]}`;
+      const start = `${from[0]},${from[1]}`, end = `${to[0]},${to[1]}`;
+      // Keep going through the random point (if any) when we reroute after you move.
+      const via = routeVia ? `;${routeVia[0]},${routeVia[1]}` : "";
+      const url = newRandom
+        ? `/api/random-route?points=${start};${end}`
+        : `/api/route?points=${start}${via};${end}`;
       try {
-        const res = await fetch(`/api/route?points=${points}`);
+        const res = await fetch(url);
         const data = await res.json();
         if (requestId !== routeRequestId) return;  // a newer route was requested meanwhile
         if (!res.ok) throw new Error(data.error || "Route request failed");
+        if (data.via) routeVia = data.via;           // Python picked a new side-step point
+        if (data.via_reached) routeVia = null;      // you walked past it: straight to the treasure now
+        newRouteBtn.hidden = false;
         if (routeLine) routeLine.remove();
         // Gold line with a dark edge so it stands out on satellite photos.
         // Square ends and corners so it looks drawn in pixels, like the rest of the map.
@@ -387,6 +404,11 @@
         showRouteError(err.message);
       }
     }
+
+    // "New route": Python picks a new random side-step point, so the same treasure gets another path.
+    newRouteBtn.addEventListener("click", () => {
+      if (currentPos && routeTarget) drawRoute(currentPos, routeTarget, true, true);
+    });
 
     // ------------------------------------------------------------ journey (live stats, like a run tracker)
 

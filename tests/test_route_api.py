@@ -47,6 +47,45 @@ class TestRouteApi(unittest.TestCase):
                 self.assertEqual(r.status_code, 400)
                 self.assertIn("error", r.get_json())
 
+    # ---------------------------------------------------- random routes (Feature 6)
+
+    def test_random_route_goes_through_a_side_step_point(self):
+        r = self.client.get("/api/random-route?points=24.795324,120.994796;24.8040,120.9948")
+        data = r.get_json()
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(data["path"]), 3)
+        self.assertEqual(data["path"][1], data["via"])
+
+    def test_same_treasure_gets_different_routes(self):
+        url = "/api/random-route?points=24.795324,120.994796;24.8040,120.9948"
+        vias = {tuple(self.client.get(url).get_json()["via"]) for _ in range(5)}
+        self.assertGreater(len(vias), 1)
+
+    def test_random_route_bad_requests_return_400(self):
+        for url in [
+            "/api/random-route",
+            "/api/random-route?points=24.79,120.99",
+            "/api/random-route?points=24.7953,120.9948;24.7960,120.9950;24.7965,120.9960",
+            "/api/random-route?points=24.795324,120.994796;24.795324,120.994796",  # already there
+        ]:
+            with self.subTest(url=url):
+                r = self.client.get(url)
+                self.assertEqual(r.status_code, 400)
+                self.assertIn("error", r.get_json())
+
+    def test_reached_side_step_point_is_dropped(self):
+        # The middle point is about 8 m from where you are: you got there
+        r = self.client.get("/api/route?points=24.795324,120.994796;24.795400,120.994800;24.8040,120.9948")
+        data = r.get_json()
+        self.assertTrue(data["via_reached"])
+        self.assertEqual(len(data["path"]), 2)
+
+    def test_side_step_point_not_reached_is_kept(self):
+        r = self.client.get("/api/route?points=24.795324,120.994796;24.7960,120.9950;24.8040,120.9948")
+        data = r.get_json()
+        self.assertNotIn("via_reached", data)
+        self.assertEqual(len(data["path"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

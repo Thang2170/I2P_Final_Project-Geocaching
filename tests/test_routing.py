@@ -1,4 +1,6 @@
+import math
 import os
+import random
 import unittest
 
 import routing
@@ -6,13 +8,19 @@ from unittest.mock import Mock, patch
 
 import requests
 
+from location import haversine_m
 from routing import (
+    MAX_DETOUR_M,
     MAX_POINTS,
+    MIN_DETOUR_M,
     RoutingError,
     check_point,
+    drop_reached_via,
+    get_random_route,
     get_route,
     get_walking_route,
     parse_points,
+    random_via_point,
     straight_line_route,
 )
 
@@ -181,6 +189,98 @@ class TestRoutingAddress(unittest.TestCase):
         # api.openrouteservice.org was shut down in November 2026; same paths, new host.
         self.assertTrue(routing.ORS_URL.startswith("https://api.heigit.org/openrouteservice/v2/directions/"))
         self.assertNotIn("api.openrouteservice.org", routing.ORS_URL)
+
+
+# ------------------------------------------------------------ random routes (Feature 6)
+
+FAR = (24.8040, 120.9948)  # about 965 m north of NTHU
+
+
+def flat_metres(start, point):
+    """(north, east) of point from start in metres, the same flat-map maths as routing.py."""
+    north = (point[0] - start[0]) * 111_320
+    east = (point[1] - start[1]) * 111_320 * math.cos(math.radians(start[0]))
+    return north, east
+
+
+def sideways_and_along(start, end, point):
+    """How far point is from the start-end line (metres), and how far along it (0 to 1)."""
+    line_n, line_e = flat_metres(start, end)
+    p_n, p_e = flat_metres(start, point)
+    length = math.hypot(line_n, line_e)
+    sideways = abs(line_n * p_e - line_e * p_n) / length
+    along = (line_n * p_n + line_e * p_e) / length ** 2
+    return sideways, along
+
+
+class TestRandomViaPoint(unittest.TestCase):
+    def test_point_is_beside_the_line_within_limits(self):
+        # A short trip (78 m) and a long one (965 m): the 40 m minimum and 300 m maximum both apply
+        for end in (NEARBY, FAR):
+            for seed in range(50):
+                with self.subTest(end=end, seed=seed):
+                    via = random_via_point(NTHU, end, random.Random(seed))
+                    sideways, along = sideways_and_along(NTHU, end, via)
+                    self.assertGreaterEqual(sideways, MIN_DETOUR_M - 1)  # 1 m for rounding
+                    self.assertLessEqual(sideways, MAX_DETOUR_M + 1)
+                    self.assertGreaterEqual(along, 0.3 - 0.01)
+                    self.assertLessEqual(along, 0.7 + 0.01)
+
+    def test_same_seed_gives_the_same_point(self):
+        self.assertEqual(
+            random_via_point(NTHU, FAR, random.Random(7)),
+            random_via_point(NTHU, FAR, random.Random(7)),
+        )
+
+    def test_different_seeds_give_different_points(self):
+        points = {random_via_point(NTHU, FAR, random.Random(seed)) for seed in range(10)}
+        self.assertEqual(len(points), 10)
+
+    def test_both_sides_of_the_line_are_used(self):
+        # Walking north, the left side is west (smaller lon) and the right side is east.
+        sides = {random_via_point(NTHU, FAR, random.Random(seed))[1] > NTHU[1] for seed in range(20)}
+        self.assertEqual(sides, {True, False})
+
+    def test_already_at_the_treasure(self):
+        with self.assertRaises(ValueError):
+            random_via_point(NTHU, (24.795330, 120.994800))  # under 1 m away
+
+    def test_bad_point(self):
+        with self.assertRaises(ValueError):
+            random_via_point(("abc", 1), NTHU)
+
+
+class TestGetRandomRoute(NoKeyMixin, unittest.TestCase):
+    def test_no_key_gives_straight_lines_through_the_point(self):
+        route = get_random_route(NTHU, FAR, random.Random(1))
+        self.assertEqual(route["source"], "straight-line")
+        self.assertIn("warning", route)
+        self.assertEqual(len(route["path"]), 3)  # start, side-step point, treasure
+        self.assertEqual(route["path"][1], route["via"])
+        # Going through the side-step point is longer than the straight line
+        self.assertGreater(route["distance_m"], haversine_m(*NTHU, *FAR))
+
+    def test_with_key_asks_the_service_for_three_points(self):
+        os.environ["ORS_API_KEY"] = "test-key"
+        with patch("routing.requests.post", return_value=fake_response(payload=GOOD_PAYLOAD)) as post:
+            route = get_random_route(NTHU, FAR, random.Random(1))
+        sent = post.call_args.kwargs["json"]["coordinates"]
+        self.assertEqual(len(sent), 3)
+        self.assertEqual(sent[1], [route["via"][1], route["via"][0]])  # ORS wants [lon, lat]
+        self.assertEqual(route["source"], "openrouteservice")
+
+
+class TestDropReachedVia(unittest.TestCase):
+    def test_keeps_a_point_not_reached_yet(self):
+        points = [NTHU, NEARBY, FAR]  # NEARBY is 78 m away
+        self.assertEqual(drop_reached_via(points), points)
+
+    def test_drops_a_point_within_20_m(self):
+        close = (24.795400, 120.994800)  # about 8 m from NTHU
+        self.assertEqual(drop_reached_via([NTHU, close, FAR]), [NTHU, FAR])
+
+    def test_two_points_stay_the_same(self):
+        self.assertEqual(drop_reached_via([NTHU, FAR]), [NTHU, FAR])
 
 
 if __name__ == "__main__":

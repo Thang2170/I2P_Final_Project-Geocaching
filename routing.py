@@ -7,6 +7,7 @@ happens in ONE place (get_walking_route) and nowhere else.
 
 import math
 import os
+import random
 
 import requests
 
@@ -17,6 +18,13 @@ ORS_URL = "https://api.heigit.org/openrouteservice/v2/directions/foot-walking/ge
 ORS_TIMEOUT_S = 10
 WALKING_SPEED_MPS = 1.4  # about 5 km/h
 MAX_POINTS = 10
+
+# Random routes (Feature 6): a "side-step" point off the straight line makes a new path.
+METERS_PER_DEGREE_LAT = 111_320  # one degree of latitude is about 111 km everywhere
+MIN_TRIP_M = 10        # closer than this, you are already at the treasure
+MIN_DETOUR_M = 40      # less than this and the walking path usually doesn't change
+MAX_DETOUR_M = 300     # more than this is a silly long walk
+VIA_REACHED_M = 20     # same as finding a treasure: within 20 m counts as "you got there"
 
 
 class RoutingError(Exception):
@@ -145,3 +153,66 @@ def get_route(points):
         route = straight_line_route(pts)
         route["warning"] = f"Using straight lines instead of real paths: {err}"
         return route
+
+
+# --------------------------------------------------------- random routes (Feature 6)
+
+
+def random_via_point(start, end, rng=random):
+    """Pick a random side-step point next to the straight line from start to end.
+
+    The route then goes start -> point -> end, so each new point gives a different
+    walking path to the SAME treasure. rng is the random generator: tests pass
+    random.Random(seed) so they always get the same numbers.
+    """
+    lat1, lon1 = check_point(start)
+    lat2, lon2 = check_point(end)
+    trip_m = haversine_m(lat1, lon1, lat2, lon2)
+    if trip_m < MIN_TRIP_M:
+        raise ValueError("You are already at the treasure")
+
+    # Work in metres on a flat map. For a walk of a few hundred metres the Earth's
+    # curve doesn't matter. A degree of longitude gets shorter away from the equator.
+    meters_per_degree_lon = METERS_PER_DEGREE_LAT * math.cos(math.radians(lat1))
+    north_m = (lat2 - lat1) * METERS_PER_DEGREE_LAT
+    east_m = (lon2 - lon1) * meters_per_degree_lon
+    length_m = math.hypot(north_m, east_m)
+
+    # One metre at a right angle to the line: turn the direction by 90 degrees.
+    side_north = -east_m / length_m
+    side_east = north_m / length_m
+
+    along = rng.uniform(0.3, 0.7)  # somewhere in the middle part of the trip, not at the ends
+    sideways_m = rng.uniform(0.25, 0.5) * trip_m
+    sideways_m = min(max(sideways_m, MIN_DETOUR_M), MAX_DETOUR_M)
+    sideways_m *= rng.choice([-1, 1])  # left or right of the line
+
+    via_north = along * north_m + sideways_m * side_north
+    via_east = along * east_m + sideways_m * side_east
+    return (
+        round(lat1 + via_north / METERS_PER_DEGREE_LAT, 6),
+        round(lon1 + via_east / meters_per_degree_lon, 6),
+    )
+
+
+def get_random_route(start, end, rng=random):
+    """A different walking route to the same place: start -> random point -> end.
+
+    Same fallback as get_route. The point is sent back as "via" so the map can
+    keep using it when it asks for a new route after you move.
+    """
+    via = random_via_point(start, end, rng)
+    route = get_route([start, via, end])
+    route["via"] = list(via)
+    return route
+
+
+def drop_reached_via(points, reached_m=VIA_REACHED_M):
+    """Remove the middle stops the walker has already reached.
+
+    points[0] is where the walker is now and points[-1] is the treasure. Without
+    this, after passing the side-step point the route would send you back to it.
+    """
+    start, end = points[0], points[-1]
+    middle = [p for p in points[1:-1] if haversine_m(start[0], start[1], p[0], p[1]) > reached_m]
+    return [start, *middle, end]

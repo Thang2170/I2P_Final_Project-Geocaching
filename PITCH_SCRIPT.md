@@ -25,7 +25,7 @@ The spoken pitch is about 225 words: just under 2 minutes at a calm speed. Don't
 **Hand-off:** "B, what happens inside the server?"
 
 ### Slide 4, inside one request (B, 0:55 to 1:25)
-> Every feature has three layers. To claim a treasure, the Blueprint checks you're logged in. The rule, `coins.claim_problem`, is plain Python: not your own treasure, not twice, not over 20 metres. Then `models.py` saves ten coins in SQLite. Plain rules are easy to test: we have 598 tests, and none of them call the real routing API.
+> Every feature has three layers. To claim a treasure, the Blueprint checks you're logged in. The rule, `coins.claim_problem`, is plain Python: not your own treasure, not twice, not over 20 metres. Then `models.py` saves ten coins in SQLite. Plain rules are easy to test: we have 614 tests, and none of them call the real routing API.
 
 **Hand-off:** "C wrote the maths behind the numbers you'll see."
 
@@ -33,7 +33,7 @@ The spoken pitch is about 225 words: just under 2 minutes at a calm speed. Don't
 > I wrote `calculator.py`. Steps are metres divided by 0.75, one average step. Calories are 0.5 times your weight times kilometres. So one kilometre at 60 kilos is 1,333 steps and 30 calories.
 
 ### Slide 6, where we are (C, 1:45 to 2:00)
-> Features 1 to 5 work, and hunts, coins and the shop are done early. The random route is next, then the street warning. Let's show you.
+> Features 1 to 6 work, and hunts, coins and the shop are done early. The street warning and QR scan come next. Let's show you.
 
 **Switch to the browser** (slide 7 stays up while A switches).
 
@@ -55,6 +55,8 @@ The spoken pitch is about 225 words: just under 2 minutes at a calm speed. Don't
 - Show the map: your marker, the treasure chests and the orange walking route.
 - Point at the box at the bottom: "173 m to National Tsing Hua University, 0.31 km walk, about 4 minutes."
 > The 173 metres is the straight line from haversine. The walk is longer because the route follows real paths. Both numbers come from Python.
+- Press **New route** twice: a different path to the same treasure each time.
+> Python picks a random side-step point beside the straight line, and the route goes through it. Once you reach that point, the route goes straight to the treasure.
 
 ### 0:40 to 1:10, A then B: find the treasure
 - A pastes the second address: you are now standing on the treasure.
