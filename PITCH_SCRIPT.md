@@ -25,7 +25,7 @@ The spoken pitch is about 225 words: just under 2 minutes at a calm speed. Don't
 **Hand-off:** "B, what happens inside the server?"
 
 ### Slide 4, inside one request (B, 0:55 to 1:25)
-> Every feature has three layers. To claim a treasure, the Blueprint checks you're logged in. The rule, `coins.claim_problem`, is plain Python: not your own treasure, not twice, not over 20 metres. Then `models.py` saves ten coins in SQLite. Plain rules are easy to test: we have 614 tests, and none of them call the real routing API.
+> Every feature has three layers. To claim a treasure, the Blueprint checks you're logged in. The rule, `coins.claim_problem`, is plain Python: not your own treasure, not twice, not over 20 metres. Then `models.py` saves ten coins in SQLite. Plain rules are easy to test: we have 789 tests, and none of them call the real routing API.
 
 **Hand-off:** "C wrote the maths behind the numbers you'll see."
 
@@ -33,7 +33,7 @@ The spoken pitch is about 225 words: just under 2 minutes at a calm speed. Don't
 > I wrote `calculator.py`. Steps are metres divided by 0.75, one average step. Calories are 0.5 times your weight times kilometres. So one kilometre at 60 kilos is 1,333 steps and 30 calories.
 
 ### Slide 6, where we are (C, 1:45 to 2:00)
-> Features 1 to 6 work, and hunts, coins and the shop are done early. The street warning and QR scan come next. Let's show you.
+> All ten planned features work, and we added a few of our own. Next is the ESP32 health band on real hardware. Let's show you.
 
 **Switch to the browser** (slide 7 stays up while A switches).
 
