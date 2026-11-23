@@ -22,6 +22,8 @@
       <!-- A: hunt race mode (/?hunt=<id>&treasure=<id>, from the Hunts page) -->
       <div id="huntInfo" class="sheet__route" hidden></div>
       <div id="teamInfo" class="sheet__route" hidden></div>
+      <!-- A: shown when the phone has no connection (the journey keeps counting) -->
+      <div id="netInfo" class="sheet__route net-line" hidden></div>
       <!-- B: after a find, rate the treasure 1-5 stars (Python checks you really found it) -->
       <div id="rateBox" class="rate-box" hidden>
         <p class="rate-box__ask">How was <span id="rateName"></span>?</p>
@@ -195,6 +197,7 @@
         const wanted = Number(params.get("treasure"));
         const wantedTreasure = list.find((t) => t.id === wanted);
         if (wantedTreasure && markersById.has(wanted)) selectTreasure(wantedTreasure, markersById.get(wanted));
+        resumeJourney();  // A: carry on a journey the server remembers (after a reload or lost signal)
       } catch (err) {
         console.error("Treasure markers failed:", err);
       }
@@ -559,6 +562,7 @@
       const now = Date.now();
       if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
       journey.tickAt = now;
+      if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
       if (journey.state === "running" && journey.meters !== journey.statsMeters
           && now - journey.statsAt >= STATS_EVERY_MS) loadJourneyStats();
       renderJourney();
@@ -576,12 +580,15 @@
       if (document.visibilityState === "visible" && journey.state === "running") keepScreenOn(true);
     });
 
-    function startJourney(t) {
+    // restored = the numbers the server kept (resumeJourney), or null for a brand-new journey
+    function startJourney(t, restored = null) {
       Object.assign(journey, {
         state: "running", targetId: t.id, name: t.name, target: [t.lat, t.lon],
-        elapsedMs: 0, meters: 0, steps: 0, calories: 0, statsAt: 0, statsMeters: 0, saveStarted: false,
+        elapsedMs: restored ? restored.elapsedMs : 0, meters: restored ? restored.meters : 0,
+        steps: 0, calories: 0, statsAt: 0, statsMeters: -1, saveStarted: false, progressAt: Date.now(),
         tickAt: Date.now(), last: currentPos ? { pos: currentPos, time: Date.now() } : null
       });
+      if (!restored) tellServerJourneyStarted(t);
       closeBoard();
       document.body.classList.add("is-journey");
       journeyBox.hidden = false;
@@ -647,8 +654,12 @@
         ok = res.ok;
         text = ok ? "Hunt saved." : (data.error || text);
       } catch (err) {
-        console.error("Saving the hunt failed:", err);
+        // A: no connection: keep it and send it when the phone is back online
+        queueForLater("/api/journeys", body);
+        queueForLater("/api/journeys/active", {}, "DELETE");
+        text = "No connection: this hunt will be saved as soon as you are back online.";
       }
+      if (ok) endServerJourney();
       jSaved.textContent = text;
       jSaved.classList.toggle("is-bad", !ok);
       if (ok) {
@@ -672,7 +683,11 @@
       if (!journeyActive() && currentPos && selectedTreasure) startJourney(selectedTreasure);
     });
     jPause.addEventListener("click", pauseOrResume);
-    jFinish.addEventListener("click", () => (journey.state === "finished" ? closeJourney() : finishJourney(false)));
+    jFinish.addEventListener("click", () => {
+      if (journey.state === "finished") return closeJourney();
+      finishJourney(false);
+      endServerJourney();  // A: stopped on purpose: nothing to carry on
+    });
 
     // The status card is hidden during a journey, so its messages ("123 m to Library",
     // "You found it", the coins you got) are copied into the panel.
@@ -781,6 +796,132 @@
       loadTeammates();
       setInterval(loadTeammates, 10000);  // the same pace as positions are sent
     }
+
+    // ------------------------------------------------------------ lost connection (A)
+
+    // The server remembers your journey with a deadline that fits the walk (journey_resume.py),
+    // so you can carry on after losing signal or reloading. Anything that must reach the server
+    // while you are offline waits in an "outbox" on the phone and is sent when you are back.
+    const PROGRESS_EVERY_MS = 30000;
+    const OFFLINE_FOUND_M = 20;  // same as FOUND_RADIUS_M in location.py; Python checks again later
+    const OUTBOX_KEY = "stepquest.outbox";
+    const netInfo = document.getElementById("netInfo");
+
+    function showNet(text) {
+      netInfo.textContent = text;
+      netInfo.hidden = !text;
+    }
+
+    function readOutbox() {
+      try { return JSON.parse(localStorage.getItem(OUTBOX_KEY)) || []; } catch (err) { return []; }
+    }
+    function writeOutbox(list) {
+      try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(list)); } catch (err) { /* private mode */ }
+    }
+    function queueForLater(url, body, method = "POST") {
+      const list = readOutbox();
+      list.push({ url, body, method });
+      writeOutbox(list);
+      showNet(`No connection. ${list.length} thing(s) will be sent when you are back online.`);
+    }
+
+    // Send what waited. Any answer from the server (even "no") means it arrived; only a
+    // network error or a server crash (5xx) keeps it for the next try.
+    let flushing = false;
+    async function flushOutbox() {
+      const list = readOutbox();
+      if (flushing || !list.length) return;
+      flushing = true;
+      const keep = [];
+      const refused = [];  // the server answered "no" (too far, too fast, ...): say so, don't hide it
+      for (const item of list) {
+        try {
+          const res = await fetch(item.url, {
+            method: item.method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.body)
+          });
+          if (res.status >= 500) keep.push(item);
+          else if (!res.ok) refused.push((await res.json().catch(() => ({}))).error || `refused (${res.status})`);
+        } catch (err) {
+          keep.push(item);
+        }
+      }
+      writeOutbox(keep);
+      flushing = false;
+      if (keep.length < list.length) {
+        if (keep.length) showNet(`Sent ${list.length - keep.length}, ${keep.length} still waiting.`);
+        else if (refused.length) showNet(`Back online. Not saved: ${refused.join(" ")}`);
+        else showNet("Back online: everything you did offline is saved.");
+        loadBalance();
+        if (!keep.length && !refused.length) setTimeout(() => showNet(""), 6000);
+      }
+    }
+    window.addEventListener("online", flushOutbox);
+    window.addEventListener("offline", () => showNet("No connection. Your journey keeps counting."));
+    setInterval(flushOutbox, 30000);
+
+    async function tellServerJourneyStarted(t) {
+      if (!currentPos) return;
+      try {
+        const res = await fetch("/api/journeys/active", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ treasure_id: t.id, lat: currentPos[0], lon: currentPos[1] })
+        });
+        const data = await res.json();
+        if (res.ok) journeyNote(`If you lose signal you can carry on for ${Math.round(data.window_s / 60)} min.`);
+      } catch (err) {
+        console.error("Could not tell the server about the journey:", err);  // it still runs here
+      }
+    }
+
+    async function sendProgress() {
+      journey.progressAt = Date.now();
+      try {
+        await fetch("/api/journeys/active/progress", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ meters: Math.round(journey.meters), elapsed_s: Math.round(journey.elapsedMs / 1000) })
+        });
+      } catch (err) { /* offline: the next try in 30 s */ }
+    }
+
+    function endServerJourney() {
+      fetch("/api/journeys/active", { method: "DELETE" })
+        .catch(() => queueForLater("/api/journeys/active", {}, "DELETE"));
+    }
+
+    // After a reload (or the browser closed the page while you had no signal):
+    // carry on the journey the server remembers, with its distance and clock.
+    async function resumeJourney() {
+      if (journeyActive()) return;
+      try {
+        const res = await fetch("/api/journeys/active");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.expired) {
+          showNet(`Your journey to ${data.expired.treasure} ran out of time.`);
+          return;
+        }
+        const a = data.active;
+        if (!a || !a.treasure || !markersById.has(a.treasure.id)) return;
+        selectTreasure(a.treasure, markersById.get(a.treasure.id));
+        startJourney(a.treasure, { meters: a.meters, elapsedMs: (a.elapsed_s + a.since_update_s) * 1000 });
+        journeyNote(`Welcome back! Carrying on to ${a.treasure.name} (${Math.round(a.seconds_left / 60)} min left).`);
+      } catch (err) {
+        console.error("Could not check for a journey to carry on:", err);
+      }
+    }
+
+    // No signal but GPS still works: if you are at the treasure, count it now. Python
+    // checks the position again when the saved actions arrive.
+    function arrivedWhileOffline() {
+      if (!journeyActive() || !currentPos) return;
+      if (map.distance(currentPos, journey.target) > OFFLINE_FOUND_M) return;
+      const [lat, lon] = currentPos;
+      queueForLater(`/api/treasures/${journey.targetId}/claim`, { lat, lon });
+      if (raceHuntId && journey.targetId === raceTreasureId) queueForLater(`/api/hunts/${raceHuntId}/arrived`, { lat, lon });
+      finishJourney(true);  // saveJourney queues itself when the network fails
+      statusBox.textContent = `You reached ${journey.name} with no signal. Coins and saving happen when you are back online.`;
+    }
+    flushOutbox();
 
     // ------------------------------------------------------------ coins
 
@@ -975,6 +1116,7 @@
         if (data.found && askedFor === raceTreasureId) reportArrival(lat, lon);  // A: hunt race
       } catch (err) {
         statusBox.textContent = `Could not get distance: ${err.message}`;
+        arrivedWhileOffline();  // A: no signal at the treasure? still count it
       }
     }
 

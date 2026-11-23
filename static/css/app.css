@@ -1803,3 +1803,6 @@ button.post__likes[hidden] { display: none; }
 .btn.btn--small { width: auto; margin: 6px 0 0; padding: 6px 10px; font-size: 9px; }
 .admin__checks { margin-top: 0; }
 .admin__checks li { display: block; }
+
+/* A: the "no connection" line */
+.net-line { color: var(--px-bad); }
