@@ -192,6 +192,67 @@
       }
     }
 
+
+    // ------------------------------------------------ A: street crossings added by hand (Feature 7)
+    // OpenStreetMap doesn't know every crossing (and its free servers are sometimes down).
+    // Tap the map to add one; players on a route over it get the same warning.
+    const crossingMarks = L.layerGroup().addTo(map);
+    const crossingSign = L.divIcon({
+      className: "crossing-sign",
+      html: '<span class="sprite sprite--warning"></span>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 22]
+    });
+    const CROSSING_KINDS = ["street crossing", "zebra crossing", "crossing with traffic lights", "railway crossing"];
+    let crossingKey = null;
+
+    async function sendCrossing(url, method, body) {
+      const res = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Could not save");
+      map.closePopup();
+      await refresh();
+    }
+
+    function drawCrossings(list) {
+      const key = list.map(c => c.id).join(",");
+      if (key === crossingKey) return;
+      crossingKey = key;
+      crossingMarks.clearLayers();
+      for (const c of list) {
+        const box = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = c.kind;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "btn btn--small";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () =>
+          sendCrossing(`/api/admin/crossings/${c.id}`, "DELETE").catch(err => setText("updated", err.message)));
+        box.append(title, document.createElement("br"), remove);
+        L.marker([c.lat, c.lon], { icon: crossingSign, title: c.kind }).bindPopup(box).addTo(crossingMarks);
+      }
+    }
+
+    map.on("click", event => {
+      const box = document.createElement("div");
+      const question = document.createElement("div");
+      question.textContent = "Add a street crossing here?";
+      const kind = document.createElement("select");
+      for (const k of CROSSING_KINDS) kind.append(new Option(k, k));
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "btn btn--small";
+      add.textContent = "Add crossing";
+      add.addEventListener("click", () =>
+        sendCrossing("/api/admin/crossings", "POST",
+                     { lat: event.latlng.lat, lon: event.latlng.lng, kind: kind.value })
+          .catch(err => setText("updated", err.message)));
+      box.append(question, kind, document.createElement("br"), add);
+      L.popup().setLatLng(event.latlng).setContent(box).openOn(map);
+    });
+
     function drawFeed(events) {
       const feed = document.getElementById("feed");
       feed.replaceChildren();
@@ -221,6 +282,7 @@
         setText("sHunts", data.hunts);
         drawPins(data.treasure_list);
         drawPlayers(data.live_players);
+        drawCrossings(data.crossings || []);
         drawFeed(data.events);
         setText("updated", "Updated " + new Date().toLocaleTimeString());
       } catch (error) {

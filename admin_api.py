@@ -24,6 +24,7 @@ from live_positions import is_live, parse_position, seconds_ago
 from models import CoinTransaction, Hunt, HuntMember, Purchase, Treasure, User, db
 from photo_api import photo_url
 from treasure_checks import set_verified, verified_ids
+from crossing_marks import ManualCrossing, all_manual, parse_kind
 
 admin_api = Blueprint("admin_api", __name__)
 
@@ -155,6 +156,7 @@ def summary():
         "unverified": sum(1 for t in treasures if t.id not in verified),
         "events": recent_events(),
         "live_players": live_players(datetime.now(timezone.utc)),
+        "crossings": all_manual(),  # A: street crossings added by hand (Feature 7)
     }
 
 
@@ -219,3 +221,45 @@ def verify_treasure(treasure_id):
         return jsonify(error="No such treasure"), 404
     db.session.commit()
     return jsonify(treasure_id=treasure_id, verified=treasure_id in verified_ids())
+
+
+def _admin_or_error():
+    """(user, None) for an admin, else (None, error response)."""
+    user = current_user()
+    if user is None:
+        return None, (jsonify(error="Log in first"), 401)
+    if not is_admin(user):
+        return None, (jsonify(error="This page is for admins"), 403)
+    return user, None
+
+
+@admin_api.route("/api/admin/crossings", methods=["POST"])
+def add_crossing():
+    """Admins only. {"lat", "lon", "kind" (optional)}: a street crossing OpenStreetMap doesn't know."""
+    user, error = _admin_or_error()
+    if error:
+        return error
+    data = request.get_json(silent=True)
+    try:
+        lat, lon = parse_position(data)
+        kind = parse_kind(data.get("kind"))
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    crossing = ManualCrossing(lat=lat, lon=lon, kind=kind, added_by=user.id)
+    db.session.add(crossing)
+    db.session.commit()
+    return jsonify(crossing.to_dict()), 201
+
+
+@admin_api.route("/api/admin/crossings/<int(signed=True):crossing_id>", methods=["DELETE"])
+def remove_crossing(crossing_id):
+    """Admins only. The id is the map id (negative), as sent by the summary."""
+    user, error = _admin_or_error()
+    if error:
+        return error
+    crossing = db.session.get(ManualCrossing, abs(crossing_id))
+    if crossing is None:
+        return jsonify(error="No such crossing"), 404
+    db.session.delete(crossing)
+    db.session.commit()
+    return jsonify(ok=True)

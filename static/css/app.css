@@ -1806,3 +1806,27 @@ button.post__likes[hidden] { display: none; }
 
 /* A: the "no connection" line */
 .net-line { color: var(--px-bad); }
+
+/* ---------- A: street-crossing warnings (Feature 7) ---------- */
+.crossing-sign { background: none; border: 0; }
+.crossing-alert {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  z-index: 1200;
+  width: min(92vw, 520px);
+  transform: translateX(-50%);
+  padding: 14px 18px;
+  color: var(--px-paper);
+  background: var(--px-bad);
+  box-shadow: var(--px-edge), var(--px-drop);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  cursor: pointer;
+  animation: px-blink 0.5s steps(1) 3;
+}
+.crossing-alert[hidden] { display: none; }
+@keyframes px-blink { 50% { background: var(--px-ink); } }
+@media (prefers-reduced-motion: reduce) { .crossing-alert { animation: none; } }

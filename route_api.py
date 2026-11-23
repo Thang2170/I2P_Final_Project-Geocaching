@@ -7,6 +7,8 @@ app.py only needs two lines:
     app.register_blueprint(route_api)
 """
 
+import time
+
 from flask import Blueprint, jsonify, request
 
 from routing import check_point, drop_reached_via, get_random_route, get_route, parse_points
@@ -50,3 +52,73 @@ def api_random_route():
     except ValueError as err:
         return jsonify(error=str(err)), 400
     return jsonify(route)
+
+
+# ------------------------------------------------------------ street crossings (Feature 7)
+
+from crossings import (CrossingError, bounding_box, check_path, crossings_on_route,  # noqa: E402
+                       fetch_crossings, parse_crossings, warning_for)
+from crossing_marks import all_manual  # noqa: E402
+from live_positions import parse_position  # noqa: E402
+
+# Overpass is a free, shared service: remember answers for the same area instead of asking
+# again on every reroute. Small on purpose (a dict that forgets the oldest area).
+_crossing_cache = {}
+CACHE_SIZE = 50
+
+
+OVERPASS_PAUSE_S = 300   # after every Overpass server failed, don't make players wait again for 5 min
+_overpass_down_until = 0.0
+
+
+def _crossings_near(path):
+    global _overpass_down_until
+    key = tuple(round(x, 3) for x in bounding_box(path))  # about 100 m steps
+    if key not in _crossing_cache and time.time() < _overpass_down_until:
+        raise CrossingError("OpenStreetMap was unreachable a moment ago")
+    if key not in _crossing_cache:
+        try:
+            found = fetch_crossings(path)
+        except CrossingError:
+            _overpass_down_until = time.time() + OVERPASS_PAUSE_S
+            raise
+        if len(_crossing_cache) >= CACHE_SIZE:
+            _crossing_cache.pop(next(iter(_crossing_cache)))
+        _crossing_cache[key] = found
+    return _crossing_cache[key]
+
+
+@route_api.route("/api/crossings", methods=["POST"])
+def api_crossings():
+    """POST {"path": [[lat, lon], ...]} (the route's path) -> the crossings you will walk over.
+
+    If OpenStreetMap can't be reached the answer is still 200, with an empty list and a
+    warning, so the map keeps working without crossing warnings.
+    """
+    data = request.get_json(silent=True)
+    try:
+        path = check_path(data.get("path") if isinstance(data, dict) else None)
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    # Crossings an admin added by hand come first: they work even when OpenStreetMap is down
+    manual = crossings_on_route(path, all_manual())
+    try:
+        found = crossings_on_route(path, _crossings_near(path))
+    except CrossingError as err:
+        if manual:
+            return jsonify(crossings=manual, source="stepquest",
+                           warning=f"Only crossings added by StepQuest right now ({err}).")
+        return jsonify(crossings=[], source="unavailable", warning=f"No crossing warnings right now: {err}")
+    return jsonify(crossings=manual + found, source="openstreetmap")
+
+
+@route_api.route("/api/crossings/warning", methods=["POST"])
+def api_crossing_warning():
+    """POST {"lat", "lon", "crossings": [...]} -> {"warning": {...} or null}. Python decides when to warn."""
+    data = request.get_json(silent=True)
+    try:
+        lat, lon = parse_position(data)
+        crossings = parse_crossings(data.get("crossings"))
+    except (ValueError, AttributeError) as err:
+        return jsonify(error=str(err)), 400
+    return jsonify(warning=warning_for(lat, lon, crossings))

@@ -13,6 +13,8 @@
     <div id="map"></div>
 
     <!-- Status card at the bottom: distance to the treasure and the route summary -->
+    <!-- A: "Zebra crossing in 14 m: look up from your phone!" (tap to close) -->
+    <div id="crossingAlert" class="crossing-alert" role="alert" hidden></div>
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
@@ -24,6 +26,8 @@
       <div id="teamInfo" class="sheet__route" hidden></div>
       <!-- A: shown when the phone has no connection (the journey keeps counting) -->
       <div id="netInfo" class="sheet__route net-line" hidden></div>
+      <!-- A: how many street crossings this route has (Feature 7) -->
+      <div id="crossingInfo" class="sheet__route" hidden></div>
       <!-- B: after a find, rate the treasure 1-5 stars (Python checks you really found it) -->
       <div id="rateBox" class="rate-box" hidden>
         <p class="rate-box__ask">How was <span id="rateName"></span>?</p>
@@ -433,6 +437,7 @@
         ]).addTo(map);
         if (fit) map.fitBounds(routeLine.getBounds(), routePadding());
         showRoute(data);
+        loadCrossings(data.path);  // A: street crossings along this route
       } catch (err) {
         if (requestId !== routeRequestId) return;
         if (routeLine) { routeLine.remove(); routeLine = null; }  // don't leave an out-of-date line
@@ -797,6 +802,67 @@
       setInterval(loadTeammates, 10000);  // the same pace as positions are sent
     }
 
+    // ------------------------------------------------------------ street crossings (A, Feature 7)
+
+    // Python finds the crossings along the route (OpenStreetMap, crossings.py) and decides when
+    // you are close enough to warn. The page draws a sign at each one and shows the warning.
+    let routeCrossings = [];
+    const warnedCrossings = new Set();  // warn once per crossing, not every 3 seconds
+    const crossingLayer = L.layerGroup().addTo(map);
+    const crossingAlert = document.getElementById("crossingAlert");
+    const crossingInfo = document.getElementById("crossingInfo");
+    const crossingIcon = L.divIcon({
+      className: "crossing-sign",
+      html: '<span class="sprite sprite--warning"></span>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 22]
+    });
+    let crossingRequestId = 0;
+
+    async function loadCrossings(path) {
+      const requestId = ++crossingRequestId;
+      try {
+        const res = await fetch("/api/crossings", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path })
+        });
+        const data = await res.json();
+        if (requestId !== crossingRequestId || !res.ok) return;  // a newer route came meanwhile
+        routeCrossings = data.crossings;
+        crossingLayer.clearLayers();
+        for (const c of routeCrossings) {
+          L.marker([c.lat, c.lon], { icon: crossingIcon, interactive: false, title: c.kind }).addTo(crossingLayer);
+        }
+        const n = routeCrossings.length;
+        crossingInfo.textContent = data.warning
+          || (n ? `${n} street crossing${n === 1 ? "" : "s"} on this route: we'll warn you before each one.`
+                : "No street crossings on this route.");
+        crossingInfo.hidden = false;
+      } catch (err) {
+        console.error("Crossings failed:", err);  // the route still works without warnings
+      }
+    }
+
+    let crossingAlertTimer = null;
+    async function checkCrossing(lat, lon) {
+      if (!routeCrossings.length) return;
+      try {
+        const res = await fetch("/api/crossings/warning", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lon, crossings: routeCrossings })
+        });
+        const data = await res.json();
+        const w = data.warning;
+        if (!res.ok || !w || warnedCrossings.has(w.id)) return;
+        warnedCrossings.add(w.id);
+        crossingAlert.textContent = w.text;
+        crossingAlert.hidden = false;
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);  // phones buzz, so you look up
+        clearTimeout(crossingAlertTimer);
+        crossingAlertTimer = setTimeout(() => { crossingAlert.hidden = true; }, 7000);
+      } catch (err) { /* offline: no new warnings until the connection is back */ }
+    }
+    crossingAlert.addEventListener("click", () => { crossingAlert.hidden = true; });
+
     // ------------------------------------------------------------ lost connection (A)
 
     // The server remembers your journey with a deadline that fits the walk (journey_resume.py),
@@ -1112,6 +1178,7 @@
           ? foundText(data.treasure, askedFor)
           : `${Math.round(data.meters)} m to ${data.treasure}`;
         sheet.classList.toggle("is-found", data.found);
+        checkCrossing(lat, lon);  // A: about to cross a street?
         if (data.found) claimCoins(askedFor, data.treasure, lat, lon);
         if (data.found && askedFor === raceTreasureId) reportArrival(lat, lon);  // A: hunt race
       } catch (err) {

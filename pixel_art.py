@@ -247,6 +247,21 @@ SPRITES = {
         "RR.RR.RR.RR",
         "RR.RR.RR.RR",
     ]],
+    # Street-crossing warning sign (Feature 7), drawn on the map at each crossing
+    "warning": [[
+        ".....oo.....",
+        "....oGGo....",
+        "....oGGo....",
+        "...oGGGGo...",
+        "...oGooGo...",
+        "..oGGooGGo..",
+        "..oGGooGGo..",
+        ".oGGGooGGGo.",
+        ".oGGGGGGGGo.",
+        "oGGGGooGGGGo",
+        "oGGGGGGGGGGo",
+        "oooooooooooo",
+    ]],
     # Little marks that sit on a map pin (2 x 2 pixels each, see PIXEL_SIZE)
     "mark-verified": [[
         ".oooooo.",
@@ -271,7 +286,7 @@ SPRITES = {
 }
 
 FRAME_TIME_S = {"explorer": 0.6, "coin-spin": 0.8}  # one whole animation loop
-PIXEL_SIZE = {"mark-verified": SMALL_PIXEL, "mark-collectible": SMALL_PIXEL}  # the rest use PIXEL
+PIXEL_SIZE = {"mark-verified": SMALL_PIXEL, "mark-collectible": SMALL_PIXEL, "warning": SMALL_PIXEL}  # the rest use PIXEL
 
 
 # ------------------------------------------------------------------ picture -> CSS
