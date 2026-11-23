@@ -44,7 +44,7 @@ The spoken pitch is about 225 words: just under 2 minutes at a calm speed. Don't
 **Driver:** A at the laptop. B and C talk when it's their part, and point at the screen.
 
 ### Before you go on stage
-1. On the latest `main`: `python -m unittest` shows `OK`.
+1. On the latest code (`feature/live-players`, or `main` once it is merged): `python -m unittest` shows `OK`.
 2. For a clean demo, stop the app, delete `instance\geohunt.db`, run `python seed_demo.py`, then `python app.py`.
 3. Log in as `demo_player` (password in `DEMO.md`). This player starts with 60 coins.
 4. Open only **one** map tab: `/?fake=24.7955,120.9965` (about 170 m from the first treasure).

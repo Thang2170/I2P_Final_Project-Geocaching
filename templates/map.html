@@ -657,11 +657,12 @@
         duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
         lat: currentPos[0], lon: currentPos[1]
       };
-      let ok = false, text = "Could not save this hunt.";
+      let ok = false, answered = false, text = "Could not save this hunt.";
       try {
         const res = await fetch("/api/journeys", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
         });
+        answered = true;  // saved or refused: either way this journey is over
         const data = await res.json();
         ok = res.ok;
         text = ok ? "Hunt saved." : (data.error || text);
@@ -671,7 +672,7 @@
         queueForLater("/api/journeys/active", {}, "DELETE");
         text = "No connection: this hunt will be saved as soon as you are back online.";
       }
-      if (ok) endServerJourney();
+      if (answered) endServerJourney();  // A: the server shouldn't offer to "carry on" a finished journey
       jSaved.textContent = text;
       jSaved.classList.toggle("is-bad", !ok);
       if (ok) {
