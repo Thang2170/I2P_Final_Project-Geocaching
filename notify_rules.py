@@ -15,7 +15,8 @@ FRIEND_REQUEST = "friend_request"    # someone wants to be your friend (the bell
 FRIEND_ACCEPTED = "friend_accepted"  # someone said yes to your friend request
 SHARE = "share"          # someone shared your post
 REPLY = "reply"          # someone replied to your comment
-KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY)
+HUNT_WON = "hunt_won"    # A: someone won a hunt race you were in
+KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY, HUNT_WON)
 
 SHOWN = 20  # how many notifications the bell lists
 
@@ -45,6 +46,8 @@ def message(kind, actor_name, subject):
         return f"{actor_name} wants to be your friend"
     if kind == FRIEND_ACCEPTED:
         return f"{actor_name} accepted your friend request"
+    if kind == HUNT_WON:
+        return f'{actor_name} won the hunt "{subject}"'
     raise ValueError(f"Unknown notification kind: {kind}")
 
 
@@ -57,6 +60,8 @@ def link(kind, post_id=None, hunt_id=None, actor_name=None):
         return f"/hunts/{hunt_id}/chat"
     if kind in (FRIEND_REQUEST, FRIEND_ACCEPTED):
         return f"/players/{quote(actor_name or '')}"
+    if kind == HUNT_WON:
+        return "/hunts"
     raise ValueError(f"Unknown notification kind: {kind}")
 
 

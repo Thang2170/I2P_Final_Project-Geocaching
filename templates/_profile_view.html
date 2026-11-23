@@ -6,6 +6,8 @@
       <span id="avatar" class="avatar avatar--huge" aria-hidden="true"></span>
       <div class="profile__who">
         <h1 id="name">{{ username }}</h1>
+        <!-- A: the Explorer badge from the shop (Python says: badge) -->
+        <span id="badge" class="explorer-badge" hidden>Explorer</span>
         <p id="joined" class="muted"></p>
         <p id="rank" class="profile__rank"></p>
       </div>
@@ -79,6 +81,7 @@
       $("avatar").textContent = p.avatar.letter;
       $("avatar").classList.add("avatar--" + (Number(p.avatar.colour) || 0));
       $("name").textContent = p.username;
+      $("badge").hidden = !p.badge;
       $("joined").textContent = p.joined + (p.is_me ? " · This is you" : "");
       $("rank").textContent = p.stats.rank ? `#${p.stats.rank} of ${p.stats.players} on the Leaderboard` : "";
       $("editMine").hidden = !p.is_me;

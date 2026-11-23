@@ -19,17 +19,18 @@
   {% else %}
   <main class="admin">
     <div class="admin__head">
-      <h1>Live board</h1>
+      <h1><span class="admin__title-art" aria-hidden="true"><span class="sprite sprite--explorer"></span><span class="sprite sprite--trophy"></span></span>Live board</h1>
       <p id="updated" class="muted">Loading…</p>
     </div>
 
     <!-- The numbers: Python counts, the page shows -->
     <section class="admin__stats" aria-live="polite">
-      <div class="tile"><span>Players</span><strong id="sPlayers">–</strong></div>
-      <div class="tile"><span>Treasures</span><strong id="sTreasures">–</strong></div>
-      <div class="tile"><span>Finds</span><strong id="sFinds">–</strong></div>
-      <div class="tile"><span>Coins paid</span><strong id="sCoins">–</strong></div>
-      <div class="tile"><span>Hunts</span><strong id="sHunts">–</strong></div>
+      <div class="tile"><span class="sprite sprite--explorer tile__art" aria-hidden="true"></span><span>Players</span><strong id="sPlayers">–</strong></div>
+      <div class="tile"><span class="sprite sprite--signal tile__art" aria-hidden="true"></span><span>On the map now</span><strong id="sLive">–</strong></div>
+      <div class="tile"><span class="sprite sprite--chest-open tile__art" aria-hidden="true"></span><span>Treasures</span><strong id="sTreasures">–</strong></div>
+      <div class="tile"><span class="sprite sprite--map tile__art" aria-hidden="true"></span><span>Finds</span><strong id="sFinds">–</strong></div>
+      <div class="tile"><span class="sprite sprite--coin-spin tile__art" aria-hidden="true"></span><span>Coins paid</span><strong id="sCoins">–</strong></div>
+      <div class="tile"><span class="sprite sprite--flag tile__art" aria-hidden="true"></span><span>Hunts</span><strong id="sHunts">–</strong></div>
     </section>
 
     <div class="admin__grid">
@@ -92,6 +93,34 @@
       if (treasures.length) map.fitBounds(pins.getBounds(), { padding: [40, 40], maxZoom: 17 });
     }
 
+    // Live players: a dot with a name label for everyone seen in the last 2 minutes.
+    // Python decides who is "live"; the page only draws what it is given.
+    // Their own layer above the treasure pins, so a chest never hides a player.
+    map.createPane("players").style.zIndex = 650;
+    const players = L.featureGroup().addTo(map);
+    // A: each player is a little walking explorer (the sprite from pixel_art.py)
+    const playerIcon = L.divIcon({
+      className: "admin-player",
+      html: '<span class="sprite sprite--explorer"></span>',
+      iconSize: [48, 48],
+      iconAnchor: [24, 46]
+    });
+    function drawPlayers(list) {
+      players.clearLayers();
+      for (const p of list) {
+        L.marker([p.lat, p.lon], { icon: playerIcon, pane: "players", title: p.name })
+          .bindTooltip(`${p.name} · ${p.seconds_ago}s ago`, { permanent: true, direction: "top", offset: [0, -44] })
+          .addTo(players);
+      }
+      setText("sLive", list.length);
+      // A player walked off the edge of the map (they can be far away): zoom out to show everyone.
+      const view = map.getBounds();
+      if (list.some(p => !view.contains([p.lat, p.lon]))) {
+        const everything = L.featureGroup([...pins.getLayers(), ...players.getLayers()]);
+        map.fitBounds(everything.getBounds(), { padding: [40, 40], maxZoom: 17 });
+      }
+    }
+
     function drawFeed(events) {
       const feed = document.getElementById("feed");
       feed.replaceChildren();
@@ -120,6 +149,7 @@
         setText("sCoins", data.coins_paid);
         setText("sHunts", data.hunts);
         drawPins(data.treasure_list);
+        drawPlayers(data.live_players);
         drawFeed(data.events);
         setText("updated", "Updated " + new Date().toLocaleTimeString());
       } catch (error) {

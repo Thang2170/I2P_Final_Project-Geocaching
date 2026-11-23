@@ -44,6 +44,9 @@
         <input id="description" name="description" maxlength="200">
         <label for="capacity">Players at once (1 to 50, default 10)</label>
         <input id="capacity" name="capacity" inputmode="numeric" placeholder="10">
+        <!-- A: where the race goes. Filled from /api/treasures below. -->
+        <label for="treasure">Where the hunt goes</label>
+        <select id="treasure" name="treasure_id"></select>
         <button type="submit" class="btn">Create hunt</button>
       </form>
     </details>
@@ -79,9 +82,21 @@
       for (const hunt of hunts) {
         const row = el("div", undefined, "hunt");
         const info = el("div");
-        const counts = `${hunt.playing}/${hunt.capacity} playing` + (hunt.waiting ? ` · ${hunt.waiting} waiting` : "");
-        info.append(el("p", hunt.name, "hunt__name"), el("p", counts, "muted hunt__text"));
+        // A: "joined" = has a place (kept until Leave); "online now" = had the map open in the last 2 minutes
+        const counts = `${hunt.playing}/${hunt.capacity} joined` + (hunt.waiting ? ` · ${hunt.waiting} waiting` : "")
+          + ` · ${hunt.online} online now`;
+        // A: a pixel flag before each hunt's name
+        const name = el("p", undefined, "hunt__name");
+        name.append(el("span", undefined, "sprite sprite--flag hunt__flag"), hunt.name);
+        info.append(name, el("p", counts, "muted hunt__text"));
         if (hunt.description) info.append(el("p", hunt.description, "muted hunt__text"));
+        // A: the race. Python decides the state, the winner and who may press Start.
+        const game = hunt.game || {};
+        if (game.treasure) info.append(el("p", `Goes to: ${game.treasure.name}`, "muted hunt__text"));
+        const race = el("p", undefined, "hunt__text");
+        if (game.state === "finished") race.append(el("span", undefined, "sprite sprite--trophy hunt__trophy"));
+        race.append(raceText(game));
+        info.append(race);
         if (hunt.me) info.append(el("p", myStatus(hunt.me), "hunt__text"));
 
         const buttons = el("div", undefined, "hunt__buttons");
@@ -89,14 +104,65 @@
         // In line, the chat stays closed until you move up (Python decides; see hunt_chat.py).
         if (hunt.me && hunt.me.state === "playing") buttons.append(chatLink(hunt));
         else if (hunt.me) buttons.append(el("span", "Chat opens when you play", "muted hunt__chat-later"));
-        const button = el("button", hunt.me ? "Leave" : "Join", hunt.me ? "btn btn--ghost" : "btn");
-        button.type = "button";
-        button.addEventListener("click", () => act(hunt, button));
-        buttons.append(button);
+        // A: Start (only when Python says you may), then "Go to the hunt" for everyone playing
+        if (game.can_start) buttons.append(startButton(hunt));
+        if (game.state === "started" && hunt.me && hunt.me.state === "playing" && game.treasure) {
+          const go = el("a", "Go to the hunt", "btn");
+          go.href = `/?hunt=${Number(hunt.id)}&treasure=${Number(game.treasure.id)}`;
+          buttons.append(go);
+        }
+        // Once a race has started nobody new can join it (leaving is still fine)
+        if (hunt.me || game.state === "open" || !game.state) {
+          const button = el("button", hunt.me ? "Leave" : "Join", hunt.me ? "btn btn--ghost" : "btn");
+          button.type = "button";
+          button.addEventListener("click", () => act(hunt, button));
+          buttons.append(button);
+        }
         row.append(info, buttons);
         box.append(row);
       }
     }
+
+    // A: one line about the race
+    function raceText(game) {
+      if (game.state === "finished") return `Finished · winner: ${game.winner}`;
+      if (game.state === "started") return "Racing now: the first to reach the treasure wins +20 coins";
+      return "Not started yet";
+    }
+
+    function startButton(hunt) {
+      const button = el("button", "Start", "btn");
+      button.type = "button";
+      button.addEventListener("click", async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        try {
+          const data = await post(`/api/hunts/${hunt.id}/start`);
+          show(`"${data.name}" has started! Tap "Go to the hunt" and race to ${data.treasure.name}.`, true);
+        } catch (error) {
+          show(error.message, false);
+        }
+        await load();
+      });
+      return button;
+    }
+
+    // A: fill the "Where the hunt goes" list with every treasure
+    async function loadTreasureChoices() {
+      try {
+        const res = await fetch("/api/treasures");
+        const list = await res.json();
+        const select = document.getElementById("treasure");
+        for (const t of list) {
+          const option = el("option", t.name);
+          option.value = t.id;
+          select.append(option);
+        }
+      } catch (error) {
+        console.error("Treasure list failed:", error);
+      }
+    }
+    loadTreasureChoices();
 
     function chatLink(hunt) {
       const link = el("a", "Open group chat", "btn btn--chat");

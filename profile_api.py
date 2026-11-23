@@ -12,6 +12,7 @@ from feed_rules import avatar, time_ago
 from journey_log import format_duration
 from leaderboard_api import player_rows
 from models import HuntMember, Journey, Post, Treasure, User, db
+from shop_api import has_badge  # A: the Explorer badge from the shop
 from player_profile import (HIDDEN_SHOWN, RECENT_HUNTS, RECENT_POSTS, joined_label, parse_username, rank_of,
                             walk_totals)
 
@@ -60,6 +61,7 @@ def profile(username):
     return jsonify(
         username=player.username,
         avatar=avatar(player.username),
+        badge=has_badge(uid),  # A: bought the Explorer badge in the shop
         joined=joined_label(player.created_at),
         is_me=uid == me.id,
         stats={

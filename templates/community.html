@@ -157,6 +157,13 @@
       return box;
     }
 
+    // A: a player's name, plus the Explorer badge if they bought it in the shop (Python says: author_badge)
+    function authorName(x, className) {
+      const name = el("strong", x.author, className);
+      if (x.author_badge) name.append(" ", el("span", "Explorer", "explorer-badge"));
+      return name;
+    }
+
     // B: the post a share shares, in a box. Python sends null once the original was deleted.
     function sharedBox(o) {
       const box = el("div", undefined, "shared");
@@ -167,7 +174,7 @@
       }
       const head = el("div", undefined, "shared__head");
       const who = el("div", undefined, "post__who");
-      who.append(playerLink(o.author, el("strong", o.author, "post__author player-link__name")),
+      who.append(playerLink(o.author, authorName(o, "post__author player-link__name")),
                  el("span", o.hunt ? `${o.ago} · finished a hunt` : o.ago, "post__meta"));
       head.append(playerLink(o.author, avatarEl(o.avatar)), who);
       box.append(head);
@@ -197,7 +204,7 @@
       const row = el("li", undefined, "comment comment--reply");
       const body = el("div", undefined, "comment__body");
       const bubble = el("div", undefined, "comment__bubble");
-      bubble.append(playerLink(r.author, el("strong", r.author, "player-link__name")), el("span", r.text, "comment__text"));
+      bubble.append(playerLink(r.author, authorName(r, "player-link__name")), el("span", r.text, "comment__text"));
       const meta = el("div", r.ago, "comment__meta");
       const replyBtn = el("button", "Reply", "link-button");
       replyBtn.type = "button";
@@ -214,7 +221,7 @@
       const row = el("li", undefined, "comment");
       const body = el("div", undefined, "comment__body");
       const bubble = el("div", undefined, "comment__bubble");
-      bubble.append(playerLink(c.author, el("strong", c.author, "player-link__name")), el("span", c.text, "comment__text"));
+      bubble.append(playerLink(c.author, authorName(c, "player-link__name")), el("span", c.text, "comment__text"));
       const meta = el("div", c.ago, "comment__meta");
 
       // B: replies, and the box to write one (hidden until you tap Reply)
@@ -284,7 +291,7 @@
       // who and when
       const head = el("header", undefined, "post__head");
       const who = el("div", undefined, "post__who");
-      who.append(playerLink(p.author, el("strong", p.author, "post__author player-link__name")),
+      who.append(playerLink(p.author, authorName(p, "post__author player-link__name")),
                  el("span", p.is_share ? `${p.ago} · ${sharedWhat(p)}` : p.hunt ? `${p.ago} · finished a hunt` : p.ago,
                     "post__meta"));
       head.append(playerLink(p.author, avatarEl(p.avatar)), who);

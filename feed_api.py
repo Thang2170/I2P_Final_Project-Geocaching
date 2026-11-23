@@ -22,6 +22,7 @@ from notify_api import notify
 from notify_rules import COMMENT, LIKE, REPLY, SHARE
 from rate_limit import slow_down_message, wait_left
 from shares import parse_share, share_target
+from shop_api import has_badge  # A: the Explorer badge from the shop
 
 feed_api = Blueprint("feed_api", __name__)
 
@@ -53,6 +54,7 @@ def _reply_dict(reply, me):
         "id": reply.id,
         "author": reply.user.username,
         "avatar": avatar(reply.user.username),
+        "author_badge": has_badge(reply.user_id),  # A: Explorer badge from the shop
         "text": reply.text,
         "ago": time_ago(reply.created_at),
         "mine": reply.user_id == me.id,
@@ -67,6 +69,7 @@ def _comment_dict(comment, me):
         "id": comment.id,
         "author": comment.user.username,
         "avatar": avatar(comment.user.username),
+        "author_badge": has_badge(comment.user_id),  # A: Explorer badge from the shop
         "text": comment.text,
         "ago": time_ago(comment.created_at),
         "mine": comment.user_id == me.id,
@@ -95,6 +98,7 @@ def _original_dict(post):
         "id": post.id,
         "author": post.user.username,
         "avatar": avatar(post.user.username),
+        "author_badge": has_badge(post.user_id),  # A: Explorer badge from the shop
         "ago": time_ago(post.created_at),
         "text": post.text,
         "hunt": _hunt_dict(post.journey) if post.journey else None,
@@ -108,6 +112,7 @@ def _post_dict(post, me):
         "id": post.id,
         "author": post.user.username,
         "avatar": avatar(post.user.username),
+        "author_badge": has_badge(post.user_id),  # A: Explorer badge from the shop
         "mine": post.user_id == me.id,
         "ago": time_ago(post.created_at),
         "when": post.created_at.isoformat(),

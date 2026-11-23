@@ -9,7 +9,7 @@ app.py only needs two lines:
 
 from flask import Blueprint, jsonify, request
 
-from routing import drop_reached_via, get_random_route, get_route, parse_points
+from routing import check_point, drop_reached_via, get_random_route, get_route, parse_points
 
 route_api = Blueprint("route_api", __name__)
 
@@ -34,16 +34,19 @@ def api_route():
 
 @route_api.route("/api/random-route")
 def api_random_route():
-    """GET /api/random-route?points=lat,lon;lat,lon  (exactly 2: you, then the treasure).
+    """GET /api/random-route?points=lat,lon;lat,lon[&current=lat,lon]
 
-    Every call picks a new random side-step point, so the same treasure gets a
-    different route. The answer is a normal route plus "via": [lat, lon].
+    points: exactly 2, you then the treasure. current (optional): the "via" of the
+    route the map shows now, so the new route is a different one.
+    The answer is a normal route plus "via": [lat, lon].
     """
     try:
         points = parse_points(request.args.get("points", ""))
         if len(points) != 2:
             raise ValueError("Need exactly 2 points: where you are, then the treasure")
-        route = get_random_route(points[0], points[1])
+        current = request.args.get("current")
+        current_via = check_point(current.split(",")) if current else None
+        route = get_random_route(points[0], points[1], current_via=current_via)
     except ValueError as err:
         return jsonify(error=str(err)), 400
     return jsonify(route)

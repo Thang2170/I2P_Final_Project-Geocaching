@@ -13,17 +13,34 @@ Like route_api.py, this lives in its own Blueprint. app.py only needs:
 """
 
 import os
-from datetime import timezone
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import func
 
 from auth_api import current_user
 from coin_api import FOUND_REASON
+from live_positions import is_live, parse_position, seconds_ago
 from models import CoinTransaction, Hunt, HuntMember, Purchase, Treasure, User, db
 from photo_api import photo_url
 
 admin_api = Blueprint("admin_api", __name__)
+
+
+class PlayerPosition(db.Model):
+    """Where each player was last seen, for the admin's live map.
+
+    One row per player (user_id is the key): each update REPLACES the old position,
+    so we never keep a history of where someone walked. It lives here and not in
+    models.py so A doesn't change B's file. app.py imports this file before
+    db.create_all(), so the table is made in an existing database too.
+    """
+
+    __tablename__ = "player_positions"
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    lat = db.Column(db.Float, nullable=False)
+    lon = db.Column(db.Float, nullable=False)
+    updated_at = db.Column(db.DateTime, nullable=False)
 
 DEFAULT_ADMINS = "admin"
 EVENTS_SHOWN = 15
@@ -86,6 +103,35 @@ def recent_events():
     return events[:EVENTS_SHOWN]
 
 
+def online_user_ids(user_ids, now):
+    """Which of these players sent a position in the last LIVE_WINDOW_S seconds.
+
+    Used by the Hunts page to say how many members are online now. Only a count
+    leaves this file there, never a position.
+    """
+    if not user_ids:
+        return set()
+    rows = db.session.execute(
+        db.select(PlayerPosition).where(PlayerPosition.user_id.in_(user_ids))).scalars().all()
+    return {pos.user_id for pos in rows if is_live(pos.updated_at, now)}
+
+
+def live_players(now, user_ids=None):
+    """Players seen in the last LIVE_WINDOW_S seconds, as plain dicts sorted by name.
+
+    user_ids: only these players (the hunt map shows just its own members). None = everyone.
+    """
+    query = (db.select(User.username, PlayerPosition)
+             .join(PlayerPosition, PlayerPosition.user_id == User.id)
+             .order_by(User.username))
+    if user_ids is not None:
+        query = query.where(User.id.in_(user_ids))
+    rows = db.session.execute(query).all()
+    return [{"name": name, "lat": pos.lat, "lon": pos.lon,
+             "seconds_ago": seconds_ago(pos.updated_at, now)}
+            for name, pos in rows if is_live(pos.updated_at, now)]
+
+
 def _count(query):
     return db.session.execute(query).scalar_one()
 
@@ -105,6 +151,7 @@ def summary():
         "treasure_list": [{**t.to_dict(), "creator": creators.get(t.created_by, "demo"),
                            "photo_url": photo_url(t.id)} for t in treasures],
         "events": recent_events(),
+        "live_players": live_players(datetime.now(timezone.utc)),
     }
 
 
@@ -127,3 +174,27 @@ def admin_summary():
     if not is_admin(user):
         return jsonify(error="This page is for admins"), 403
     return jsonify(summary())
+
+
+@admin_api.route("/api/me/position", methods=["POST"])
+def save_position():
+    """The map page sends {"lat": .., "lon": ..} every few seconds while you play.
+
+    Saved so the admin's live map can show you. Only your last position is kept.
+    """
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    try:
+        lat, lon = parse_position(request.get_json(silent=True))
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+
+    position = db.session.get(PlayerPosition, user.id)
+    if position is None:  # first time: make this player's one row
+        position = PlayerPosition(user_id=user.id)
+        db.session.add(position)
+    position.lat, position.lon = lat, lon
+    position.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify(ok=True)

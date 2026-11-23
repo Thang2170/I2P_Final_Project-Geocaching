@@ -1,10 +1,12 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask
 
+from admin_api import PlayerPosition
 from auth_api import auth_api
 from hunt_api import hunt_api
-from models import Hunt, HuntMember, db, seed_demo_hunt
+from models import Hunt, HuntMember, User, db, seed_demo_hunt
 from tests import PROJECT_ROOT
 
 
@@ -147,6 +149,45 @@ class TestHuntApi(unittest.TestCase):
         seed_demo_hunt()
         self.assertEqual(db.session.query(Hunt).count(), 1)
         self.assertIsNone(db.session.query(Hunt).one().created_by)
+
+
+    # ---------------------------------------- A: "online now" (members with the map open)
+
+    def put_on_map(self, name, minutes_ago=0):
+        """Save a live position for this player, as the map page does every 10 seconds."""
+        user = db.session.execute(db.select(User).filter_by(username=name)).scalar_one()
+        when = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        db.session.add(PlayerPosition(user_id=user.id, lat=24.79, lon=120.99, updated_at=when))
+        db.session.commit()
+
+    def test_nobody_online_at_first(self):
+        bao = self.player("bao")
+        self.create(bao)
+        self.assertEqual(bao.get("/api/hunts").get_json()[0]["online"], 0)
+
+    def test_member_with_the_map_open_counts_as_online(self):
+        bao = self.player("bao")
+        hunt_id = self.create(bao).get_json()["id"]
+        lan = self.player("lan")
+        lan.post(f"/api/hunts/{hunt_id}/join")
+        self.put_on_map("lan")
+        data = bao.get("/api/hunts").get_json()[0]
+        self.assertEqual((data["playing"], data["online"]), (2, 1))  # both joined, one around now
+
+    def test_logged_out_member_keeps_their_place_but_is_not_online(self):
+        bao = self.player("bao")
+        self.create(bao)
+        self.put_on_map("bao", minutes_ago=5)  # closed the map 5 minutes ago
+        bao.post("/api/logout")
+        data = self.player("lan").get("/api/hunts").get_json()[0]
+        self.assertEqual((data["playing"], data["online"]), (1, 0))
+
+    def test_online_player_outside_the_hunt_is_not_counted(self):
+        bao = self.player("bao")
+        self.create(bao)
+        self.player("lan")
+        self.put_on_map("lan")  # on the map, but never joined
+        self.assertEqual(bao.get("/api/hunts").get_json()[0]["online"], 0)
 
 
 if __name__ == "__main__":

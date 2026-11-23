@@ -12,6 +12,7 @@ from coin_api import coin_api, found_treasure_ids
 from coins import first_to_find
 from feed_api import feed_api
 from hunt_api import hunt_api
+from hunt_game_api import hunt_game_api  # A: hunt races
 from journey_api import journey_api
 from leaderboard_api import leaderboard_api
 from notify_api import notify_api
@@ -74,6 +75,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(coin_api)
     app.register_blueprint(shop_api)
     app.register_blueprint(hunt_api)
+    app.register_blueprint(hunt_game_api)
     app.register_blueprint(chat_api)
     app.register_blueprint(notify_api)
     app.register_blueprint(rating_api)
