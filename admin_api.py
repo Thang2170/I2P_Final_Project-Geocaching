@@ -23,6 +23,7 @@ from coin_api import FOUND_REASON
 from live_positions import is_live, parse_position, seconds_ago
 from models import CoinTransaction, Hunt, HuntMember, Purchase, Treasure, User, db
 from photo_api import photo_url
+from treasure_checks import set_verified, verified_ids
 
 admin_api = Blueprint("admin_api", __name__)
 
@@ -140,6 +141,7 @@ def summary():
     """Everything the admin page shows, as one dict."""
     treasures = db.session.execute(db.select(Treasure).order_by(Treasure.id)).scalars().all()
     creators = {u.id: u.username for u in db.session.execute(db.select(User)).scalars().all()}
+    verified = verified_ids()
     return {
         "players": _count(db.select(func.count(User.id))),
         "treasures": len(treasures),
@@ -149,7 +151,8 @@ def summary():
                              .where(CoinTransaction.reason == FOUND_REASON)),
         "hunts": _count(db.select(func.count(Hunt.id))),
         "treasure_list": [{**t.to_dict(), "creator": creators.get(t.created_by, "demo"),
-                           "photo_url": photo_url(t.id)} for t in treasures],
+                           "photo_url": photo_url(t.id), "verified": t.id in verified} for t in treasures],
+        "unverified": sum(1 for t in treasures if t.id not in verified),
         "events": recent_events(),
         "live_players": live_players(datetime.now(timezone.utc)),
     }
@@ -198,3 +201,21 @@ def save_position():
     position.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify(ok=True)
+
+
+@admin_api.route("/api/admin/treasures/<int:treasure_id>/verify", methods=["POST"])
+def verify_treasure(treasure_id):
+    """Admins only. Send JSON {"verified": true} to check a treasure, false to take it back."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    if not is_admin(user):
+        return jsonify(error="This page is for admins"), 403
+    data = request.get_json(silent=True)
+    wanted = data.get("verified", True) if isinstance(data, dict) else True
+    if not isinstance(wanted, bool):
+        return jsonify(error="verified must be true or false"), 400
+    if not set_verified(treasure_id, user.id, wanted):
+        return jsonify(error="No such treasure"), 404
+    db.session.commit()
+    return jsonify(treasure_id=treasure_id, verified=treasure_id in verified_ids())

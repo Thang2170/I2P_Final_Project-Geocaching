@@ -18,6 +18,7 @@ Use a sprite in HTML like this:  <span class="sprite sprite--explorer"></span>
 from pathlib import Path
 
 PIXEL = 3  # each picture pixel is a 3 x 3 screen pixel box
+SMALL_PIXEL = 2  # the little marks on map pins use 2 x 2 boxes (see PIXEL_SIZE)
 OUTPUT = Path(__file__).parent / "static" / "css" / "sprites.css"
 
 # One letter per colour. The colours themselves live in pixel.css (--px-...).
@@ -246,9 +247,31 @@ SPRITES = {
         "RR.RR.RR.RR",
         "RR.RR.RR.RR",
     ]],
+    # Little marks that sit on a map pin (2 x 2 pixels each, see PIXEL_SIZE)
+    "mark-verified": [[
+        ".oooooo.",
+        "ollllllo",
+        "olllllpo",
+        "ollllplo",
+        "olplpllo",
+        "ollplllo",
+        "ollllllo",
+        ".oooooo.",
+    ]],
+    "mark-collectible": [[
+        "...oo...",
+        "..oGgo..",
+        ".oGggdo.",
+        "oGgggddo",
+        "oggggddo",
+        ".oggddo.",
+        "..oddo..",
+        "...oo...",
+    ]],
 }
 
 FRAME_TIME_S = {"explorer": 0.6, "coin-spin": 0.8}  # one whole animation loop
+PIXEL_SIZE = {"mark-verified": SMALL_PIXEL, "mark-collectible": SMALL_PIXEL}  # the rest use PIXEL
 
 
 # ------------------------------------------------------------------ picture -> CSS
@@ -272,14 +295,14 @@ def check_sprite(name, frames):
     return width, height
 
 
-def box_shadow(rows):
+def box_shadow(rows, size=PIXEL):
     """One CSS shadow per coloured pixel. The shadow box sits one pixel up-left
     of the sprite (see .sprite::before in pixel.css), hence the + 1."""
     shadows = []
     for y, row in enumerate(rows):
         for x, letter in enumerate(row):
             if letter != ".":
-                shadows.append(f"{(x + 1) * PIXEL}px {(y + 1) * PIXEL}px 0 0 var({PALETTE[letter]})")
+                shadows.append(f"{(x + 1) * size}px {(y + 1) * size}px 0 0 var({PALETTE[letter]})")
     return ",\n    ".join(shadows)
 
 
@@ -287,8 +310,12 @@ def sprite_css(name, frames):
     """The CSS for one sprite: its size, its first frame, and (if it has more
     frames) an animation that steps through them."""
     width, height = check_sprite(name, frames)
-    css = [f".sprite--{name} {{ width: {width * PIXEL}px; height: {height * PIXEL}px; }}",
-           f".sprite--{name}::before {{\n  box-shadow:\n    {box_shadow(frames[0])};"]
+    size = PIXEL_SIZE.get(name, PIXEL)  # most sprites use PIXEL; the little pin marks are smaller
+    css = [f".sprite--{name} {{ width: {width * size}px; height: {height * size}px; }}"]
+    if size != PIXEL:  # the shadow box must be exactly one picture pixel big
+        css.append(f".sprite--{name}::before {{ left: -{size}px; top: -{size}px; "
+                   f"width: {size}px; height: {size}px; }}")
+    css.append(f".sprite--{name}::before {{\n  box-shadow:\n    {box_shadow(frames[0], size)};")
     if len(frames) == 1:
         css[-1] += "\n}"
         return "\n".join(css)
@@ -298,7 +325,7 @@ def sprite_css(name, frames):
     keyframes = [f"@keyframes sprite-{name} {{"]
     for number, rows in enumerate(frames):
         percent = round(number * 100 / len(frames), 2)
-        keyframes.append(f"  {percent}% {{ box-shadow:\n    {box_shadow(rows)}; }}")
+        keyframes.append(f"  {percent}% {{ box-shadow:\n    {box_shadow(rows, size)}; }}")
     keyframes.append("}")
     css.append("\n".join(keyframes))
     # People who asked their computer for less motion get the first frame only

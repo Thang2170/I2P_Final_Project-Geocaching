@@ -43,6 +43,13 @@
         <ol id="feed" class="feed"></ol>
         <p id="feedEmpty" class="muted" hidden>Nothing has happened yet.</p>
       </section>
+
+      <!-- A: treasures players hid that no admin has checked yet. Verify the real ones. -->
+      <section class="admin__feed admin__checks">
+        <h2>Check these treasures <span id="checksCount" class="muted"></span></h2>
+        <ol id="checks" class="feed"></ol>
+        <p id="checksEmpty" class="muted" hidden>Every treasure is verified.</p>
+      </section>
     </div>
   </main>
 
@@ -60,19 +67,25 @@
     }).addTo(map);
     L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(map);
 
-    const pinIcon = L.divIcon({
-      className: "pin pin--treasure",
-      html: '<div class="pin__grow"><div class="pin__shape"></div></div>',
-      iconSize: [30, 36],
-      iconAnchor: [15, 34]
-    });
+    // A: a verified treasure's pin carries the same green check as on the players' map
+    function pinIcon(t) {
+      const mark = t.verified ? '<span class="pin__marks"><span class="sprite sprite--mark-verified"></span></span>' : "";
+      return L.divIcon({
+        className: "pin pin--treasure",
+        html: '<div class="pin__grow"><div class="pin__shape"></div></div>' + mark,
+        iconSize: [30, 36],
+        iconAnchor: [15, 34]
+      });
+    }
     const pins = L.featureGroup().addTo(map);  // a feature group knows its bounds
-    let pinCount = -1;
+    let pinKey = null;
+    let firstFit = true;
 
-    // Redraw the pins only when a treasure was added, so open popups stay open
+    // Redraw the pins only when a treasure was added or (un)verified, so open popups stay open
     function drawPins(treasures) {
-      if (treasures.length === pinCount) return;
-      pinCount = treasures.length;
+      const key = treasures.map(t => `${t.id}:${t.verified}`).join(",");
+      if (key === pinKey) return;
+      pinKey = key;
       pins.clearLayers();
       for (const t of treasures) {
         const popup = document.createElement("div");
@@ -88,9 +101,67 @@
           img.className = "popup-photo";
           popup.append(img);
         }
-        L.marker([t.lat, t.lon], { icon: pinIcon, title: t.name }).bindPopup(popup).addTo(pins);
+        popup.append(checkLine(t), verifyButton(t));
+        L.marker([t.lat, t.lon], { icon: pinIcon(t), title: t.name }).bindPopup(popup).addTo(pins);
       }
-      if (treasures.length) map.fitBounds(pins.getBounds(), { padding: [40, 40], maxZoom: 17 });
+      if (firstFit && treasures.length) {
+        map.fitBounds(pins.getBounds(), { padding: [40, 40], maxZoom: 17 });
+        firstFit = false;  // later redraws keep where the admin is looking
+      }
+      drawChecks(treasures.filter(t => !t.verified));
+    }
+
+    // ------------------------------------------------ A: verifying treasures
+
+    function checkLine(t) {
+      const line = document.createElement("div");
+      line.textContent = t.verified ? "✓ Verified" : "Not verified yet";
+      return line;
+    }
+
+    function verifyButton(t) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn--small";
+      button.textContent = t.verified ? "Take back the check" : "Verify";
+      button.addEventListener("click", () => setVerified(t.id, !t.verified, button));
+      return button;
+    }
+
+    async function setVerified(treasureId, verified, button) {
+      button.disabled = true;
+      try {
+        const res = await fetch(`/api/admin/treasures/${treasureId}/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ verified })
+        });
+        if (!res.ok) throw new Error((await res.json()).error || "Could not save");
+        map.closePopup();
+        await refresh();
+      } catch (error) {
+        button.disabled = false;
+        setText("updated", error.message);
+      }
+    }
+
+    function drawChecks(waiting) {
+      const list = document.getElementById("checks");
+      list.replaceChildren();
+      document.getElementById("checksEmpty").hidden = waiting.length > 0;
+      setText("checksCount", waiting.length ? `(${waiting.length})` : "");
+      for (const t of waiting) {
+        const li = document.createElement("li");
+        const name = document.createElement("b");
+        name.textContent = t.name;
+        const look = document.createElement("button");
+        look.type = "button";
+        look.className = "link-button";
+        look.textContent = "Show on map";
+        look.addEventListener("click", () => map.setView([t.lat, t.lon], 18));
+        li.append(name, ` by ${t.creator} · `, look, " ", verifyButton(t));
+        list.append(li);
+      }
     }
 
     // Live players: a dot with a name label for everyone seen in the last 2 minutes.

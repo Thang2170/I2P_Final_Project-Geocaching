@@ -1787,3 +1787,19 @@ button.post__likes[hidden] { display: none; }
 @media (min-width: 901px) and (max-width: 1180px) {
   .admin__stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---------- A: verified treasures and collectibles: marks on map pins ---------- */
+.pin__marks {
+  position: absolute;
+  top: -10px;
+  right: -12px;
+  display: flex;
+  gap: 1px;
+  pointer-events: none;   /* taps still go to the pin */
+}
+.board__verified { margin: 6px 0 0; font-size: 18px; color: var(--px-muted); }
+.board__verified.is-verified { color: var(--px-good); }
+/* A: the small Verify buttons on the admin board */
+.btn.btn--small { width: auto; margin: 6px 0 0; padding: 6px 10px; font-size: 9px; }
+.admin__checks { margin-top: 0; }
+.admin__checks li { display: block; }

@@ -69,6 +69,8 @@
       <h2 id="boardName"></h2>
       <p id="boardHint" class="board__hint"></p>
       <p id="boardStars" class="board__stars"></p>
+      <!-- A: verified by an admin, or not yet (you can still go there) -->
+      <p id="boardVerified" class="board__verified"></p>
       <!-- The photo the hider took of the spot (loads only if the treasure has one) -->
       <img id="boardPhoto" class="board__photo" alt="Photo of the spot" hidden>
       <div class="board__stats">
@@ -139,7 +141,26 @@
       }).addTo(map);
       marker.on("click", () => selectTreasure(t, marker));
       markersById.set(t.id, marker);
+      addPinMarks(marker, t);
       return marker;
+    }
+
+    // A: little pixel marks on a pin: a green check if an admin verified the treasure,
+    // a gem if it has a collectible to scan. Python says which (verified / collectible).
+    const infoById = new Map();  // treasure id -> {verified, collectible}, from /api/treasures
+    function addPinMarks(marker, t) {
+      const pin = marker.getElement();
+      if (!pin) return;
+      pin.querySelector(".pin__marks")?.remove();
+      const marks = document.createElement("span");
+      marks.className = "pin__marks";
+      for (const [on, sprite] of [[t.verified, "mark-verified"], [t.collectible, "mark-collectible"]]) {
+        if (!on) continue;
+        const mark = document.createElement("span");
+        mark.className = `sprite sprite--${sprite}`;
+        marks.append(mark);
+      }
+      if (marks.childElementCount) pin.append(marks);
     }
 
     // The treasure you are hunting: its pin is orange and the status card
@@ -165,7 +186,9 @@
           ratingsById.set(t.id, { rating: t.rating, mine: t.my_rating });
           // B: Python marks the ones you were already paid for (found_by_me); they show a tick.
           if (t.found_by_me) foundIds.add(t.id);
+          infoById.set(t.id, { verified: t.verified, collectible: t.collectible });
           if (t.id !== treasure.id) addTreasurePin(t, t.found_by_me ? "found" : "treasure");
+          else addPinMarks(huntMarker, t);  // the first pin was drawn before the list arrived
         }
         if (foundIds.has(treasure.id)) showTick(huntMarker);  // you found them all: even this one is ticked
         // B: /?treasure=<id> (from the welcome page) opens that treasure's board.
@@ -206,6 +229,12 @@
       document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
       showBoardPhoto(t.id);
       showBoardStars(t.id);
+      const info = infoById.get(t.id) || {};
+      const verifiedLine = document.getElementById("boardVerified");
+      verifiedLine.textContent = info.verified
+        ? "✓ Verified by StepQuest"
+        : "Not verified yet: hidden by a player and not checked by an admin. You can still go.";
+      verifiedLine.classList.toggle("is-verified", Boolean(info.verified));
       boardKm.textContent = "–";
       boardMin.textContent = "–";
       boardSteps.textContent = "–";

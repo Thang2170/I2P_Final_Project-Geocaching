@@ -71,7 +71,10 @@ def list_treasures():
     ratings = rating_summaries()
     mine = my_ratings(user.id) if user else {}
     none = {"average": None, "count": 0}
+    from treasure_checks import verified_ids  # A: the admin's check mark (same reason)
+    verified = verified_ids()
     return jsonify([{**t.to_dict(), "found_by_me": t.id in found,
+                     "verified": t.id in verified,  # A: checked by an admin (demo ones always are)
                      # B: stars for the map's info board (see ratings.py)
                      "rating": {k: ratings.get(t.id, none)[k] for k in ("average", "count")},
                      "my_rating": mine.get(t.id)} for t in treasures])
