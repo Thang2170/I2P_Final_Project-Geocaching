@@ -77,6 +77,8 @@
       <p id="boardStars" class="board__stars"></p>
       <!-- A: verified by an admin, or not yet (you can still go there) -->
       <p id="boardVerified" class="board__verified"></p>
+      <!-- A: a QR collectible is hidden here (scan it for a 3D trophy) -->
+      <p id="boardCollectible" class="board__verified" hidden></p>
       <!-- The photo the hider took of the spot (loads only if the treasure has one) -->
       <img id="boardPhoto" class="board__photo" alt="Photo of the spot" hidden>
       <div class="board__stats">
@@ -192,7 +194,7 @@
           ratingsById.set(t.id, { rating: t.rating, mine: t.my_rating });
           // B: Python marks the ones you were already paid for (found_by_me); they show a tick.
           if (t.found_by_me) foundIds.add(t.id);
-          infoById.set(t.id, { verified: t.verified, collectible: t.collectible });
+          infoById.set(t.id, { verified: t.verified, collectible: t.collectible, collected: t.collected_by_me });
           if (t.id !== treasure.id) addTreasurePin(t, t.found_by_me ? "found" : "treasure");
           else addPinMarks(huntMarker, t);  // the first pin was drawn before the list arrived
         }
@@ -242,6 +244,11 @@
         ? "✓ Verified by StepQuest"
         : "Not verified yet: hidden by a player and not checked by an admin. You can still go.";
       verifiedLine.classList.toggle("is-verified", Boolean(info.verified));
+      const collectibleLine = document.getElementById("boardCollectible");
+      collectibleLine.hidden = !info.collectible;
+      collectibleLine.textContent = info.collected
+        ? "◆ You collected this treasure's trophy"
+        : "◆ Has a collectible: find the QR code at the spot and scan it (Collection > Scan)";
       boardKm.textContent = "–";
       boardMin.textContent = "–";
       boardSteps.textContent = "–";

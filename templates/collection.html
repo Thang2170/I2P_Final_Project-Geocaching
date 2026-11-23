@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Collection · StepQuest</title>
+  {# A: Google's <model-viewer> shows the 3D trophies and opens AR on phones (Android Scene
+     Viewer, iPhone Quick Look). Python makes the trophies (voxel_models.py). #}
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+  <style>
+    .trophies { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; margin-top: 16px; }
+    .trophy { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px;
+              background: var(--px-paper); box-shadow: var(--px-edge); text-align: center; }
+    .trophy.is-new { animation: px-shake .3s steps(2) 3; }
+    .trophy__art { display: grid; place-items: center; height: 60px; }
+    .trophy__name { margin: 0; font-size: 20px; }
+    .trophy .btn { width: auto; margin: 0; padding: 8px 10px; font-size: 9px; }
+    .viewer { position: relative; margin-top: 20px; background: #1d3a33; box-shadow: var(--px-edge); }
+    .viewer[hidden] { display: none; }
+    model-viewer { width: 100%; height: 380px; --poster-color: transparent; }
+    .viewer__bar { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+                   padding: 10px 14px; color: var(--px-paper); }
+    .viewer__bar .btn { width: auto; margin: 0; padding: 8px 10px; font-size: 9px; }
+    .setup { display: grid; gap: 8px; padding: 14px 0; border-top: 2px dashed var(--line); }
+    .setup__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .setup .btn { width: auto; margin: 0; padding: 8px 10px; font-size: 9px; }
+    .setup .code { color: var(--px-gold-dark); letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+  {% set active = "collection" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1><span class="sprite sprite--mark-collectible" aria-hidden="true"></span> Collection</h1>
+    <p class="muted">Find a treasure with a collectible (the gem on its map pin), scan the QR code hidden there,
+      and its 3D trophy joins your collection. Tap a trophy to turn it around, or see it in AR on your phone.</p>
+    <a class="btn" href="/scan">Scan a QR code</a>
+    <p id="message" class="message" role="status"></p>
+
+    <div id="trophies" class="trophies"></div>
+    <p id="empty" class="muted" hidden>No trophies yet. Look for treasures with a gem on the map.</p>
+
+    <!-- The one 3D viewer, filled with whichever trophy you tap -->
+    <section id="viewer" class="viewer" hidden>
+      <model-viewer id="model" camera-controls auto-rotate shadow-intensity="1" ar
+                    ar-modes="webxr scene-viewer quick-look" alt="A 3D trophy"></model-viewer>
+      <div class="viewer__bar">
+        <span id="viewerName"></span>
+        <span>
+          <button type="button" id="arButton" class="btn">View in AR</button>
+          <button type="button" id="closeViewer" class="btn btn--ghost">Close</button>
+        </span>
+      </div>
+    </section>
+
+    <section id="setupBox" hidden>
+      <h2>Your treasures: add a collectible</h2>
+      <p class="muted">Choose a trophy (or upload your own 3D model as a <b>.glb</b> file, up to 5 MB),
+        then print the QR code and stick it at the treasure.</p>
+      <div id="setups"></div>
+    </section>
+  </main>
+
+  <script>
+    // The page only shows and sends: Python decides what you collected and checks every model file.
+    const message = document.getElementById("message");
+    const params = new URLSearchParams(location.search);
+    let trophyNames = [];
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+    function show(text, ok) {
+      message.textContent = text;
+      message.className = "message " + (ok ? "ok" : "bad");
+    }
+
+    function openViewer(item) {
+      const viewer = document.getElementById("viewer");
+      document.getElementById("model").src = item.model_url;
+      document.getElementById("viewerName").textContent = item.name + (item.uploaded ? " (handmade)" : "");
+      viewer.hidden = false;
+      viewer.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    document.getElementById("closeViewer").addEventListener("click", () => {
+      document.getElementById("viewer").hidden = true;
+    });
+    document.getElementById("arButton").addEventListener("click", () => {
+      const model = document.getElementById("model");
+      if (model.canActivateAR) model.activateAR();
+      else show("AR needs a phone with AR support (Android with ARCore, or an iPhone).", false);
+    });
+
+    function renderMine(mine) {
+      const box = document.getElementById("trophies");
+      box.replaceChildren();
+      document.getElementById("empty").hidden = mine.length > 0;
+      for (const item of mine) {
+        const card = el("div", undefined, "trophy");
+        if (String(item.id) === params.get("new")) card.classList.add("is-new");
+        const art = el("div", undefined, "trophy__art");
+        art.append(el("span", undefined, `sprite sprite--${item.trophy}`));
+        const open = el("button", "View in 3D", "btn");
+        open.type = "button";
+        open.addEventListener("click", () => openViewer(item));
+        card.append(art, el("p", item.name, "trophy__name"), el("p", item.treasure || "", "muted"), open);
+        box.append(card);
+      }
+    }
+
+    function setupRow(t) {
+      const row = el("form", undefined, "setup");
+      row.append(el("b", t.name));
+      const line = el("div", undefined, "setup__row");
+      const name = el("input");
+      name.name = "name";
+      name.placeholder = "Trophy name";
+      name.maxLength = 40;
+      name.value = t.collectible ? t.collectible.name : "";
+      const pick = el("select");
+      pick.name = "trophy";
+      for (const n of trophyNames) pick.append(new Option(n, n, false, t.collectible && t.collectible.trophy === n));
+      const file = el("input");
+      file.type = "file";
+      file.name = "model";
+      file.accept = ".glb,model/gltf-binary";
+      const save = el("button", t.collectible ? "Save" : "Add collectible", "btn");
+      save.type = "submit";
+      line.append(name, pick, file, save);
+      row.append(line);
+      if (t.collectible) {
+        const info = el("div", undefined, "setup__row");
+        const qr = el("a", "Print QR code", "btn btn--ghost");
+        qr.href = `/treasures/${t.id}/qr`;
+        const look = el("button", "View in 3D", "btn btn--ghost");
+        look.type = "button";
+        look.addEventListener("click", () => openViewer(t.collectible));
+        info.append(el("span", `Code: ${t.collectible.code}`, "code"), qr, look);
+        row.append(info);
+      }
+      row.addEventListener("submit", async event => {
+        event.preventDefault();
+        save.disabled = true;
+        try {
+          const res = await fetch(`/api/treasures/${t.id}/collectible`, { method: "POST", body: new FormData(row) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not save");
+          show(`Saved "${data.name}". Now print its QR code and stick it at ${t.name}.`, true);
+          await load();
+        } catch (error) {
+          show(error.message, false);
+          save.disabled = false;
+        }
+      });
+      return row;
+    }
+
+    async function load() {
+      const res = await fetch("/api/collection");
+      if (res.status === 401) { location.href = "/login?next=/collection"; return; }
+      const data = await res.json();
+      trophyNames = data.trophies;
+      renderMine(data.mine);
+      const setups = document.getElementById("setups");
+      setups.replaceChildren(...data.my_treasures.map(setupRow));
+      document.getElementById("setupBox").hidden = data.my_treasures.length === 0;
+    }
+
+    if (params.get("error")) show(params.get("error"), false);
+    else if (params.get("new")) show("New trophy collected! Tap it to see it in 3D.", true);
+    else if (params.get("have")) show("You already have this trophy.", true);
+    load().catch(error => show(error.message, false));
+  </script>
+</body>
+</html>

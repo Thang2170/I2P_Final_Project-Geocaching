@@ -72,9 +72,13 @@ def list_treasures():
     mine = my_ratings(user.id) if user else {}
     none = {"average": None, "count": 0}
     from treasure_checks import verified_ids  # A: the admin's check mark (same reason)
+    from collectible_api import collectible_flags  # A: QR collectibles (same reason)
     verified = verified_ids()
+    collectibles = collectible_flags(user.id if user else None)
     return jsonify([{**t.to_dict(), "found_by_me": t.id in found,
                      "verified": t.id in verified,  # A: checked by an admin (demo ones always are)
+                     "collectible": t.id in collectibles,  # A: has a QR trophy at the spot
+                     "collected_by_me": collectibles.get(t.id, False),
                      # B: stars for the map's info board (see ratings.py)
                      "rating": {k: ratings.get(t.id, none)[k] for k in ("average", "count")},
                      "my_rating": mine.get(t.id)} for t in treasures])
