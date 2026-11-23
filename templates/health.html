@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Health · StepQuest</title>
+  <style>
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+    .tiles .tile { padding-right: 16px; min-height: 0; }
+    .chart { width: 100%; height: 120px; margin: 8px 0; background: var(--px-green); box-shadow: var(--px-edge); }
+    .zones { display: grid; gap: 6px; margin: 12px 0; }
+    .zone { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 8px; font-size: 18px; }
+    .zone__bar { height: 14px; background: var(--px-gold); box-shadow: inset -3px -3px 0 rgba(0,0,0,.25); }
+    .advice { margin: 8px 0; padding-left: 20px; font-size: 20px; }
+    .ai { padding: 14px 16px; background: var(--px-paper); box-shadow: var(--px-edge); font-size: 20px; }
+    .ai__source { margin: 8px 0 0; font-size: 16px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .row .btn { width: auto; margin: 0; padding: 10px 12px; font-size: 10px; }
+    .token { padding: 10px; background: var(--px-ink); color: var(--px-gold-light); word-break: break-all;
+             font-family: var(--font-body); font-size: 20px; }
+    .disclaimer { font-size: 16px; }
+  </style>
+</head>
+<body>
+  {% set active = "health" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1><span class="sprite sprite--explorer" aria-hidden="true"></span> Health</h1>
+    <p class="muted">Wear the StepQuest band (an ESP32 with a heart-rate and motion sensor) on your walks.
+      After a walk you see your heart rate, steps and blood oxygen, and a coach-style summary.</p>
+    <p class="muted disclaimer">These are estimates from cheap sensors. StepQuest is a walking game, not a medical device.</p>
+    <p id="message" class="message" role="status"></p>
+
+    <section id="walkBox" hidden>
+      <h2>Your last walk <span id="walkWhen" class="muted"></span></h2>
+      <div class="tiles" id="tiles"></div>
+      <h2>Heart rate</h2>
+      {# Python works out the line's points (health.heart_chart_points); the page only draws them #}
+      <svg class="chart" viewBox="0 0 300 80" preserveAspectRatio="none" aria-label="Heart rate during the walk">
+        <polyline id="chartLine" fill="none" stroke="#f2a93b" stroke-width="2" points=""></polyline>
+      </svg>
+      <div class="zones" id="zones"></div>
+      <h2>What it means</h2>
+      <ul class="advice" id="advice"></ul>
+      <div class="row">
+        <button type="button" id="analyseBtn" class="btn">Ask the AI coach</button>
+      </div>
+      <div id="aiBox" class="ai" hidden>
+        <p id="aiText"></p>
+        <p id="aiSource" class="muted ai__source"></p>
+      </div>
+    </section>
+    <p id="noWalk" class="muted" hidden>No walk yet. Pair your band below and go for a walk.</p>
+
+    <h2>Your age</h2>
+    <form id="ageForm" class="row">
+      <label for="age">Age (for heart-rate zones)</label>
+      <input id="age" name="age" inputmode="numeric" size="4">
+      <label for="restingHr">Resting heart rate, if you know it</label>
+      <input id="restingHr" name="resting_hr" inputmode="numeric" size="4" placeholder="e.g. 62">
+      <button type="submit" class="btn btn--ghost">Save</button>
+    </form>
+
+    <h2>Your bands</h2>
+    <ul id="devices"></ul>
+    <form id="pairForm" class="row">
+      <input id="deviceName" name="name" placeholder="Band name" maxlength="40">
+      <button type="submit" class="btn">Pair a new band</button>
+    </form>
+    <div id="tokenBox" hidden>
+      <p>Put this token in <b>esp32/config.py</b> as <code>DEVICE_TOKEN</code>. It is shown only once:</p>
+      <p id="token" class="token"></p>
+    </div>
+  </main>
+
+  <script>
+    // The page only shows what Python sends: the numbers, the chart line and the advice.
+    const message = document.getElementById("message");
+    function show(text, ok) { message.textContent = text; message.className = "message " + (ok ? "ok" : "bad"); }
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined && text !== null) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+    async function json(url, options) {
+      const res = await fetch(url, options);
+      if (res.status === 401) { location.href = "/login?next=/health"; throw new Error("Log in first"); }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      return data;
+    }
+    const post = (url, body) => json(url, { method: "POST", headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify(body || {}) });
+
+    function tile(label, value) {
+      const box = el("div", undefined, "tile");
+      box.append(el("span", label), el("strong", value ?? "–"));
+      return box;
+    }
+
+    async function loadSummary() {
+      const data = await json("/api/health/summary");
+      document.getElementById("age").value = data.age;
+      document.getElementById("restingHr").value = data.resting_hr ?? "";
+      const w = data.walk;
+      document.getElementById("walkBox").hidden = !w;
+      document.getElementById("noWalk").hidden = Boolean(w);
+      if (!w) return;
+      document.getElementById("walkWhen").textContent = new Date(w.start).toLocaleString();
+      document.getElementById("tiles").replaceChildren(
+        tile("Minutes", w.minutes), tile("Steps", w.steps), tile("Distance (m)", w.distance_m),
+        tile("Avg heart (bpm)", w.hr_avg), tile("Max heart (bpm)", w.hr_max),
+        tile("Blood oxygen (%)", w.spo2_avg), tile("Calories (kcal)", w.calories),
+        tile("VO2max (est.)", w.vo2max_estimate),
+        tile("Resting heart", `${w.hr_rest_estimate ?? "–"} (${w.hr_rest_source})`));
+      document.getElementById("chartLine").setAttribute("points", data.chart);
+      const longest = Math.max(...w.zones.map(z => z.minutes), 1);
+      document.getElementById("zones").replaceChildren(...w.zones.map(z => {
+        const row = el("div", undefined, "zone");
+        const bar = el("div", undefined, "zone__bar");
+        bar.style.width = `${(z.minutes / longest) * 100}%`;
+        const track = el("div");
+        track.append(bar);
+        row.append(el("span", z.name), track, el("span", `${z.minutes} min`));
+        return row;
+      }));
+      document.getElementById("advice").replaceChildren(...data.advice.map(t => el("li", t)));
+    }
+
+    async function loadDevices() {
+      const data = await json("/api/health/devices");
+      document.getElementById("devices").replaceChildren(...data.devices.map(d => {
+        const li = el("li", `${d.name} · ${d.last_seen ? "last upload " + new Date(d.last_seen).toLocaleString() : "no uploads yet"} `);
+        const remove = el("button", "Remove", "link-button");
+        remove.type = "button";
+        remove.addEventListener("click", async () => {
+          await json(`/api/health/devices/${d.id}`, { method: "DELETE" });
+          loadDevices();
+        });
+        li.append(remove);
+        return li;
+      }));
+    }
+
+    document.getElementById("analyseBtn").addEventListener("click", async event => {
+      const button = event.target;
+      button.disabled = true;
+      button.textContent = "Thinking…";
+      try {
+        const data = await post("/api/health/analyse");
+        document.getElementById("aiText").textContent = data.text;
+        document.getElementById("aiSource").textContent = `Written by: ${data.source}` + (data.note ? ` (${data.note})` : "");
+        document.getElementById("aiBox").hidden = false;
+      } catch (error) {
+        show(error.message, false);
+      }
+      button.disabled = false;
+      button.textContent = "Ask the AI coach";
+    });
+
+    document.getElementById("pairForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const data = await post("/api/health/devices", { name: document.getElementById("deviceName").value });
+        document.getElementById("token").textContent = data.token;
+        document.getElementById("tokenBox").hidden = false;
+        loadDevices();
+      } catch (error) { show(error.message, false); }
+    });
+
+    document.getElementById("ageForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        await post("/api/health/profile", { age: document.getElementById("age").value,
+                                            resting_hr: document.getElementById("restingHr").value });
+        show("Saved.", true);
+        loadSummary();
+      } catch (error) { show(error.message, false); }
+    });
+
+    loadSummary().catch(error => show(error.message, false));
+    loadDevices().catch(() => {});
+  </script>
+</body>
+</html>
