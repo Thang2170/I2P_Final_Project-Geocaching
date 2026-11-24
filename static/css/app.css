@@ -1911,3 +1911,7 @@ button.post__likes[hidden] { display: none; }
 /* B: the "Install the app" button (static/js/install.js): hidden until the browser allows it */
 [data-install][hidden] { display: none !important; }
 .install-btn { margin-top: 10px; }
+
+/* B: under the journey's calories: which formula Python used (energy.py) */
+.journey__from { display: block; font-size: 13px; color: var(--px-muted); line-height: 1.1; }
+.journey__from:empty { display: none; }
