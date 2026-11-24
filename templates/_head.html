@@ -12,3 +12,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 {# A: every <select> gets the pixel dropdown look (static/js/fancy_select.js); the real one stays for the form #}
 <script src="{{ url_for('static', filename='js/fancy_select.js') }}" defer></script>
+{# B: install StepQuest like an app (pwa_api.py): the manifest, the icon, and the service worker #}
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="StepQuest">
+<script src="{{ url_for('static', filename='js/install.js') }}" defer></script>

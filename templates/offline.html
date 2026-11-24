@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Offline · StepQuest</title>
+  <style>
+    /* B: shown by the service worker (static/js/sw.js) when there is no internet */
+    .offline { max-width: 520px; margin: 12vh auto; text-align: center; }
+    .offline img { width: 96px; height: 96px; image-rendering: pixelated; }
+    .offline .btn { width: auto; display: inline-block; }
+  </style>
+</head>
+<body>
+  <main class="card offline">
+    <img src="/static/icons/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>StepQuest needs the internet to load the map and your coins.
+       If you were on a journey, it keeps counting: your finds are sent when you're back online.</p>
+    <button type="button" class="btn" id="retry">Try again</button>
+  </main>
+  <script>
+    document.getElementById("retry").addEventListener("click", () => location.reload());
+    window.addEventListener("online", () => location.reload());  // back online: carry on by itself
+  </script>
+</body>
+</html>
