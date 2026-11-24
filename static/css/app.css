@@ -1872,3 +1872,29 @@ button.post__likes[hidden] { display: none; }
 /* inside a small map popup: a bit smaller */
 .leaflet-popup-content .fancy-select { min-width: 200px; margin: 8px 0; }
 .leaflet-popup-content .fancy-select__button { min-height: 36px; font-size: 18px; }
+
+/* B: Treasure Trail (map.html): the goal picker, and the numbered stops on the map */
+.trail-box[hidden], .trail-msg[hidden] { display: none; }
+.trail-box { margin-top: 8px; }
+.trail-box__ask { margin: 0 0 6px; font-size: 18px; color: var(--px-muted); }
+.trail-box__choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.trail-pick {
+  padding: 8px 4px;
+  border: 0;
+  background: var(--px-paper);
+  color: var(--px-ink);
+  box-shadow: 0 0 0 3px var(--px-ink);
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  cursor: pointer;
+}
+.trail-pick:hover { background: #fff; }
+.trail-pick:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+.trail-msg { color: var(--px-ink); }
+.trail-stop {
+  display: grid;
+  place-items: center;
+  background: #4fc3b0;
+  box-shadow: 0 0 0 3px #14231f;
+}
+.trail-stop__n { font-family: var(--font-pixel); font-size: 11px; color: #14231f; }
