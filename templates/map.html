@@ -1070,6 +1070,17 @@
       });
     });
 
+    // A: arrived at a treasure with a collectible you don't have yet: the celebration
+    // (templates/_celebrate.html) collects it and asks camera or skip. Python checks the 20 m.
+    function maybeCelebrate(treasureId, name, lat, lon) {
+      const info = infoById.get(treasureId);
+      if (!info || !info.collectible || info.collected || !window.celebrateCollectible) return;
+      info.collected = true;  // ask once, even if this runs again on the next GPS update
+      window.celebrateCollectible(treasureId, name, lat, lon)
+        .then(isNew => { if (!isNew) info.collected = false; })
+        .catch(err => { info.collected = false; console.error("Collectible failed:", err); });
+    }
+
     async function claimCoins(treasureId, name, lat, lon) {
       if (triedClaim.has(treasureId)) return;
       triedClaim.add(treasureId);
@@ -1085,10 +1096,12 @@
           showBalance(data.balance, data.coins_earned);
           collectPin(treasureId);
           showRateBox(treasureId, name);
+          maybeCelebrate(treasureId, name, lat, lon);
         } else {
           if (res.status === 409) {  // you had already found it
             collectPin(treasureId);
             showRateBox(treasureId, name);
+            maybeCelebrate(treasureId, name, lat, lon);  // a collectible added after your first visit
           }
           // Refused: say why (you hid it yourself, you already found it, ...) instead of staying silent.
           claimNotes.set(treasureId, data.error || "No coins this time.");
@@ -1236,5 +1249,6 @@
     }
   </script>
   {% include "_tour.html" %}
+  {% include "_celebrate.html" %}
 </body>
 </html>

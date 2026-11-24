@@ -146,6 +146,7 @@ body {
 }
 
 .btn[disabled] { opacity: .5; cursor: default; }
+.btn[hidden] { display: none; }  /* .btn sets display: block, which would beat the hidden attribute */
 
 .btn--ghost {
   background: var(--px-paper);
@@ -1830,3 +1831,44 @@ button.post__likes[hidden] { display: none; }
 .crossing-alert[hidden] { display: none; }
 @keyframes px-blink { 50% { background: var(--px-ink); } }
 @media (prefers-reduced-motion: reduce) { .crossing-alert { animation: none; } }
+
+/* ---------- pixel dropdowns (static/js/fancy_select.js draws them over every <select>) ---------- */
+
+.fancy-select { position: relative; width: 100%; max-width: 420px; margin: 6px 0 12px; }
+.fancy-select__native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.fancy-select__button { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                        width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 0;
+                        background: var(--px-paper); color: var(--px-ink); text-align: left; cursor: pointer;
+                        box-shadow: var(--px-edge), inset -4px -4px 0 0 var(--px-cloud-shade);
+                        font-family: var(--font-body); font-size: 22px; line-height: 1.1; }
+.fancy-select__button:hover { background: #fff3cf; }
+.fancy-select__button:focus-visible { outline: 4px solid var(--px-leaf); outline-offset: 6px; }
+.fancy-select__button:disabled { opacity: .5; cursor: default; }
+.fancy-select__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the arrow: a little pixel triangle that flips when the list is open */
+.fancy-select__arrow { flex: none; width: 0; height: 0; border-left: 7px solid transparent;
+                       border-right: 7px solid transparent; border-top: 8px solid var(--px-ink);
+                       transition: transform .15s steps(2); }
+.fancy-select.is-open .fancy-select__arrow { transform: rotate(180deg); }
+.fancy-select__panel { position: absolute; top: calc(100% + 10px); left: 0; right: 0; z-index: 7000;
+                       padding: 6px; background: var(--px-paper); box-shadow: var(--px-edge), var(--px-drop);
+                       animation: px-boot .2s steps(3) both; }
+.fancy-select__panel[hidden] { display: none; }
+.fancy-select.opens-up .fancy-select__panel { top: auto; bottom: calc(100% + 10px); }
+.fancy-select__search { width: 100%; margin: 0 0 6px; }
+.fancy-select__search[hidden] { display: none; }
+.fancy-select__list { max-height: 240px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.fancy-select__option { padding: 8px 10px 8px 26px; font-size: 21px; line-height: 1.1; cursor: pointer;
+                        position: relative; }
+.fancy-select__option[hidden] { display: none; }
+.fancy-select__option.is-active { background: var(--px-gold-light); }
+/* the chosen one gets a menu cursor, like picking an item in a game */
+.fancy-select__option[aria-selected="true"]::before { content: ""; position: absolute; left: 9px; top: 50%;
+                        width: 0; height: 0; margin-top: -6px; border-top: 6px solid transparent;
+                        border-bottom: 6px solid transparent; border-left: 7px solid var(--px-gold-dark); }
+.fancy-select__option[aria-disabled="true"] { opacity: .45; cursor: default; }
+.fancy-select__nothing { margin: 6px 10px; color: var(--px-muted); font-size: 20px; }
+.fancy-select__nothing[hidden] { display: none; }
+/* inside a small map popup: a bit smaller */
+.leaflet-popup-content .fancy-select { min-width: 200px; margin: 8px 0; }
+.leaflet-popup-content .fancy-select__button { min-height: 36px; font-size: 18px; }
