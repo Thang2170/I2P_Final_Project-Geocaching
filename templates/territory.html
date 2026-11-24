@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Territory · StepQuest</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    /* B: claim the campus (territory.py). Python decides who owns each hexagon. */
+    .terr { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+    #terrMap { height: 520px; box-shadow: var(--px-edge); }
+    .teams { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .team { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; font-size: 20px; }
+    .team__swatch { width: 22px; height: 22px; box-shadow: 0 0 0 3px var(--px-ink); }
+    .team--mine .team__name { font-weight: bold; }
+    .team__hexes { font-family: var(--font-pixel); font-size: 11px; }
+    .pick { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .pick .btn { width: auto; margin: 0; }
+    .pick .btn[aria-pressed="true"] { background: var(--px-ink); color: var(--px-gold); }
+    #leader { font-size: 22px; color: var(--px-gold-dark); }
+    @media (max-width: 800px) { .terr { grid-template-columns: 1fr; } #terrMap { height: 380px; } }
+  </style>
+</head>
+<body>
+  {% set active = "territory" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Claim the campus</h1>
+    <p class="muted">Pick a team, then walk with the map open. Every hexagon you walk through gets a visit
+      for your team (once a day). The team with the most visits in a hexagon this week owns it.</p>
+
+    <div class="terr">
+      <div id="terrMap" role="img" aria-label="Map of the hexagons each team owns this week"></div>
+      <section aria-labelledby="boardTitle">
+        <h2 id="boardTitle">This week</h2>
+        <p id="leader" aria-live="polite"></p>
+        <ul class="teams" id="teams"></ul>
+        <h3>Your team</h3>
+        <p id="myTeam" class="muted"></p>
+        <div class="pick" role="group" aria-label="Choose your team">
+          {% for id, (name, colour) in teams.items() %}
+          <button type="button" class="btn btn--ghost team-pick" data-team="{{ id }}" aria-pressed="false">{{ name }}</button>
+          {% endfor %}
+        </div>
+        <p id="terrMsg" class="muted" role="status"></p>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const ORIGIN = {{ origin | list | tojson }};
+    const map = L.map("terrMap").setView(ORIGIN, 16);
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    const hexLayer = L.layerGroup().addTo(map);
+    let fitted = false;
+    const say = (id, text) => { document.getElementById(id).textContent = text; };
+
+    function draw(data) {
+      hexLayer.clearLayers();
+      for (const h of data.hexes) {
+        const contested = !h.team;
+        const hex = L.polygon(h.corners, {
+          color: "#14231f", weight: 2,
+          fillColor: contested ? "#888888" : h.colour, fillOpacity: contested ? 0.25 : 0.55,
+          dashArray: contested ? "4 4" : null
+        });
+        const tip = document.createElement("span");  // an element, so no HTML text is parsed
+        tip.textContent = contested ? `Contested · ${h.visits} visits` : `${h.visits} visits`;
+        hex.bindTooltip(tip).addTo(hexLayer);
+      }
+      if (!fitted && data.hexes.length) {
+        map.fitBounds(L.featureGroup(hexLayer.getLayers()).getBounds(), { padding: [30, 30], maxZoom: 17 });
+        fitted = true;
+      }
+
+      const list = document.getElementById("teams");
+      list.replaceChildren();
+      for (const t of data.teams) {
+        const li = document.createElement("li");
+        li.className = "team" + (t.id === data.my_team ? " team--mine" : "");
+        const swatch = document.createElement("span");
+        swatch.className = "team__swatch";
+        swatch.style.background = t.colour;
+        const name = document.createElement("span");
+        name.className = "team__name";
+        name.textContent = `${t.name} · ${t.players} player${t.players === 1 ? "" : "s"}`;
+        const hexes = document.createElement("span");
+        hexes.className = "team__hexes";
+        hexes.textContent = `${t.hexes} ⬢`;
+        li.append(swatch, name, hexes);
+        list.append(li);
+      }
+      const lead = data.teams.find(t => t.id === data.leader);
+      say("leader", lead ? `👑 ${lead.name} is in front` : data.hexes.length ? "It's a tie!" : "No hexagons claimed yet this week.");
+      const mine = data.teams.find(t => t.id === data.my_team);
+      say("myTeam", mine ? `You walk for ${mine.name}. You coloured ${data.my_visits} hexagon visit${data.my_visits === 1 ? "" : "s"} this week.`
+                         : "No team yet: pick one to start claiming.");
+      for (const b of document.querySelectorAll(".team-pick")) {
+        b.setAttribute("aria-pressed", String(b.dataset.team === data.my_team));
+      }
+    }
+
+    async function load() {
+      const res = await fetch("/api/territory");
+      if (res.status === 401) { location.href = "/login?next=/territory"; return; }
+      draw(await res.json());
+    }
+
+    for (const button of document.querySelectorAll(".team-pick")) {
+      button.addEventListener("click", async () => {
+        const res = await fetch("/api/territory/team", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team: button.dataset.team })
+        });
+        const data = await res.json();
+        say("terrMsg", res.ok ? `You joined ${data.name}. Go for a walk with the map open!` : data.error);
+        load();
+      });
+    }
+
+    load();
+    setInterval(load, 30000);  // other players walk too
+  </script>
+</body>
+</html>
