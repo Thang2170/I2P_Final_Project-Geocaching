@@ -253,6 +253,20 @@
         <p class="stat-note" id="weekMsg" role="status"></p>
       </section>
 
+      <!-- B: YOUR GOAL: pick a health goal and collect milestones on the way (goals.py). Logged in only. -->
+      <section class="stat-card week-card goal-card" id="goalCard" hidden aria-labelledby="goalTitle">
+        <div class="week-card__head">
+          <h2 id="goalTitle">Your goal</h2>
+          <button type="button" class="btn btn--small btn--ghost" id="goalChange" hidden>Change goal</button>
+        </div>
+        <p class="stat-note" id="goalText"></p>
+        <div class="goal-picks" id="goalPicks" hidden></div>
+        <ol class="goal-week" id="goalWeek" aria-label="This week, day by day"></ol>
+        <p class="goal-advice" id="goalAdvice" role="alert" hidden></p>
+        <ul class="challenges" id="goalMilestones"></ul>
+        <p class="stat-note" id="goalMsg" role="status"></p>
+      </section>
+
       <!-- MAIN CONTENT GRID -->
       <div class="content-grid">
 
@@ -501,6 +515,122 @@
       }
     }
 
+    // B: your health goal. Python counts steps and minutes and decides what is done.
+    function goalUnit(value, unit) {
+      if (unit === "steps") return `${value.toLocaleString()} steps`;
+      return unit === "days" ? `${value} day${value === 1 ? "" : "s"}` : `${value} ${unit}`;
+    }
+
+    function showGoal(state) {
+      if (!state) return;  // logged out
+      document.getElementById("goalCard").hidden = false;
+      const picks = document.getElementById("goalPicks");
+      const change = document.getElementById("goalChange");
+      const choosing = !state.goal || picks.dataset.open === "yes";
+      picks.hidden = !choosing;
+      change.hidden = !state.goal || choosing;
+      setText("goalTitle", state.goal ? `Your goal: ${state.title}` : "Pick a goal");
+      setText("goalText", state.goal ? state.text : "Choose what you want to work towards. You can change it later.");
+      if (choosing) {
+        const choices = state.choices || GOAL_CHOICES;
+        picks.replaceChildren(...choices.map(c => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "goal-pick" + (c.id === state.goal ? " is-current" : "");
+          const t = document.createElement("strong");
+          t.textContent = c.title;
+          const d = document.createElement("span");
+          d.textContent = c.text;
+          b.append(t, d);
+          b.addEventListener("click", () => pickGoal(c.id));
+          return b;
+        }));
+      }
+      if (state.choices) GOAL_CHOICES = state.choices;
+
+      const week = document.getElementById("goalWeek");
+      week.replaceChildren(...(state.week || []).map(d => {
+        const li = document.createElement("li");
+        li.className = "goal-day" + (d.met ? " is-met" : "") + (d.future ? " is-future" : "");
+        const name = document.createElement("span");
+        name.textContent = d.day;
+        const value = document.createElement("strong");
+        value.textContent = d.future ? "–" : d.value.toLocaleString();
+        li.append(name, value);
+        li.title = d.date;
+        return li;
+      }));
+      week.hidden = !state.goal;
+
+      const advice = document.getElementById("goalAdvice");
+      advice.hidden = !state.advice;
+      advice.textContent = state.advice || "";
+
+      const list = document.getElementById("goalMilestones");
+      list.replaceChildren(...(state.milestones || []).map(m => {
+        const li = document.createElement("li");
+        li.className = "challenge" + (m.claimed ? " challenge--claimed" : m.done ? " challenge--done" : "");
+        const title = document.createElement("span");
+        title.className = "challenge__title";
+        title.textContent = m.title;  // Python's words say "today" or "this week"
+        const bar = document.createElement("progress");
+        bar.max = m.target;
+        bar.value = m.progress;
+        bar.setAttribute("aria-label", `${m.title}: ${m.progress} of ${m.target}`);
+        const end = document.createElement(m.done && !m.claimed ? "button" : "span");
+        end.className = m.done && !m.claimed ? "btn btn--small" : "challenge__state";
+        end.textContent = m.claimed ? "✓ Collected" : m.done ? `Collect +${m.reward}`
+          : `${goalUnit(m.progress, m.unit)} / ${goalUnit(m.target, m.unit)}`;
+        if (end.tagName === "BUTTON") {
+          end.type = "button";
+          end.addEventListener("click", () => claimMilestone(m.id, end));
+        }
+        li.append(title, bar, end);
+        return li;
+      }));
+    }
+    let GOAL_CHOICES = [];
+
+    async function pickGoal(goal) {
+      try {
+        const res = await fetch("/api/goal", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ goal })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not save your goal");
+        document.getElementById("goalPicks").dataset.open = "no";
+        setText("goalMsg", `Goal set: ${data.title}.`);
+        showGoal(data);
+      } catch (err) {
+        setText("goalMsg", err.message);
+      }
+    }
+
+    document.getElementById("goalChange").addEventListener("click", async () => {
+      document.getElementById("goalPicks").dataset.open = "yes";
+      if (!GOAL_CHOICES.length) {
+        // the list of goals comes from Python too
+        const res = await fetch("/api/goal/choices");
+        if (res.ok) GOAL_CHOICES = (await res.json()).choices;
+      }
+      showGoal(await getJson("/api/goal"));
+    });
+
+    async function claimMilestone(id, button) {
+      button.disabled = true;
+      try {
+        const res = await fetch(`/api/goal/milestones/${encodeURIComponent(id)}/claim`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not collect it");
+        setText("goalMsg", `+${data.coins_earned} coins! You have ${data.balance} now.`);
+        setText("statCoins", data.balance);
+        showGoal(data);
+      } catch (err) {
+        button.disabled = false;
+        setText("goalMsg", err.message);
+      }
+    }
+
     async function claimChallenge(id, button) {
       button.disabled = true;
       try {
@@ -518,6 +648,7 @@
 
     (async () => {
       getJson("/api/challenges").then(showWeek);  // B
+      getJson("/api/goal").then(showGoal);  // B: health goal
       const [me, coins, treasures, rankings, players] = await Promise.all([
         getJson("/api/me"), getJson("/api/coins"), getJson("/api/treasures"),
         getJson("/api/treasures/rankings"), getJson("/api/leaderboard")
