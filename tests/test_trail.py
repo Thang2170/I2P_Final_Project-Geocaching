@@ -1,7 +1,10 @@
 """Treasure Trail: a walking loop through unfound treasures (trail_planner.py, trail_api.py, map.html)."""
 
+import os
 import unittest
 from unittest.mock import patch
+
+import requests
 
 from app import create_app
 from models import Treasure, User, db
@@ -73,6 +76,13 @@ class TestPlanner(unittest.TestCase):
 
 class TestTrailApi(unittest.TestCase):
     def setUp(self):
+        # Tests never call the real routing service. Pretend a key is set (like on a real laptop)
+        # and the network is down (what requests raises when you're offline): routing then falls
+        # back to straight lines. Same result with or without ORS_API_KEY on the machine.
+        for patcher in (patch.dict(os.environ, {"ORS_API_KEY": "test-key"}),
+                        patch("routing.requests.post", side_effect=requests.ConnectionError("offline"))):
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.app = create_app("sqlite:///:memory:")
         self.context = self.app.app_context()
         self.context.push()
@@ -99,8 +109,7 @@ class TestTrailApi(unittest.TestCase):
         self.assertEqual(self.client.post("/api/trail", json={"steps": 3000}).status_code, 400)
 
     def test_a_loop_through_the_treasures(self):
-        with patch("routing.requests.post", side_effect=Exception("offline")):
-            data = self.trail(steps=5000).get_json()
+        data = self.trail(steps=5000).get_json()
         self.assertEqual(len(data["stops"]), 4)
         self.assertEqual([s["order"] for s in data["stops"]], [1, 2, 3, 4])
         self.assertEqual(data["path"][0], data["path"][-1])  # back where you started
