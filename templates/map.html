@@ -1206,6 +1206,9 @@
         if (res.ok) {
           claimNotes.delete(treasureId);
           showBalance(data.balance, data.coins_earned);
+          for (const chain of data.chains_completed || []) {  // B: this find finished a riddle chain
+            coinInfo.textContent += ` · 🧩 "${chain.title}" solved: +${chain.bonus}!`;
+          }
           collectPin(treasureId);
           showRateBox(treasureId, name);
           maybeCelebrate(treasureId, name, lat, lon);

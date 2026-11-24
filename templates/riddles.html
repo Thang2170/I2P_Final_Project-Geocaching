@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Riddles · StepQuest</title>
+  <style>
+    /* B: riddle chains (riddles.py). Python decides which riddles you can see. */
+    .chain { padding: 16px 0; border-top: 2px dashed var(--line); }
+    .chain__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .chain__title { font-size: 24px; margin: 0; }
+    .chain__meta { margin: 4px 0 8px; color: var(--px-muted); font-size: 18px; }
+    .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; font-size: 20px; }
+    .step__mark { font-family: var(--font-pixel); font-size: 11px; padding-top: 4px; }
+    .step--found { color: var(--px-muted); }
+    .step--current .step__clue { color: var(--px-ink); font-weight: bold; }
+    .step--locked { color: var(--px-muted); font-style: italic; }
+    .done-badge { font-family: var(--font-pixel); font-size: 9px; color: var(--px-ink); background: var(--px-gold);
+                  padding: 4px 8px; box-shadow: 0 0 0 3px var(--px-ink); }
+    .chain .link-button { font-size: 16px; }
+    .maker { margin-top: 24px; }
+    .maker__step { display: grid; gap: 6px; padding: 12px 0; border-top: 2px dashed var(--line); }
+    .maker__step-head { display: flex; justify-content: space-between; align-items: center; }
+    .maker__bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .maker__bar .btn { width: auto; margin: 0; }
+    #makerMsg { min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  {% set active = "riddles" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Riddle chains</h1>
+    <p class="muted">Solve the riddle, walk to the treasure, find it, and the next riddle appears.
+      Finish a whole chain for a bonus.</p>
+
+    <section id="chains" aria-live="polite"></section>
+    <p id="noChains" class="muted" hidden>No riddle chains yet. Make the first one below.</p>
+
+    <section class="maker" aria-labelledby="makerTitle">
+      <h2 id="makerTitle">Make a chain</h2>
+      <form id="maker">
+        <label for="chainTitle">Title</label>
+        <input id="chainTitle" maxlength="60" required placeholder="e.g. The library mystery">
+        <div id="makerSteps"></div>
+        <div class="maker__bar">
+          <button type="button" id="addStep" class="btn btn--ghost">+ Add a step</button>
+          <button type="submit" class="btn">Save chain</button>
+        </div>
+        <p id="makerMsg" class="muted" role="status"></p>
+      </form>
+    </section>
+  </main>
+
+  <template id="stepTemplate">
+    <div class="maker__step">
+      <div class="maker__step-head">
+        <strong class="maker__n"></strong>
+        <button type="button" class="link-button maker__remove">Remove</button>
+      </div>
+      <label class="maker__pick-label">Treasure</label>
+      <select class="maker__pick" required></select>
+      <label class="maker__clue-label">Riddle that leads there</label>
+      <textarea class="maker__clue" rows="2" maxlength="200" required
+                placeholder="e.g. Where books sleep and stairs climb, look under the third step."></textarea>
+    </div>
+  </template>
+
+  <script>
+    const MIN_STEPS = 2, MAX_STEPS = 6;
+    let treasures = [];
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    // ---------- the chains, as Python lets you see them
+
+    function chainEl(c) {
+      const box = el("article", undefined, "chain");
+      const head = el("div", undefined, "chain__head");
+      head.append(el("h2", c.title, "chain__title"));
+      if (c.complete) head.append(el("span", `Solved · +${c.bonus} coins`, "done-badge"));
+      box.append(head, el("p", `by ${c.creator} · ${c.done} of ${c.total} found · bonus ${c.bonus} coins`, "chain__meta"));
+
+      const list = el("ol", undefined, "steps");
+      for (const s of c.steps) {
+        const li = el("li", undefined, `step step--${s.state}`);
+        const mark = s.state === "found" ? "✓" : s.state === "current" ? `${s.n}.` : "🔒";
+        const text = el("div");
+        if (s.state === "found") {
+          text.append(el("span", `${s.treasure}: `), el("span", s.clue, "step__clue"));
+        } else if (s.state === "current") {
+          text.append(el("span", s.clue, "step__clue"));
+          text.append(document.createElement("br"), el("small", "Solve it, walk there, and find the treasure on the map.", "muted"));
+        } else {
+          text.append(el("span", "Find the step before to unlock this riddle."));
+        }
+        li.append(el("span", mark, "step__mark"), text);
+        list.append(li);
+      }
+      box.append(list);
+
+      if (c.mine) {
+        const del = el("button", "Delete my chain", "link-button");
+        del.type = "button";
+        del.addEventListener("click", async () => {
+          if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "Sure? Tap again"; return; }
+          const res = await fetch(`/api/riddles/${c.id}`, { method: "DELETE" });
+          if (res.ok) load();
+        });
+        box.append(del);
+      }
+      return box;
+    }
+
+    async function load() {
+      const res = await fetch("/api/riddles");
+      if (res.status === 401) { location.href = "/login?next=/riddles"; return; }
+      const data = await res.json();
+      treasures = data.treasures;
+      const box = document.getElementById("chains");
+      box.replaceChildren(...data.chains.map(chainEl));
+      document.getElementById("noChains").hidden = data.chains.length > 0;
+      for (const select of document.querySelectorAll(".maker__pick")) fillPick(select);
+    }
+
+    // ---------- making a chain
+
+    const stepsBox = document.getElementById("makerSteps");
+    const say = text => { document.getElementById("makerMsg").textContent = text; };
+
+    function fillPick(select) {
+      const chosen = select.value;
+      select.replaceChildren(el("option", "Choose a treasure…"));
+      select.firstChild.value = "";
+      for (const t of treasures) {
+        const option = el("option", t.name);
+        option.value = String(t.id);
+        select.append(option);
+      }
+      select.value = chosen;
+      select.dispatchEvent(new Event("options-changed"));  // the pixel dropdown redraws its label
+    }
+
+    function renumber() {
+      [...stepsBox.children].forEach((step, i) => {
+        step.querySelector(".maker__n").textContent = `Step ${i + 1}`;
+        const id = `step${i + 1}`;
+        step.querySelector(".maker__pick").id = `${id}pick`;
+        step.querySelector(".maker__pick-label").htmlFor = `${id}pick`;
+        step.querySelector(".maker__clue").id = `${id}clue`;
+        step.querySelector(".maker__clue-label").htmlFor = `${id}clue`;
+        step.querySelector(".maker__remove").hidden = stepsBox.children.length <= MIN_STEPS;
+      });
+      document.getElementById("addStep").hidden = stepsBox.children.length >= MAX_STEPS;
+    }
+
+    function addStep() {
+      const node = document.getElementById("stepTemplate").content.firstElementChild.cloneNode(true);
+      fillPick(node.querySelector(".maker__pick"));
+      node.querySelector(".maker__remove").addEventListener("click", () => { node.remove(); renumber(); });
+      stepsBox.append(node);
+      renumber();
+    }
+
+    document.getElementById("addStep").addEventListener("click", addStep);
+
+    document.getElementById("maker").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const steps = [...stepsBox.children].map(step => ({
+        treasure_id: Number(step.querySelector(".maker__pick").value) || null,
+        clue: step.querySelector(".maker__clue").value
+      }));
+      say("Saving…");
+      try {
+        const res = await fetch("/api/riddles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: document.getElementById("chainTitle").value, steps })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not save the chain");
+        say(`Saved "${data.title}". Other players can follow it now.`);
+        event.target.reset();
+        stepsBox.replaceChildren();
+        for (let i = 0; i < MIN_STEPS; i++) addStep();
+        load();
+      } catch (err) {
+        say(err.message);  // Python's message, e.g. "Step 2: that treasure is already in the chain"
+      }
+    });
+
+    load().then(() => { for (let i = 0; i < MIN_STEPS; i++) addStep(); });
+  </script>
+</body>
+</html>

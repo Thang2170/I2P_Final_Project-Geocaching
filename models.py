@@ -446,3 +446,43 @@ class FindCheck(db.Model):
 
     user = db.relationship("User", foreign_keys=[user_id])
     treasure = db.relationship("Treasure")
+
+
+class RiddleChain(db.Model):
+    """A riddle chain: treasures found in order, each riddle unlocking the next (owner: B). Rules: riddles.py."""
+
+    __tablename__ = "riddle_chains"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(60), nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    creator = db.relationship("User")
+    steps = db.relationship("RiddleStep", order_by="RiddleStep.position", cascade="all, delete-orphan")
+
+
+class RiddleStep(db.Model):
+    """One step of a riddle chain: the treasure and the riddle that leads to it."""
+
+    __tablename__ = "riddle_steps"
+
+    id = db.Column(db.Integer, primary_key=True)
+    chain_id = db.Column(db.Integer, db.ForeignKey("riddle_chains.id"), nullable=False, index=True)
+    position = db.Column(db.Integer, nullable=False)  # 1, 2, 3, ...
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False, index=True)
+    clue = db.Column(db.String(200), nullable=False)
+
+    treasure = db.relationship("Treasure")
+
+
+class ChainBonus(db.Model):
+    """A player finished a riddle chain and was paid its bonus (once per chain)."""
+
+    __tablename__ = "chain_bonuses"
+    __table_args__ = (db.UniqueConstraint("user_id", "chain_id", name="one_bonus_per_chain"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    chain_id = db.Column(db.Integer, db.ForeignKey("riddle_chains.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
