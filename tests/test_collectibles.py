@@ -4,13 +4,15 @@ import os
 import shutil
 import struct
 import tempfile
+from datetime import datetime, timedelta, timezone
 import unittest
 from unittest.mock import patch
 
 from app import create_app
 from collectibles import (CODE_LENGTH, MAX_MODEL_BYTES, can_manage, check_glb, clean_code, make_code,
-                          parse_name, parse_trophy)
+                          parse_name, parse_trophy, still_to_find, utc_iso)
 from models import db
+from pixel_art import SPRITES
 from voxel_models import (DEPTH, OUTPUT_DIR, PIXEL_CSS, TROPHIES, build_mesh, glb_bytes, letter_colours,
                           srgb_to_linear, trophy_glb)
 
@@ -72,6 +74,19 @@ class TestRules(unittest.TestCase):
                     check_glb(data)
 
 
+    def test_utc_iso_keeps_the_time_zone(self):
+        naive = datetime(2026, 11, 24, 6, 5)  # what SQLite gives back
+        self.assertEqual(utc_iso(naive), "2026-11-24T06:05:00+00:00")
+        taipei = datetime(2026, 11, 24, 14, 5, tzinfo=timezone(timedelta(hours=8)))
+        self.assertEqual(utc_iso(taipei), "2026-11-24T14:05:00+08:00")
+        self.assertIsNone(utc_iso(None))
+
+    def test_still_to_find(self):
+        self.assertEqual(still_to_find(10, 2, 3), 5)
+        self.assertEqual(still_to_find(3, 0, 3), 0)
+        self.assertEqual(still_to_find(1, 1, 1), 0)  # never below zero
+
+
 class TestVoxelModels(unittest.TestCase):
     def test_srgb_to_linear(self):
         self.assertEqual(srgb_to_linear(0), 0)
@@ -79,26 +94,43 @@ class TestVoxelModels(unittest.TestCase):
         self.assertAlmostEqual(srgb_to_linear(128), 0.2158, places=3)
 
     def test_one_pixel_is_one_cube(self):
-        colours = letter_colours(PIXEL_CSS.read_text(encoding="utf-8"))
-        positions, normals, cols, indices = build_mesh(["o"], colours, depth=1)
+        positions, normals, indices = build_mesh(["o"], depth=1)["o"]
         self.assertEqual(len(positions), 24)  # 6 faces x 4 corners
         self.assertEqual(len(indices), 36)    # 6 faces x 2 triangles x 3 corners
 
     def test_hidden_faces_between_blocks_are_skipped(self):
-        colours = letter_colours(PIXEL_CSS.read_text(encoding="utf-8"))
-        two = build_mesh(["oo"], colours, depth=1)[0]
+        two = build_mesh(["oo"], depth=1)["o"][0]
         self.assertEqual(len(two), 2 * 24 - 2 * 4)  # the face where they touch is gone on both
+
+    def test_blocks_are_grouped_by_colour(self):
+        groups = build_mesh(["oy", "y."], depth=1)
+        self.assertEqual(sorted(groups), ["o", "y"])
+        self.assertEqual(len(groups["o"][0]), 24 - 2 * 4)  # touches y on its right and below
+
+    def read_gltf(self, data):
+        return json.loads(data[20:20 + struct.unpack_from("<I", data, 12)[0]])
 
     def test_glb_header_and_size(self):
         data = trophy_glb("trophy")
         magic, version, length = struct.unpack_from("<4sII", data)
         self.assertEqual((magic, version, length), (b"glTF", 2, len(data)))
         self.assertEqual(len(data) % 4, 0)
-        info = json.loads(data[20:20 + struct.unpack_from("<I", data, 12)[0]])
-        self.assertEqual(info["meshes"][0]["primitives"][0]["attributes"]["COLOR_0"], 2)
-        top = info["accessors"][0]["max"][1]
-        self.assertAlmostEqual(info["accessors"][0]["min"][1], 0)  # stands on the floor
-        self.assertGreater(top, 0.2)  # about 26 cm tall in AR
+        info = self.read_gltf(data)
+        bottoms = [a["min"][1] for a in info["accessors"] if "min" in a]
+        tops = [a["max"][1] for a in info["accessors"] if "max" in a]
+        self.assertAlmostEqual(min(bottoms), 0)  # stands on the floor
+        self.assertGreater(max(tops), 0.2)       # about 26 cm tall in AR
+
+    def test_colours_are_materials_so_ar_shows_them(self):
+        # Phone AR ignores colours stored on corners (COLOR_0): that made the trophy white.
+        colours = letter_colours(PIXEL_CSS.read_text(encoding="utf-8"))
+        info = self.read_gltf(trophy_glb("trophy"))
+        for primitive in info["meshes"][0]["primitives"]:
+            self.assertNotIn("COLOR_0", primitive["attributes"])
+        used = {tuple(m["pbrMetallicRoughness"]["baseColorFactor"]) for m in info["materials"]}
+        letters = {ch for row in SPRITES["trophy"][0] for ch in row if ch != "."}
+        self.assertEqual(used, {colours[ch] for ch in letters})
+        self.assertNotIn((1, 1, 1, 1), used)  # not one plain white material any more
 
     def test_saved_trophies_match_the_pixel_art(self):
         # If this fails: run  python voxel_models.py
@@ -108,7 +140,9 @@ class TestVoxelModels(unittest.TestCase):
 
     def test_depth(self):
         self.assertGreaterEqual(DEPTH, 1)
-        self.assertIsInstance(glb_bytes([(0, 0, 0)] * 3, [(0, 0, 1)] * 3, [(1, 1, 1, 1)] * 3, [0, 1, 2]), bytes)
+        one = {"o": ([(0, 0, 0)] * 3, [(0, 0, 1)] * 3, [0, 1, 2])}
+        self.assertIsInstance(glb_bytes(one, {"o": (1, 0, 0, 1)}), bytes)
+        self.assertTrue(check_glb(glb_bytes(one, {"o": (1, 0, 0, 1)})))
 
 
 class TestCollectibleApi(unittest.TestCase):
@@ -152,9 +186,47 @@ class TestCollectibleApi(unittest.TestCase):
         self.assertTrue(first["new"])
         self.assertEqual(first["item"]["name"], "Pond cup")
         self.assertFalse(self.bao.post("/api/collect", json={"code": code}).get_json()["new"])  # only once
-        mine = self.bao.get("/api/collection").get_json()["mine"]
+        shelf = self.bao.get("/api/collection").get_json()
+        mine = shelf["mine"]
         self.assertEqual([m["name"] for m in mine], ["Pond cup"])
+        # where and when, for the shelf card
+        self.assertEqual((mine[0]["treasure"], mine[0]["lat"], mine[0]["lon"]), ("Pond", 24.80, 120.99))
+        self.assertTrue(mine[0]["collected_at"].endswith("+00:00"))
+        self.assertEqual(shelf["to_find"], 0)
         self.assertTrue({t["name"]: t for t in self.bao.get("/api/treasures").get_json()}["Pond"]["collected_by_me"])
+
+    def test_empty_shelf_spots(self):
+        self.set_up(self.alice)
+        self.assertEqual(self.bao.get("/api/collection").get_json()["to_find"], 1)
+        self.assertEqual(self.alice.get("/api/collection").get_json()["to_find"], 0)  # her own
+
+    def here(self, client, lat=24.80, lon=120.99, tid=None):
+        return client.post(f"/api/treasures/{tid or self.tid}/collect-here", json={"lat": lat, "lon": lon})
+
+    def test_collect_by_walking_there(self):
+        self.set_up(self.alice, name="Pond cup")
+        first = self.here(self.bao, lat=24.80005)  # about 6 m away: close enough
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual((first.get_json()["new"], first.get_json()["item"]["name"]), (True, "Pond cup"))
+        self.assertFalse(self.here(self.bao).get_json()["new"])  # only once
+        self.assertEqual(len(self.bao.get("/api/collection").get_json()["mine"]), 1)
+
+    def test_collect_here_too_far(self):
+        self.set_up(self.alice)
+        r = self.here(self.bao, lat=24.801)  # about 111 m away
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("m away", r.get_json()["error"])
+        self.assertEqual(self.bao.get("/api/collection").get_json()["mine"], [])
+
+    def test_collect_here_refusals(self):
+        self.assertEqual(self.here(self.bao).status_code, 404)              # no collectible yet
+        self.set_up(self.alice)
+        self.assertEqual(self.here(self.bao, tid=9999).status_code, 404)    # no such treasure
+        self.assertEqual(self.here(self.alice).status_code, 403)            # you hid it yourself
+        self.assertEqual(self.here(self.app.test_client()).status_code, 401)
+        bad = self.bao.post(f"/api/treasures/{self.tid}/collect-here", json={"lat": "north"})
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(self.bao.post(f"/api/treasures/{self.tid}/collect-here", data="x").status_code, 400)
 
     def test_scanning_the_printed_link(self):
         code = self.set_up(self.alice).get_json()["code"]

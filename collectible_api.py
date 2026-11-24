@@ -5,6 +5,7 @@ Rules live in collectibles.py, the 3D trophies are made by voxel_models.py.
 Pages:  /collection (your trophies + set up your treasures), /scan (camera), /collect/<code>
         (what the printed QR code opens), /treasures/<id>/qr (the QR code to print).
 API:    POST /api/collect {"code"}, GET /api/collection,
+        POST /api/treasures/<id>/collect-here {"lat", "lon"} (collect it by walking there),
         POST /api/treasures/<id>/collectible (form: name, trophy, optional file "model"),
         GET /api/collectibles/<id>/model.glb
 
@@ -23,8 +24,11 @@ from sqlalchemy.exc import IntegrityError
 
 from admin_api import is_admin
 from auth_api import current_user
-from collectibles import can_manage, check_glb, clean_code, make_code, parse_name, parse_trophy
+from collectibles import (can_manage, check_glb, clean_code, make_code, parse_name, parse_trophy,
+                          still_to_find, utc_iso)
+from location import FOUND_RADIUS_M, haversine_m
 from models import Treasure, db
+from treasure_input import parse_number
 
 collectible_api = Blueprint("collectible_api", __name__)
 
@@ -90,6 +94,12 @@ def collect(user, code):
     c = db.session.execute(db.select(Collectible).where(Collectible.code == code)).scalar_one_or_none()
     if c is None:
         raise ValueError("No collectible has this code")
+    return give(user, c)
+
+
+def give(user, c):
+    """Add collectible c to the player's shelf (once). Returns (c, is_new) or raises ValueError.
+    Used by both ways of collecting: scanning the QR code and walking to the treasure."""
     treasure = db.session.get(Treasure, c.treasure_id)
     if treasure is not None and treasure.created_by == user.id:
         raise ValueError("You hid this treasure yourself, so you can't collect its trophy")
@@ -178,6 +188,43 @@ def api_collect():
     return jsonify(new=is_new, item=_item_dict(c, treasure.name if treasure else None))
 
 
+@collectible_api.route("/api/treasures/<int:treasure_id>/collect-here", methods=["POST"])
+def collect_here(treasure_id):
+    """Collect a treasure's trophy by standing at it (the map calls this when you arrive).
+
+    The phone only says where it is: Python checks you are within FOUND_RADIUS_M (20 m),
+    the same rule that pays the coins. Scanning the QR code still works too.
+    """
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    treasure = db.session.get(Treasure, treasure_id)
+    if treasure is None:
+        return jsonify(error="No such treasure"), 404
+    c = db.session.execute(db.select(Collectible).where(Collectible.treasure_id == treasure_id)).scalar_one_or_none()
+    if c is None:
+        return jsonify(error="This treasure has no collectible"), 404
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Send your lat and lon"), 400
+    try:
+        lat = parse_number(data.get("lat"), "lat", -90, 90)
+        lon = parse_number(data.get("lon"), "lon", -180, 180)
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    distance_m = haversine_m(lat, lon, treasure.lat, treasure.lon)
+    if distance_m > FOUND_RADIUS_M:
+        return jsonify(error=f"You are {round(distance_m)} m away. Get within {FOUND_RADIUS_M} m.",
+                       distance_m=round(distance_m, 1)), 400
+
+    try:
+        c, is_new = give(user, c)
+    except ValueError as err:
+        return jsonify(error=str(err)), 403
+    return jsonify(new=is_new, item=_item_dict(c, treasure.name))
+
+
 @collectible_api.route("/api/collection")
 def api_collection():
     """Your trophies, and the treasures you hid (to set up their collectible)."""
@@ -185,11 +232,17 @@ def api_collection():
     if user is None:
         return jsonify(error="Log in first"), 401
     rows = db.session.execute(
-        db.select(Collectible, CollectedItem.collected_at, Treasure.name)
+        db.select(Collectible, CollectedItem.collected_at, Treasure)
         .join(CollectedItem, CollectedItem.collectible_id == Collectible.id)
         .join(Treasure, Treasure.id == Collectible.treasure_id, isouter=True)
         .where(CollectedItem.user_id == user.id).order_by(CollectedItem.id.desc())).all()
-    mine = [dict(_item_dict(c, name), collected_at=when.isoformat()) for c, when, name in rows]
+    # Each trophy also says where it was found, for the shelf's "where and when" card.
+    mine = [dict(_item_dict(c, t.name if t else None), collected_at=utc_iso(when),
+                 lat=t.lat if t else None, lon=t.lon if t else None) for c, when, t in rows]
+    total = db.session.execute(db.select(db.func.count(Collectible.id))).scalar()
+    hidden_by_me = db.session.execute(
+        db.select(db.func.count(Collectible.id)).join(Treasure, Treasure.id == Collectible.treasure_id)
+        .where(Treasure.created_by == user.id)).scalar()
 
     admin = is_admin(user)
     query = db.select(Treasure).order_by(Treasure.id)
@@ -201,7 +254,8 @@ def api_collection():
         hidden.append({"id": t.id, "name": t.name,
                        "collectible": dict(_item_dict(c), code=c.code) if c else None})
     from voxel_models import TROPHIES  # the built-in looks to choose from
-    return jsonify(mine=mine, my_treasures=hidden, trophies=TROPHIES, is_admin=admin)
+    return jsonify(mine=mine, my_treasures=hidden, trophies=TROPHIES, is_admin=admin,
+                   to_find=still_to_find(total, hidden_by_me, len(mine)))
 
 
 @collectible_api.route("/api/treasures/<int:treasure_id>/collectible", methods=["POST"])

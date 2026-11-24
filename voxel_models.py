@@ -11,7 +11,8 @@ Only the Python standard library is used (struct, json). To make the files again
 
 How a .glb file is built:
   header:  "glTF", version 2, total length
-  chunk 1: JSON that describes the model (which bytes are corners, normals, colours, triangles)
+  chunk 1: JSON that describes the model (which bytes are corners, normals, triangles,
+           and one coloured material per pixel colour)
   chunk 2: the bytes themselves (BIN)
 """
 
@@ -65,9 +66,11 @@ def letter_colours(css_text):
     return colours
 
 
-def build_mesh(rows, colours, depth=DEPTH, size=VOXEL_M):
-    """Turn a picture into lists of corners, normals, colours and triangles.
+def build_mesh(rows, depth=DEPTH, size=VOXEL_M):
+    """Turn a picture into blocks, grouped by colour letter.
 
+    Returns {letter: (corners, normals, triangle indices)}. Each colour is kept apart
+    because each colour becomes its own material in the .glb (see glb_bytes).
     Only faces you can see are kept: a side face between two filled blocks is hidden,
     so it is skipped (smaller file, cleaner model).
     """
@@ -76,11 +79,12 @@ def build_mesh(rows, colours, depth=DEPTH, size=VOXEL_M):
     def filled(x, y, z):
         return 0 <= y < height and 0 <= x < width and 0 <= z < depth and rows[y][x] != "."
 
-    positions, normals, vertex_colours, indices = [], [], [], []
+    groups = {}
     for y, row in enumerate(rows):
         for x, letter in enumerate(row):
             if letter == ".":
                 continue
+            positions, normals, indices = groups.setdefault(letter, ([], [], []))
             for z in range(depth):
                 for normal, corners in FACES:
                     nx, ny, nz = normal
@@ -95,53 +99,62 @@ def build_mesh(rows, colours, depth=DEPTH, size=VOXEL_M):
                             (z + cz - depth / 2) * size,      # centred front to back
                         ))
                         normals.append(normal)
-                        vertex_colours.append(colours[letter])
                     indices += [start, start + 1, start + 2, start, start + 2, start + 3]
-    return positions, normals, vertex_colours, indices
+    return groups
 
 
 def _pad(data, filler):
     return data + filler * ((4 - len(data) % 4) % 4)
 
 
-def glb_bytes(positions, normals, vertex_colours, indices, name="StepQuest trophy"):
-    """Pack the mesh into a .glb file (glTF 2.0 binary)."""
-    pos_bin = b"".join(struct.pack("<3f", *p) for p in positions)
-    nor_bin = b"".join(struct.pack("<3f", *n) for n in normals)
-    col_bin = b"".join(struct.pack("<4f", *c) for c in vertex_colours)
-    idx_bin = struct.pack(f"<{len(indices)}I", *indices)
-    parts = [pos_bin, nor_bin, col_bin, idx_bin]
-    offsets, offset = [], 0
-    for part in parts:
-        offsets.append(offset)
-        offset += len(part)
-    binary = _pad(b"".join(parts), b"\x00")
+def glb_bytes(groups, colours, name="StepQuest trophy"):
+    """Pack the blocks into a .glb file (glTF 2.0 binary).
 
-    xs, ys, zs = zip(*positions)
-    count = len(positions)
+    WHY one material per colour: an earlier version stored the colour on every corner
+    ("vertex colours") under one white material. The web viewer showed the colours, but
+    phone AR (Android Scene Viewer, iPhone Quick Look) ignores vertex colours, so the
+    trophy looked plain white. A material colour works in every viewer.
+    """
+    chunks, views, accessors, primitives, materials = [], [], [], [], []
+    offset = 0
+
+    def add_view(data, target):
+        nonlocal offset
+        views.append({"buffer": 0, "byteOffset": offset, "byteLength": len(data), "target": target})
+        chunks.append(data)
+        offset += len(data)  # every part is a multiple of 4 bytes, so no padding is needed
+        return len(views) - 1
+
+    all_corners = []
+    for letter, (positions, normals, indices) in groups.items():
+        all_corners += positions
+        xs, ys, zs = zip(*positions)
+        pos = add_view(b"".join(struct.pack("<3f", *p) for p in positions), 34962)
+        nor = add_view(b"".join(struct.pack("<3f", *n) for n in normals), 34962)
+        idx = add_view(struct.pack(f"<{len(indices)}I", *indices), 34963)
+        accessors += [
+            {"bufferView": pos, "componentType": 5126, "count": len(positions), "type": "VEC3",
+             "min": [min(xs), min(ys), min(zs)], "max": [max(xs), max(ys), max(zs)]},
+            {"bufferView": nor, "componentType": 5126, "count": len(normals), "type": "VEC3"},
+            {"bufferView": idx, "componentType": 5125, "count": len(indices), "type": "SCALAR"},
+        ]
+        first = len(accessors) - 3
+        primitives.append({"attributes": {"POSITION": first, "NORMAL": first + 1},
+                           "indices": first + 2, "material": len(materials)})
+        materials.append({"name": f"pixel {letter}", "pbrMetallicRoughness": {
+            "baseColorFactor": list(colours[letter]), "metallicFactor": 0.0, "roughnessFactor": 0.7}})
+
+    binary = b"".join(chunks)
     gltf = {
         "asset": {"version": "2.0", "generator": "StepQuest voxel_models.py"},
         "scene": 0,
         "scenes": [{"nodes": [0]}],
         "nodes": [{"mesh": 0, "name": name}],
-        "meshes": [{"name": name, "primitives": [{
-            "attributes": {"POSITION": 0, "NORMAL": 1, "COLOR_0": 2}, "indices": 3, "material": 0}]}],
-        "materials": [{"name": "pixels", "pbrMetallicRoughness": {
-            "baseColorFactor": [1, 1, 1, 1], "metallicFactor": 0.0, "roughnessFactor": 0.7}}],
+        "meshes": [{"name": name, "primitives": primitives}],
+        "materials": materials,
         "buffers": [{"byteLength": len(binary)}],
-        "bufferViews": [
-            {"buffer": 0, "byteOffset": offsets[0], "byteLength": len(pos_bin), "target": 34962},
-            {"buffer": 0, "byteOffset": offsets[1], "byteLength": len(nor_bin), "target": 34962},
-            {"buffer": 0, "byteOffset": offsets[2], "byteLength": len(col_bin), "target": 34962},
-            {"buffer": 0, "byteOffset": offsets[3], "byteLength": len(idx_bin), "target": 34963},
-        ],
-        "accessors": [
-            {"bufferView": 0, "componentType": 5126, "count": count, "type": "VEC3",
-             "min": [min(xs), min(ys), min(zs)], "max": [max(xs), max(ys), max(zs)]},
-            {"bufferView": 1, "componentType": 5126, "count": count, "type": "VEC3"},
-            {"bufferView": 2, "componentType": 5126, "count": count, "type": "VEC4"},
-            {"bufferView": 3, "componentType": 5125, "count": len(indices), "type": "SCALAR"},
-        ],
+        "bufferViews": views,
+        "accessors": accessors,
     }
     json_chunk = _pad(json.dumps(gltf, separators=(",", ":")).encode("utf-8"), b" ")
     total = 12 + 8 + len(json_chunk) + 8 + len(binary)
@@ -154,7 +167,7 @@ def trophy_glb(name, css_text=None):
     """The .glb bytes for one trophy (its first animation frame)."""
     css_text = css_text if css_text is not None else PIXEL_CSS.read_text(encoding="utf-8")
     rows = SPRITES[name][0]
-    return glb_bytes(*build_mesh(rows, letter_colours(css_text)), name=f"StepQuest {name}")
+    return glb_bytes(build_mesh(rows), letter_colours(css_text), name=f"StepQuest {name}")
 
 
 def main():

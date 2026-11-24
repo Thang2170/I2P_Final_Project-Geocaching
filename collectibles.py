@@ -11,6 +11,7 @@ themselves and uploaded as a .glb file.
 import json
 import secrets
 import struct
+from datetime import timezone
 
 from voxel_models import TROPHIES
 
@@ -93,3 +94,23 @@ def can_manage(user_id, treasure_creator_id, is_admin):
     """Who may add or change a treasure's collectible: whoever hid it, or an admin.
     The built-in demo treasures (no creator) can only be set up by an admin."""
     return is_admin or (treasure_creator_id is not None and treasure_creator_id == user_id)
+
+
+def utc_iso(when):
+    """A time as text the browser reads correctly, e.g. "2026-11-24T06:05:00+00:00".
+
+    WHY: SQLite forgets the time zone, so a saved UTC time comes back "naive". Without
+    "+00:00" the browser would treat it as local time and show it 8 hours off in Taiwan.
+    """
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when.isoformat()
+
+
+def still_to_find(total_collectibles, hidden_by_me, collected):
+    """How many trophies you could still collect: the ones in the game, minus the ones
+    you hid yourself (you can't collect those) and the ones you already have.
+    Used for the empty spots on the Collection shelf."""
+    return max(0, total_collectibles - hidden_by_me - collected)

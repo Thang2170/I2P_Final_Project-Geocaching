@@ -6,24 +6,90 @@
   {# A: Google's <model-viewer> shows the 3D trophies and opens AR on phones (Android Scene
      Viewer, iPhone Quick Look). Python makes the trophies (voxel_models.py). #}
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    .trophies { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; margin-top: 16px; }
-    .trophy { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px;
-              background: var(--px-paper); box-shadow: var(--px-edge); text-align: center; }
-    .trophy.is-new { animation: px-shake .3s steps(2) 3; }
-    .trophy__art { display: grid; place-items: center; height: 60px; }
-    .trophy__name { margin: 0; font-size: 20px; }
-    .trophy .btn { width: auto; margin: 0; padding: 8px 10px; font-size: 9px; }
-    .viewer { position: relative; margin-top: 20px; background: #1d3a33; box-shadow: var(--px-edge); }
-    .viewer[hidden] { display: none; }
-    model-viewer { width: 100%; height: 380px; --poster-color: transparent; }
-    .viewer__bar { display: flex; justify-content: space-between; align-items: center; gap: 12px;
-                   padding: 10px 14px; color: var(--px-paper); }
-    .viewer__bar .btn { width: auto; margin: 0; padding: 8px 10px; font-size: 9px; }
-    .setup { display: grid; gap: 8px; padding: 14px 0; border-top: 2px dashed var(--line); }
-    .setup__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .setup .btn { width: auto; margin: 0; padding: 8px 10px; font-size: 9px; }
-    .setup .code { color: var(--px-gold-dark); letter-spacing: 1px; }
+    .collection-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+    .collection-head .btn { width: auto; margin: 0; padding: 10px 14px; font-size: 10px; }
+    .tally { margin: 0; font-size: 22px; }
+
+    /* The shelf: a wooden cabinet, every trophy stands on a plank with a brass name plate */
+    .cabinet { margin-top: 16px; padding: 14px 14px 0; background: var(--px-wood-dark);
+               box-shadow: var(--px-edge), var(--px-drop); }
+    /* Every row is 150px tall plus a 14px gap. The planks are painted into the back wall at the
+       bottom of each row, so a half-empty row still has a full-width plank. */
+    .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+             grid-auto-rows: 150px; row-gap: 14px; padding-bottom: 6px;
+             background: repeating-linear-gradient(to bottom,
+               #3d2412 0 138px,                                   /* the dark back wall */
+               var(--px-wood-light) 138px 142px, var(--px-wood) 142px 150px,   /* the plank */
+               #2a180b 150px 154px, #3d2412 154px 164px); }
+    .slot { display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            gap: 6px; padding: 0 0 18px; border: 0; background: none;
+            font: inherit; color: inherit; cursor: pointer; }
+    .slot__art { display: grid; place-items: end center; height: 72px; transform: scale(1.7);
+                 transform-origin: bottom center; transition: transform .15s steps(3); }
+    .slot:hover .slot__art, .slot:focus-visible .slot__art { transform: scale(1.7) translateY(-4px); }
+    .slot:focus-visible { outline: 4px solid var(--px-gold); outline-offset: -4px; }
+    .slot__plate { max-width: 92%; padding: 2px 6px; background: var(--px-gold); color: var(--px-ink);
+                   box-shadow: inset -2px -2px 0 0 var(--px-gold-dark), inset 2px 2px 0 0 var(--px-gold-light);
+                   font-size: 16px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slot.is-new .slot__art { animation: px-shake .3s steps(2) 4; }
+    .slot.is-new .slot__plate { background: var(--px-gold-light); }
+    /* a spot for a trophy you haven't found yet */
+    .slot--empty { cursor: default; }
+    .slot--empty .slot__art { transform: none; width: 52px; height: 64px; place-items: center;
+                              border: 3px dashed rgba(255, 252, 242, .28); color: rgba(255, 252, 242, .45);
+                              font-family: var(--font-pixel); font-size: 18px; }
+    .slot--empty .slot__plate { background: rgba(255, 252, 242, .12); box-shadow: none; color: rgba(255, 252, 242, .5); }
+
+    /* The trophy card: 3D view, when and where */
+    .trophy-card { width: min(520px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0;
+                   background: var(--px-paper); color: var(--px-ink); box-shadow: var(--px-edge), var(--px-drop);
+                   overflow-y: auto; }
+    .trophy-card[open] { animation: px-boot .3s steps(4) both; }
+    .trophy-card::backdrop { background: rgba(20, 35, 31, .72); }
+    .trophy-card__stage { background: radial-gradient(circle at 50% 40%, #2c5a4e, #14231f 75%); }
+    model-viewer { width: 100%; height: 300px; --poster-color: transparent; }
+    .trophy-card__body { display: grid; gap: 10px; padding: 16px 18px 18px; }
+    .trophy-card__body h2 { margin: 0; }
+    .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 20px; }
+    .facts dt { color: var(--px-muted); }
+    .facts dd { margin: 0; }
+    .where-map { height: 150px; box-shadow: var(--px-edge); }
+    .where-map[hidden] { display: none; }
+    .trophy-card__buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .trophy-card__buttons .btn { width: auto; margin: 0; padding: 10px 12px; font-size: 9px; }
+    /* Adding a collectible: pick one treasure, then one tidy form for it */
+    .setup-box { margin-top: 28px; padding-top: 8px; border-top: 4px dashed var(--px-line); }
+    .setup { display: grid; gap: 14px; margin-top: 12px; padding: 16px; background: var(--px-bg);
+             box-shadow: var(--px-edge); }
+    .setup label, .setup legend { font-size: 20px; }
+    .setup input[type="text"] { width: 100%; }
+    .setup__status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; font-size: 20px; }
+    .setup__status .code { color: var(--px-gold-dark); letter-spacing: 2px; font-family: var(--font-pixel); font-size: 11px; }
+    .setup__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .setup__buttons .btn { width: auto; margin: 0; padding: 10px 12px; font-size: 9px; }
+    .badge-pill { padding: 2px 8px; background: var(--px-good); color: var(--px-paper); font-size: 16px; }
+    .badge-pill--none { background: var(--px-stone); }
+    /* the trophy picker: pictures you tap, not a list of words */
+    .looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px;
+             margin: 0; padding: 0; border: 0; }
+    .look { position: relative; display: grid; justify-items: center; gap: 4px; padding: 10px 4px 6px;
+            background: var(--px-paper); box-shadow: var(--px-edge); cursor: pointer; font-size: 15px;
+            text-align: center; }
+    .look input { position: absolute; opacity: 0; pointer-events: none; }
+    .look__art { display: grid; place-items: end center; height: 42px; }
+    .look:hover { background: #fff3cf; }
+    .look:has(input:checked) { background: var(--px-gold-light);
+                               box-shadow: var(--px-edge), inset 0 0 0 3px var(--px-gold-dark); }
+    .look:has(input:focus-visible) { outline: 4px solid var(--px-leaf); outline-offset: 4px; }
+    /* the upload button: a real button look, with the chosen file's name next to it */
+    .upload { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 18px; }
+    .upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .setup .upload__button { padding: 10px 12px; background: var(--px-paper); box-shadow: var(--px-edge);
+                      font-family: var(--font-pixel); font-size: 9px; cursor: pointer; }
+    .upload:has(input:focus-visible) .upload__button { outline: 4px solid var(--px-leaf); outline-offset: 4px; }
   </style>
 </head>
 <body>
@@ -31,33 +97,61 @@
   {% include "_topbar.html" %}
 
   <main class="card">
-    <h1><span class="sprite sprite--mark-collectible" aria-hidden="true"></span> Collection</h1>
-    <p class="muted">Find a treasure with a collectible (the gem on its map pin), scan the QR code hidden there,
-      and its 3D trophy joins your collection. Tap a trophy to turn it around, or see it in AR on your phone.</p>
-    <a class="btn" href="/scan">Scan a QR code</a>
+    <div class="collection-head">
+      <h1><span class="sprite sprite--mark-collectible" aria-hidden="true"></span> Collection</h1>
+      <a class="btn" href="/scan">Scan a QR code</a>
+    </div>
+    <p class="muted">Walk to a treasure with a gem on its map pin (or scan the QR code hidden there) and its
+      trophy joins your shelf. Tap a trophy to see it in 3D, when you got it and where.</p>
+    <p id="tally" class="tally"></p>
     <p id="message" class="message" role="status"></p>
 
-    <div id="trophies" class="trophies"></div>
-    <p id="empty" class="muted" hidden>No trophies yet. Look for treasures with a gem on the map.</p>
+    <div class="cabinet"><div id="shelf" class="shelf"></div></div>
 
-    <!-- The one 3D viewer, filled with whichever trophy you tap -->
-    <section id="viewer" class="viewer" hidden>
-      <model-viewer id="model" camera-controls auto-rotate shadow-intensity="1" ar
+    <!-- The trophy card: filled with whichever trophy you tap -->
+    <dialog id="viewer" class="trophy-card" aria-labelledby="viewerName">
+      <div class="trophy-card__stage">
+      {# Spins slowly (15 degrees a second) straight away, and starts again 1.5 s after you let go #}
+      <model-viewer id="model" camera-controls auto-rotate auto-rotate-delay="1500" rotation-per-second="15deg"
+                    interaction-prompt="none" shadow-intensity="1" ar
                     ar-modes="webxr scene-viewer quick-look" alt="A 3D trophy"></model-viewer>
-      <div class="viewer__bar">
-        <span id="viewerName"></span>
-        <span>
+      </div>
+      <div class="trophy-card__body">
+        <h2 id="viewerName"></h2>
+        <dl id="facts" class="facts"></dl>
+        <div id="whereMap" class="where-map" hidden></div>
+        <div class="trophy-card__buttons">
           <button type="button" id="arButton" class="btn">View in AR</button>
           <button type="button" id="closeViewer" class="btn btn--ghost">Close</button>
-        </span>
+        </div>
       </div>
-    </section>
+    </dialog>
 
-    <section id="setupBox" hidden>
-      <h2>Your treasures: add a collectible</h2>
-      <p class="muted">Choose a trophy (or upload your own 3D model as a <b>.glb</b> file, up to 5 MB),
-        then print the QR code and stick it at the treasure.</p>
-      <div id="setups"></div>
+    <section id="setupBox" class="setup-box" hidden>
+      <h2>Add a collectible to a treasure</h2>
+      <p class="muted">Pick the treasure, choose its trophy (or upload your own 3D model as a <b>.glb</b> file,
+        up to 5 MB), then print the QR code and stick it at the spot.</p>
+      <label for="treasurePick">Treasure</label>
+      <select id="treasurePick" data-search="Find a treasure"></select>
+
+      <form id="setup" class="setup">
+        <p id="setupStatus" class="setup__status"></p>
+        <div>
+          <label for="setupName">Trophy name</label>
+          <input id="setupName" name="name" type="text" maxlength="40" placeholder="e.g. Pond bench cup">
+        </div>
+        <fieldset class="looks" id="looks"><legend>Trophy</legend></fieldset>
+        <div class="upload">
+          <label class="upload__button" for="setupModel">Upload my own model</label>
+          <input id="setupModel" name="model" type="file" accept=".glb,model/gltf-binary">
+          <span id="modelName" class="muted">Optional (.glb, max 5 MB)</span>
+        </div>
+        <div class="setup__buttons">
+          <button type="submit" id="setupSave" class="btn">Add collectible</button>
+          <a id="setupQr" class="btn btn--ghost" hidden>Print QR code</a>
+          <button type="button" id="setupLook" class="btn btn--ghost" hidden>View in 3D</button>
+        </div>
+      </form>
     </section>
   </main>
 
@@ -78,99 +172,186 @@
       message.className = "message " + (ok ? "ok" : "bad");
     }
 
-    function openViewer(item) {
-      const viewer = document.getElementById("viewer");
-      document.getElementById("model").src = item.model_url;
-      document.getElementById("viewerName").textContent = item.name + (item.uploaded ? " (handmade)" : "");
-      viewer.hidden = false;
-      viewer.scrollIntoView({ behavior: "smooth", block: "center" });
+    // ---------- the trophy card (3D, when, where)
+    const viewer = document.getElementById("viewer");
+    let whereMap = null, wherePin = null;
+
+    function fact(list, label, value) {
+      list.append(el("dt", label), el("dd", value));
     }
-    document.getElementById("closeViewer").addEventListener("click", () => {
-      document.getElementById("viewer").hidden = true;
-    });
+
+    function showWhere(item) {
+      const box = document.getElementById("whereMap");
+      box.hidden = item.lat == null;
+      if (box.hidden) return;
+      const spot = [item.lat, item.lon];
+      if (!whereMap) {
+        // A small still map, just to show the spot: dragging and zooming are off
+        whereMap = L.map(box, { zoomControl: false, dragging: false, scrollWheelZoom: false,
+                                doubleClickZoom: false, touchZoom: false, keyboard: false });
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                    { maxZoom: 19, attribution: "Imagery &copy; Esri" }).addTo(whereMap);
+        wherePin = L.marker(spot).addTo(whereMap);
+      }
+      wherePin.setLatLng(spot);
+      whereMap.setView(spot, 17);
+      setTimeout(() => whereMap.invalidateSize(), 50);  // the map was made while the card was still opening
+    }
+
+    function openViewer(item) {
+      document.getElementById("model").src = item.model_url;
+      document.getElementById("viewerName").textContent = item.name;
+      const facts = document.getElementById("facts");
+      facts.replaceChildren();
+      if (item.collected_at) {
+        const when = new Date(item.collected_at);
+        fact(facts, "Collected", when.toLocaleString([], { day: "numeric", month: "short", year: "numeric",
+                                                          hour: "2-digit", minute: "2-digit" }));
+      }
+      if (item.treasure) fact(facts, "Where", item.treasure);
+      fact(facts, "Model", item.uploaded ? "Handmade by the hider" : "StepQuest pixel trophy");
+      if (!viewer.open) viewer.showModal();
+      showWhere(item);
+    }
+    document.getElementById("closeViewer").addEventListener("click", () => viewer.close());
+    viewer.addEventListener("click", event => { if (event.target === viewer) viewer.close(); });  // tap outside
     document.getElementById("arButton").addEventListener("click", () => {
       const model = document.getElementById("model");
       if (model.canActivateAR) model.activateAR();
       else show("AR needs a phone with AR support (Android with ARCore, or an iPhone).", false);
     });
 
-    function renderMine(mine) {
-      const box = document.getElementById("trophies");
-      box.replaceChildren();
-      document.getElementById("empty").hidden = mine.length > 0;
-      for (const item of mine) {
-        const card = el("div", undefined, "trophy");
-        if (String(item.id) === params.get("new")) card.classList.add("is-new");
-        const art = el("div", undefined, "trophy__art");
-        art.append(el("span", undefined, `sprite sprite--${item.trophy}`));
-        const open = el("button", "View in 3D", "btn");
-        open.type = "button";
-        open.addEventListener("click", () => openViewer(item));
-        card.append(art, el("p", item.name, "trophy__name"), el("p", item.treasure || "", "muted"), open);
-        box.append(card);
+    // ---------- the shelf
+    function trophySlot(item) {
+      const slot = el("button", undefined, "slot");
+      slot.type = "button";
+      slot.title = item.name;
+      const art = el("span", undefined, "slot__art");
+      art.append(el("span", undefined, `sprite sprite--${item.trophy}`));
+      slot.append(art, el("span", item.name, "slot__plate"));
+      slot.addEventListener("click", () => openViewer(item));
+      return slot;
+    }
+
+    function emptySlot() {
+      const slot = el("div", undefined, "slot slot--empty");
+      slot.append(el("span", "?", "slot__art"), el("span", "Not found", "slot__plate"));
+      return slot;
+    }
+
+    function renderShelf(mine, toFind) {
+      const shelf = document.getElementById("shelf");
+      shelf.replaceChildren(...mine.map(trophySlot));
+      // Empty spots: the trophies still out there, and at least four spots so a new shelf isn't bare
+      const empties = Math.max(toFind, 4 - mine.length, 0);
+      for (let i = 0; i < empties; i++) shelf.append(emptySlot());
+      document.getElementById("tally").textContent =
+        `${mine.length} ${mine.length === 1 ? "trophy" : "trophies"}` + (toFind ? ` · ${toFind} still out there` : "");
+
+      const fresh = mine.find(item => String(item.id) === params.get("new"));
+      if (fresh) {
+        shelf.children[mine.indexOf(fresh)].classList.add("is-new");
+        openViewer(fresh);
       }
     }
 
-    function setupRow(t) {
-      const row = el("form", undefined, "setup");
-      row.append(el("b", t.name));
-      const line = el("div", undefined, "setup__row");
-      const name = el("input");
-      name.name = "name";
-      name.placeholder = "Trophy name";
-      name.maxLength = 40;
-      name.value = t.collectible ? t.collectible.name : "";
-      const pick = el("select");
-      pick.name = "trophy";
-      for (const n of trophyNames) pick.append(new Option(n, n, false, t.collectible && t.collectible.trophy === n));
-      const file = el("input");
-      file.type = "file";
-      file.name = "model";
-      file.accept = ".glb,model/gltf-binary";
-      const save = el("button", t.collectible ? "Save" : "Add collectible", "btn");
-      save.type = "submit";
-      line.append(name, pick, file, save);
-      row.append(line);
-      if (t.collectible) {
-        const info = el("div", undefined, "setup__row");
-        const qr = el("a", "Print QR code", "btn btn--ghost");
-        qr.href = `/treasures/${t.id}/qr`;
-        const look = el("button", "View in 3D", "btn btn--ghost");
-        look.type = "button";
-        look.addEventListener("click", () => openViewer(t.collectible));
-        info.append(el("span", `Code: ${t.collectible.code}`, "code"), qr, look);
-        row.append(info);
-      }
-      row.addEventListener("submit", async event => {
-        event.preventDefault();
-        save.disabled = true;
-        try {
-          const res = await fetch(`/api/treasures/${t.id}/collectible`, { method: "POST", body: new FormData(row) });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Could not save");
-          show(`Saved "${data.name}". Now print its QR code and stick it at ${t.name}.`, true);
-          await load();
-        } catch (error) {
-          show(error.message, false);
-          save.disabled = false;
-        }
-      });
-      return row;
+    // ---------- adding a collectible: one treasure at a time, picked from a dropdown
+    let myTreasures = [];
+
+    function treasureLabel(t) {
+      return t.collectible ? `${t.name} · has a collectible` : t.name;
     }
 
-    async function load() {
+    function fillLooks(chosen) {
+      const looks = document.getElementById("looks");
+      looks.querySelectorAll(".look").forEach(node => node.remove());
+      for (const name of trophyNames) {
+        const look = el("label", undefined, "look");
+        const radio = el("input");
+        radio.type = "radio";
+        radio.name = "trophy";
+        radio.value = name;
+        radio.checked = name === chosen;
+        const art = el("span", undefined, "look__art");
+        art.append(el("span", undefined, `sprite sprite--${name}`));
+        look.append(radio, art, el("span", name.replace("-", " ")));
+        looks.append(look);
+      }
+    }
+
+    function showSetup() {
+      const t = myTreasures.find(t => String(t.id) === document.getElementById("treasurePick").value);
+      if (!t) return;
+      const c = t.collectible;
+      const status = document.getElementById("setupStatus");
+      status.replaceChildren();
+      if (c) {
+        status.append(el("span", "Has a collectible", "badge-pill"), el("span", "QR code:"), el("span", c.code, "code"));
+      } else {
+        status.append(el("span", "No collectible yet", "badge-pill badge-pill--none"));
+      }
+      document.getElementById("setupName").value = c ? c.name : "";
+      document.getElementById("setupName").placeholder = `${t.name} trophy`;
+      fillLooks(c ? c.trophy : trophyNames[0]);
+      document.getElementById("setupModel").value = "";
+      document.getElementById("modelName").textContent =
+        c && c.uploaded ? "Using your own model (upload again to change it)" : "Optional (.glb, max 5 MB)";
+      document.getElementById("setupSave").textContent = c ? "Save changes" : "Add collectible";
+      const qr = document.getElementById("setupQr");
+      qr.hidden = !c;
+      qr.href = `/treasures/${t.id}/qr`;
+      document.getElementById("setupLook").hidden = !c;
+    }
+
+    function fillTreasurePick(keepId) {
+      const pick = document.getElementById("treasurePick");
+      pick.replaceChildren(...myTreasures.map(t => new Option(treasureLabel(t), t.id)));
+      if (keepId != null) pick.value = String(keepId);
+      pick.dispatchEvent(new Event("options-changed"));  // lets the pretty dropdown redraw
+      showSetup();
+    }
+
+    document.getElementById("treasurePick").addEventListener("change", showSetup);
+    document.getElementById("setupModel").addEventListener("change", event => {
+      const file = event.target.files[0];
+      document.getElementById("modelName").textContent = file ? file.name : "Optional (.glb, max 5 MB)";
+    });
+    document.getElementById("setupLook").addEventListener("click", () => {
+      const t = myTreasures.find(t => String(t.id) === document.getElementById("treasurePick").value);
+      if (t && t.collectible) openViewer(t.collectible);
+    });
+    document.getElementById("setup").addEventListener("submit", async event => {
+      event.preventDefault();
+      const id = document.getElementById("treasurePick").value;
+      const t = myTreasures.find(t => String(t.id) === id);
+      const save = document.getElementById("setupSave");
+      save.disabled = true;
+      try {
+        const res = await fetch(`/api/treasures/${id}/collectible`, { method: "POST", body: new FormData(event.target) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not save");
+        show(`Saved "${data.name}". Now print its QR code and stick it at ${t.name}.`, true);
+        await load(id);
+      } catch (error) {
+        show(error.message, false);
+      } finally {
+        save.disabled = false;
+      }
+    });
+
+    async function load(keepId) {
       const res = await fetch("/api/collection");
       if (res.status === 401) { location.href = "/login?next=/collection"; return; }
       const data = await res.json();
       trophyNames = data.trophies;
-      renderMine(data.mine);
-      const setups = document.getElementById("setups");
-      setups.replaceChildren(...data.my_treasures.map(setupRow));
-      document.getElementById("setupBox").hidden = data.my_treasures.length === 0;
+      renderShelf(data.mine, data.to_find);
+      myTreasures = data.my_treasures;
+      document.getElementById("setupBox").hidden = myTreasures.length === 0;
+      if (myTreasures.length) fillTreasurePick(keepId);
     }
 
     if (params.get("error")) show(params.get("error"), false);
-    else if (params.get("new")) show("New trophy collected! Tap it to see it in 3D.", true);
+    else if (params.get("new")) show("New trophy collected! It is on your shelf.", true);
     else if (params.get("have")) show("You already have this trophy.", true);
     load().catch(error => show(error.message, false));
   </script>
