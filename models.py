@@ -543,3 +543,28 @@ class BodyHeight(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
     height_cm = db.Column(db.Float, nullable=False)
+
+
+class ZoneBonus(db.Model):
+    """Bonus coins for time in the 60-80% heart-rate zone, paid once per saved hunt (owner: B).
+
+    Rules: zone_coach.py. A new table, so nobody has to delete their database.
+    """
+
+    __tablename__ = "zone_bonuses"
+
+    journey_id = db.Column(db.Integer, db.ForeignKey("journeys.id"), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    seconds = db.Column(db.Integer, nullable=False)   # time in the bonus zone
+    coins = db.Column(db.Integer, nullable=False)     # may be 0
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class CooldownDone(db.Model):
+    """A finished cool-down quest after a hunt, paid once per hunt (owner: B). Rules: zone_coach.py."""
+
+    __tablename__ = "cooldowns_done"
+
+    journey_id = db.Column(db.Integer, db.ForeignKey("journeys.id"), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
