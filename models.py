@@ -568,3 +568,27 @@ class CooldownDone(db.Model):
     journey_id = db.Column(db.Integer, db.ForeignKey("journeys.id"), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class GoalChoice(db.Model):
+    """The health goal a player picked: steps, active or rehab (owner: B). Rules: goals.py."""
+
+    __tablename__ = "goal_choices"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    goal = db.Column(db.String(10), nullable=False)
+    started_on = db.Column(db.Date, nullable=False)   # Taiwan date: rehab grows week by week from here
+
+
+class GoalMilestone(db.Model):
+    """A milestone a player collected, once per day or week (owner: B). Rules: goals.py."""
+
+    __tablename__ = "goal_milestones"
+    __table_args__ = (db.UniqueConstraint("user_id", "milestone_id", "period_start", name="one_milestone_per_period"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    milestone_id = db.Column(db.String(20), nullable=False)
+    period_start = db.Column(db.Date, nullable=False)  # the day, or the Monday of the week
+    coins = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)

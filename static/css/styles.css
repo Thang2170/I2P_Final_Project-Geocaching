@@ -1085,3 +1085,25 @@ h1, h2 {
   .challenge { grid-template-columns: 1fr auto; }
   .challenge progress { grid-column: 1 / -1; grid-row: 2; }
 }
+
+
+/* ---------- B: your health goal (goals.py) ---------- */
+.goal-card .week-card__head .btn { margin-top: 0; }
+.goal-card .btn[hidden], .goal-picks[hidden], .goal-advice[hidden], .goal-week[hidden] { display: none; }
+.goal-picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 8px 0; }
+.goal-pick {
+  display: grid; gap: 4px; align-content: start; padding: 10px 12px; text-align: left; cursor: pointer;
+  background: var(--px-paper); color: var(--px-ink); border: 4px solid var(--px-line); font: inherit;
+}
+.goal-pick strong { font-size: 22px; font-weight: 700; line-height: 1.2; color: var(--px-green); }
+.goal-pick span { font-size: 17px; line-height: 1.15; color: var(--px-muted); }
+.goal-pick:hover, .goal-pick:focus-visible { border-color: var(--px-gold); outline: none; }
+.goal-pick.is-current { border-color: var(--px-green); }
+.goal-week { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 8px 0; padding: 0; }
+.goal-day { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; text-align: center; border: 4px solid var(--px-line); }
+.goal-day span { font-size: 16px; color: var(--px-muted); }
+.goal-day strong { font-size: 18px; font-weight: 400; }
+.goal-day.is-met { border-color: var(--px-green); background: var(--px-green); }
+.goal-day.is-met span, .goal-day.is-met strong { color: var(--px-paper); }
+.goal-day.is-future { opacity: .5; }
+.goal-advice { margin: 6px 0; padding: 4px 8px; border: 4px solid var(--px-gold); font-size: 18px; }
