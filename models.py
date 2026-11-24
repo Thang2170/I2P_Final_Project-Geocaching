@@ -486,3 +486,19 @@ class ChainBonus(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     chain_id = db.Column(db.Integer, db.ForeignKey("riddle_chains.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class ChallengeClaim(db.Model):
+    """A weekly challenge a player finished and was paid for (owner: B). Rules: streaks.py.
+
+    week_start is the Monday (Taiwan time) of that week, so each challenge pays once a week.
+    """
+
+    __tablename__ = "challenge_claims"
+    __table_args__ = (db.UniqueConstraint("user_id", "week_start", "challenge_id", name="one_claim_per_week"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    week_start = db.Column(db.Date, nullable=False)
+    challenge_id = db.Column(db.String(20), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
