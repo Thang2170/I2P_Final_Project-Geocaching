@@ -60,7 +60,7 @@ def list_treasures():
     B: each one says found_by_me, so the map can show a tick on the ones you were already paid for.
     (Always False when you are logged out.)
     """
-    from coin_api import found_treasure_ids  # here, not at the top, so the two files don't import each other
+    from coin_api import current_values, found_treasure_ids  # here, not at the top, so the two files don't import each other
 
     query = db.select(Treasure).order_by(Treasure.id)
     treasures = db.session.execute(query).scalars().all()
@@ -75,7 +75,9 @@ def list_treasures():
     from collectible_api import collectible_flags  # A: QR collectibles (same reason)
     verified = verified_ids()
     collectibles = collectible_flags(user.id if user else None)
+    values = current_values(treasures)  # B: what each pays right now (treasure_value.py)
     return jsonify([{**t.to_dict(), "found_by_me": t.id in found,
+                     "value": values[t.id],
                      "verified": t.id in verified,  # A: checked by an admin (demo ones always are)
                      "collectible": t.id in collectibles,  # A: has a QR trophy at the spot
                      "collected_by_me": collectibles.get(t.id, False),

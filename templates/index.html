@@ -188,7 +188,7 @@
             <span class="feature-list__icon"><span class="px-icon px-icon--coin"></span></span>
             <div>
               <h3>Coins</h3>
-              <p>Get within 20 m of a treasure and 10 coins go to you.</p>
+              <p>Get within 20 m of a treasure and the coins go to you: 10, or up to 30 if nobody found it lately.</p>
             </div>
           </a>
 
@@ -223,7 +223,7 @@
         <article class="stat-card">
           <small>Treasures you found</small>
           <strong id="statFound">–</strong>
-          <span class="stat-note" id="statFoundNote">10 coins each</span>
+          <span class="stat-note" id="statFoundNote">5 to 30 coins each</span>
         </article>
 
         <article class="stat-card">
@@ -284,7 +284,7 @@
               <div class="quest-card__footer">
                 <div class="reward">
                   <span class="sprite sprite--coin"></span>
-                  <strong>+10</strong>
+                  <strong id="firstCoins">+10</strong>
                   <small>coins</small>
                 </div>
 
@@ -315,7 +315,7 @@
                 <p></p>
                 <div class="mini-card__bottom">
                   <span class="rank-badge"></span>
-                  <strong><span class="sprite sprite--coin-small"></span> 10 coins</strong>
+                  <strong><span class="sprite sprite--coin-small"></span> <span class="mini-coins">10</span> coins</strong>
                   <a href="/"><span class="px-arrow-right"></span></a>
                 </div>
               </div>
@@ -401,6 +401,7 @@
         const node = card.content.cloneNode(true);
         node.querySelector(".mini-art").classList.add(box.children.length % 2 ? "mini-art--city" : "mini-art--lake");
         node.querySelector("h3").textContent = t.name;
+        if (t.value) node.querySelector(".mini-coins").textContent = t.value.coins;  // B: pays right now
         node.querySelector("p").textContent = t.description || "No hint for this one.";
         const b = node.querySelector(".rank-badge");
         b.textContent = badge(t);
@@ -422,6 +423,7 @@
         setText("firstBadge", first.rating && first.rating.count ? `#1 ${badgeText(first)}` : "New!");
         document.getElementById("firstBadge").classList.toggle("rank-badge--new", !(first.rating && first.rating.count));
         document.getElementById("firstLink").href = mapLink(first);
+        if (first.value) setText("firstCoins", `+${first.value.coins}`);  // B: what it pays right now
       } else {
         setText("firstName", "No treasures yet");
       }

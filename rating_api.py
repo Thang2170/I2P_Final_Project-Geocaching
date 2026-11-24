@@ -91,10 +91,14 @@ def rankings():
         events.setdefault(tid, []).append(moment)
     hot = trending({tid: times for tid, times in events.items() if tid in treasures}, now)
 
+    from coin_api import current_values  # here, not at the top: coin_api is imported by many files
+    values = current_values(treasures.values(), now)
+
     def item(tid):
         r = ratings.get(tid, {"average": None, "count": 0})
         return {**treasures[tid].to_dict(), "rating": {"average": r["average"], "count": r["count"]},
-                "finds_this_week": finds_this_week.get(tid, 0)}
+                "finds_this_week": finds_this_week.get(tid, 0),
+                "value": values[tid]}  # what a find pays right now (treasure_value.py)
 
     fresh = newest_unrated(treasures, ratings)
     return jsonify(top_rated=[item(t) for t in best], trending=[item(t) for t in hot],

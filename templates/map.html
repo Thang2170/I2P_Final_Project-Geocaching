@@ -90,6 +90,8 @@
       <h2 id="boardName"></h2>
       <p id="boardHint" class="board__hint"></p>
       <p id="boardStars" class="board__stars"></p>
+      <!-- B: what a find pays right now: more if nobody found it lately (treasure_value.py) -->
+      <p id="boardWorth" class="board__worth"></p>
       <!-- A: verified by an admin, or not yet (you can still go there) -->
       <p id="boardVerified" class="board__verified"></p>
       <!-- A: a QR collectible is hidden here (scan it for a 3D trophy) -->
@@ -210,8 +212,13 @@
           // B: Python marks the ones you were already paid for (found_by_me); they show a tick.
           if (t.found_by_me) foundIds.add(t.id);
           infoById.set(t.id, { verified: t.verified, collectible: t.collectible, collected: t.collected_by_me });
+          valueById.set(t.id, t.value);  // B: what a find pays now
           if (t.id !== treasure.id) addTreasurePin(t, t.found_by_me ? "found" : "treasure");
           else addPinMarks(huntMarker, t);  // the first pin was drawn before the list arrived
+          // B: a treasure nobody has found for a while glows gold: it pays a bounty (treasure_value.py)
+          if (t.value && t.value.label === "bounty" && !t.found_by_me) {
+            markersById.get(t.id)?.getElement()?.classList.add("pin--bounty");
+          }
         }
         if (foundIds.has(treasure.id)) showTick(huntMarker);  // you found them all: even this one is ticked
         // B: /?treasure=<id> (from the welcome page) opens that treasure's board.
@@ -253,6 +260,7 @@
       document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
       showBoardPhoto(t.id);
       showBoardStars(t.id);
+      showBoardWorth(t.id);
       const info = infoById.get(t.id) || {};
       const verifiedLine = document.getElementById("boardVerified");
       verifiedLine.textContent = info.verified
@@ -298,6 +306,14 @@
 
     // B: "★ 4.6 (12 ratings)" under the hint. Python works out the average.
     const boardStars = document.getElementById("boardStars");
+    // B: "Worth 24 coins: nobody has found it for a while!" (Python writes the words)
+    const valueById = new Map();
+    const boardWorth = document.getElementById("boardWorth");
+    function showBoardWorth(treasureId) {
+      const value = valueById.get(treasureId);
+      boardWorth.textContent = value && !foundIds.has(treasureId) ? value.note : "";
+      boardWorth.className = "board__worth" + (value && value.label ? ` board__worth--${value.label}` : "");
+    }
     function starsText(rating) {
       if (!rating || !rating.count) return "No ratings yet";
       return `★ ${rating.average.toFixed(1)} (${rating.count} rating${rating.count === 1 ? "" : "s"})`;
@@ -336,7 +352,8 @@
         setTimeout(() => {
           pin?.classList.remove("is-collected");
           showTick(marker);
-          if (selectedTreasure && selectedTreasure.id === treasureId) showBoardStars(treasureId);
+          if (selectedTreasure && selectedTreasure.id === treasureId) { showBoardStars(treasureId); showBoardWorth(treasureId); }
+          pin?.classList.remove("pin--bounty");  // B: found: no bounty for you any more
           if (treasureId === huntId) {
             routeTarget = null;  // nothing to walk to until you tap another treasure
             routeVia = null;

@@ -13,6 +13,7 @@ from coins import ALREADY_FOUND, COINS_PER_FIND, OWN_TREASURE, TOO_FAR, claim_pr
 from location import FOUND_RADIUS_M, haversine_m
 from models import CoinTransaction, Treasure, db
 from treasure_input import parse_number
+from treasure_value import coins_for, explain, label
 
 coin_api = Blueprint("coin_api", __name__)
 
@@ -38,6 +39,28 @@ def found_treasure_ids(user_id):
         CoinTransaction.user_id == user_id, CoinTransaction.reason == FOUND_REASON,
         CoinTransaction.treasure_id.is_not(None))  # a find always names its treasure
     return sorted(db.session.execute(query).scalars().all())
+
+
+def find_times():
+    """{treasure id: [when each find was paid]}, for every treasure that was ever found."""
+    rows = db.session.execute(db.select(CoinTransaction.treasure_id, CoinTransaction.created_at).where(
+        CoinTransaction.reason == FOUND_REASON, CoinTransaction.treasure_id.is_not(None))).all()
+    times = {}
+    for treasure_id, when in rows:
+        times.setdefault(treasure_id, []).append(when)
+    return times
+
+
+def current_values(treasures, now=None):
+    """B: {treasure id: {"coins", "label", "note"}}: what each treasure pays right now (treasure_value.py)."""
+    from datetime import datetime, timezone
+    now = now or datetime.now(timezone.utc)
+    times = find_times()
+    out = {}
+    for t in treasures:
+        coins = coins_for(t.created_at, times.get(t.id, []), now)
+        out[t.id] = {"coins": coins, "label": label(coins), "note": explain(coins)}
+    return out
 
 
 @coin_api.route("/api/coins")
@@ -90,7 +113,9 @@ def claim_treasure(treasure_id):
     if refusal:
         return jsonify(error=refusal, reasons=reasons), 403
 
-    db.session.add(CoinTransaction(user_id=user.id, amount=COINS_PER_FIND,
+    # B: the treasure's value right now (treasure_value.py): more if nobody found it lately
+    earned = current_values([treasure])[treasure.id]["coins"]
+    db.session.add(CoinTransaction(user_id=user.id, amount=earned,
                                    reason=FOUND_REASON, treasure_id=treasure_id))
     if reasons:
         flag_find(user.id, treasure_id, reasons)  # paid, but an admin will look at it
@@ -100,4 +125,4 @@ def claim_treasure(treasure_id):
         db.session.rollback()
         return jsonify(error=PROBLEMS[ALREADY_FOUND][1]), 409
 
-    return jsonify(treasure=treasure.name, coins_earned=COINS_PER_FIND, balance=get_balance(user.id))
+    return jsonify(treasure=treasure.name, coins_earned=earned, balance=get_balance(user.id))
