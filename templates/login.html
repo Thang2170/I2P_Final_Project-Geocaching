@@ -53,6 +53,15 @@
         </div>
       </form>
 
+      {# B: your height sets your step length (walk_input.py) #}
+      <form id="heightForm">
+        <label for="height">Your height in cm <span class="muted">(used to count your steps)</span></label>
+        <div class="account-settings__row">
+          <input id="height" name="height_cm" inputmode="decimal" placeholder="for example 170">
+          <button type="submit" class="btn btn--ghost">Save height</button>
+        </div>
+      </form>
+
       <div class="account-settings__row">
         <a id="toMap" class="btn" href="/">Go to the map</a>
         <a class="btn btn--ghost" href="/?tour">Replay the tour</a>
@@ -90,6 +99,7 @@
       if (user) {
         document.title = `${user.username} · Account · StepQuest`;
         loadWeight();
+        loadHeight();
         loadCoins();
         // Your profile, exactly as other players see it on /players/<name>
         loadProfile(user.username).then(() => {
@@ -113,6 +123,23 @@
       const data = await res.json();
       document.getElementById("weight").value = data.weight_kg ?? "";
     }
+
+    // B: your saved height, shown in the height box
+    async function loadHeight() {
+      const res = await fetch("/api/me/height");
+      if (!res.ok) return;
+      document.getElementById("height").value = (await res.json()).height_cm ?? "";
+    }
+
+    document.getElementById("heightForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const data = await send("/api/me/height", Object.fromEntries(new FormData(event.target)));
+        show(`Saved. Your step is about ${Math.round(data.step_length_m * 100)} cm, so steps count more accurately.`, true);
+      } catch (error) {
+        show(error.message, false);
+      }
+    });
 
     document.getElementById("weightForm").addEventListener("submit", async event => {
       event.preventDefault();
