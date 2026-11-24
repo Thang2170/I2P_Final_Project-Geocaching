@@ -75,9 +75,21 @@
           <small id="jCalFrom" class="journey__from"></small>{# B: which formula Python used (energy.py) #}</div>
         <div class="journey__stat"><strong id="jTo">–</strong><span>To treasure</span></div>
       </div>
+      {# B: your heart-rate zone from the band, bonus coins and warnings (zone_coach.py) #}
+      <p id="jZone" class="journey__zone" hidden>
+        <span id="jZoneName" class="journey__zone-name"></span>
+        <span id="jZoneText"></span>
+      </p>
+      <p id="jZoneWarn" class="journey__warn" role="alert" hidden></p>
       <p id="jMsg" class="journey__msg"></p>
       <p id="jNote" class="journey__note" hidden></p>
       <p id="jSaved" class="journey__saved" hidden></p>
+      {# B: the cool-down quest after a saved hunt (zone_coach.py) #}
+      <div id="jCool" class="journey__cool" hidden>
+        <p class="journey__cool-title">Cool-down quest</p>
+        <p id="jCoolText" class="journey__cool-text"></p>
+        <div class="journey__cool-bar" aria-hidden="true"><span id="jCoolFill"></span></div>
+      </div>
       <div class="journey__buttons">
         <button type="button" id="jPause" class="btn btn--ghost">Pause</button>
         <button type="button" id="jFinish" class="btn">Finish</button>
@@ -684,6 +696,68 @@
       } catch (err) {
         console.error("Journey stats failed:", err);
       }
+      if (journey.state === "running") loadZone(Math.max(1, Math.round(journey.elapsedMs / 1000)));
+    }
+
+    // B: your heart-rate zone now (Python works it out from the band: zone_coach.py)
+    const jZone = document.getElementById("jZone"), jZoneWarn = document.getElementById("jZoneWarn");
+    async function loadZone(seconds) {
+      try {
+        const res = await fetch(`/api/zone/now?duration_s=${seconds}`);
+        if (!res.ok) return;
+        const z = await res.json();
+        jZone.hidden = !z.has_band;
+        jZoneWarn.hidden = !z.warning;
+        jZoneWarn.textContent = z.warning || "";
+        if (!z.has_band) return;
+        const name = document.getElementById("jZoneName");
+        name.textContent = z.zone_name;
+        name.dataset.zone = z.zone;
+        const mins = Math.floor(z.bonus_seconds / 60);
+        document.getElementById("jZoneText").textContent =
+          `${z.hr} bpm (${z.percent}% of max) · ${mins} min in the 60–80% zone` +
+          (z.bonus_coins ? ` · +${z.bonus_coins} bonus coins` : "") +
+          (z.in_bonus_zone ? " ✓" : "");
+      } catch (err) {
+        console.error("Zone failed:", err);
+      }
+    }
+
+    // B: the cool-down quest: after a saved hunt, walk gently for 3 min (checked every 15 s)
+    const jCool = document.getElementById("jCool");
+    let coolTimer = null;
+    function stopCooldown() { clearInterval(coolTimer); coolTimer = null; }
+    async function checkCooldown() {
+      try {
+        const res = await fetch("/api/zone/cooldown", { method: "POST" });
+        if (!res.ok) return stopCooldown();
+        const c = await res.json();
+        const text = document.getElementById("jCoolText");
+        document.getElementById("jCoolFill").style.width = `${Math.round(100 * c.done_s / c.goal_s)}%`;
+        jCool.hidden = false;
+        if (c.state === "done") {
+          text.textContent = c.paid ? `Done! +${c.paid} coins. Well cooled down.` : "Done for this hunt.";
+          return stopCooldown();
+        }
+        if (c.state === "missed") {
+          text.textContent = "Missed this time: the cool-down must be within 20 minutes of finishing.";
+          return stopCooldown();
+        }
+        if (c.state === "no_band") {
+          text.textContent = `Wear your band, then walk gently for 3 min under ${c.below_bpm} bpm for +${c.reward} coins.`;
+          return;
+        }
+        const left = c.goal_s - c.done_s;
+        text.textContent = `Walk gently under ${c.below_bpm} bpm: ` +
+          `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} to go for +${c.reward} coins.`;
+      } catch (err) {
+        console.error("Cool-down failed:", err);
+      }
+    }
+    function startCooldown() {
+      stopCooldown();
+      checkCooldown();
+      coolTimer = setInterval(checkCooldown, 15000);
     }
 
     function journeyTick() {
@@ -783,6 +857,9 @@
         const data = await res.json();
         ok = res.ok;
         text = ok ? "Hunt saved." : (data.error || text);
+        // B: coins for steady effort in the 60–80% heart-rate zone, then the cool-down quest
+        if (ok && data.zone_bonus) text += ` +${data.zone_bonus} bonus coins for your heart-rate zone.`;
+        if (ok) startCooldown();
       } catch (err) {
         // A: no connection: keep it and send it when the phone is back online
         queueForLater("/api/journeys", body);
@@ -805,6 +882,10 @@
       journey.state = "idle";
       journeyBox.hidden = true;
       jSaved.hidden = true;
+      jCool.hidden = true;  // B
+      jZone.hidden = true;
+      jZoneWarn.hidden = true;
+      stopCooldown();
       document.body.classList.remove("is-journey");
       updateStartButton();
     }
