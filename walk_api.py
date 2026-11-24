@@ -10,8 +10,9 @@ from flask import Blueprint, jsonify, request
 
 from auth_api import current_user
 from energy import walk_energy
-from models import Profile, db
-from walk_input import DEFAULT_WEIGHT_KG, parse_distance_m, parse_duration_s, parse_weight_kg
+from models import BodyHeight, Profile, db
+from walk_input import (DEFAULT_WEIGHT_KG, parse_distance_m, parse_duration_s, parse_height_cm, parse_weight_kg,
+                        step_length_from_height)
 
 walk_api = Blueprint("walk_api", __name__)
 
@@ -22,6 +23,14 @@ def _saved_weight(user):
         return None
     profile = db.session.get(Profile, user.id)
     return profile.weight_kg if profile else None
+
+
+def saved_height(user):
+    """The height (cm) this player saved, or None."""
+    if user is None:
+        return None
+    row = db.session.get(BodyHeight, user.id)
+    return row.height_cm if row else None
 
 
 def band_readings(user_id, duration_s, ended_at=None):
@@ -46,8 +55,10 @@ def age_of(user_id):
 def energy_for(user, distance_m, weight_kg, duration_s=None, ended_at=None):
     """Steps and calories with the best formula we have data for (energy.py)."""
     user_id = user.id if user else None
+    height = saved_height(user)
+    step_length = step_length_from_height(height) if height else None  # B: your own step length
     return walk_energy(distance_m, weight_kg, age_of(user_id), duration_s,
-                       band_readings(user_id, duration_s, ended_at))
+                       band_readings(user_id, duration_s, ended_at), step_length)
 
 
 @walk_api.route("/api/walk-stats")
@@ -84,9 +95,39 @@ def walk_stats():
         calories=energy["calories"],
         source=energy["source"],
         source_text=energy["source_text"],
+        height_cm=saved_height(user),  # B: None means the average step (0.75 m) was used
         weight_kg=weight_kg,
         weight_source=source,
     )
+
+
+@walk_api.route("/api/me/height", methods=["GET"])
+def get_height():
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    height = saved_height(user)
+    return jsonify(height_cm=height, step_length_m=step_length_from_height(height) if height else None)
+
+
+@walk_api.route("/api/me/height", methods=["POST"])
+def save_height():
+    """B: save the logged-in player's height. Send JSON or form field: height_cm."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    data = request.get_json(silent=True)
+    if data is None:
+        data = request.form.to_dict()
+    try:
+        height_cm = parse_height_cm(data.get("height_cm") if isinstance(data, dict) else None)
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    row = db.session.get(BodyHeight, user.id) or BodyHeight(user_id=user.id, height_cm=height_cm)
+    row.height_cm = height_cm
+    db.session.add(row)
+    db.session.commit()
+    return jsonify(height_cm=height_cm, step_length_m=step_length_from_height(height_cm))
 
 
 @walk_api.route("/api/me/weight", methods=["GET"])

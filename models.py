@@ -531,3 +531,15 @@ class HexVisit(db.Model):
     r = db.Column(db.Integer, nullable=False)
     day = db.Column(db.Date, nullable=False)                   # Taiwan date
     week_start = db.Column(db.Date, nullable=False, index=True)  # its Monday
+
+
+class BodyHeight(db.Model):
+    """A player's height, for their own step length (owner: B). Rules: walk_input.py.
+
+    A new table, not a new column on profiles, so nobody has to delete their database.
+    """
+
+    __tablename__ = "body_heights"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    height_cm = db.Column(db.Float, nullable=False)
