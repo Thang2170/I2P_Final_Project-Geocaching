@@ -125,4 +125,8 @@ def claim_treasure(treasure_id):
         db.session.rollback()
         return jsonify(error=PROBLEMS[ALREADY_FOUND][1]), 409
 
-    return jsonify(treasure=treasure.name, coins_earned=earned, balance=get_balance(user.id))
+    # B: riddle chains (riddles.py): this find may finish a chain, which pays a bonus
+    from riddle_api import pay_finished_chains  # here: riddle_api imports this file
+    chains = pay_finished_chains(user.id, treasure_id)
+    return jsonify(treasure=treasure.name, coins_earned=earned, balance=get_balance(user.id),
+                   chains_completed=chains)
