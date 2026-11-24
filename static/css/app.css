@@ -1995,3 +1995,23 @@ button.post__likes[hidden] { display: none; }
 .journey__mode.is-slow { color: var(--px-gold-dark); }
 .journey__mode[data-mode="calm"] { color: #2f8f5b; }
 @media (max-width: 720px) { .journey__mode { grid-column: 1; } }
+
+
+/* ---------- B: safety stop (safety.py) ---------- */
+.safety[hidden] { display: none; }
+.safety {
+  position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 16px;
+  background: rgba(20, 35, 31, .72);
+}
+.safety__box {
+  width: min(460px, 100%); max-height: 100%; overflow: auto; padding: 16px 18px;
+  background: var(--px-paper); border: 6px solid var(--px-bad); box-shadow: var(--px-drop);
+}
+.safety__eyebrow { margin: 0; color: var(--px-bad); font-family: var(--font-pixel); font-size: 11px; }
+.safety__title { margin: 8px 0 6px; color: var(--px-bad); font-size: 26px; line-height: 1.15; }
+.safety__text { margin: 0 0 8px; font-size: 18px; }
+.safety__advice { margin: 0 0 12px; padding-left: 20px; font-size: 18px; line-height: 1.25; }
+.safety__advice li + li { margin-top: 4px; }
+.safety__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.safety__buttons .btn { margin-top: 0; text-align: center; text-decoration: none; }
+.safety__call { background: var(--px-bad); color: var(--px-paper); }

@@ -92,7 +92,8 @@
         <span id="jZoneText"></span>
       </p>
       <p id="jZoneWarn" class="journey__warn" role="alert" hidden></p>
-      <p id="jModeLine" class="journey__mode" hidden></p>{# B: try-hard pace or calm-walk reminder #}
+      <p id="jModeLine" class="journey__mode" hidden></p>
+      <p id="jSafety" class="journey__warn" role="status" hidden></p>{# B: safety: keep an eye on it #}{# B: try-hard pace or calm-walk reminder #}
       <p id="jMsg" class="journey__msg"></p>
       <p id="jNote" class="journey__note" hidden></p>
       <p id="jSaved" class="journey__saved" hidden></p>
@@ -107,6 +108,21 @@
         <button type="button" id="jFinish" class="btn">Finish</button>
       </div>
     </section>
+
+    <!-- B: safety stop: the band's readings look unsafe, so Python stopped the hunt (safety.py) -->
+    <div id="safetyAlert" class="safety" role="alertdialog" aria-modal="true"
+         aria-labelledby="safetyTitle" aria-describedby="safetyText" hidden>
+      <div class="safety__box">
+        <p class="safety__eyebrow">⚠ Safety stop</p>
+        <h2 id="safetyTitle" class="safety__title"></h2>
+        <p id="safetyText" class="safety__text"></p>
+        <ul id="safetyAdvice" class="safety__advice"></ul>
+        <div class="safety__buttons">
+          <a class="btn safety__call" href="tel:119">📞 Call 119</a>
+          <button type="button" id="safetyOk" class="btn btn--ghost">I'm OK, close</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Info board: slides in from the right when you tap a treasure -->
     <aside id="board" class="board" aria-hidden="true">
@@ -731,6 +747,48 @@
 
     // ------------------------------------------------------------ B: walking modes (modes.py)
 
+    // ------------------------------------------------------------ B: safety alerts (safety.py)
+
+    const SAFETY_EVERY_MS = 10000;
+    const safetyBox = document.getElementById("safetyAlert");
+    const jSafety = document.getElementById("jSafety");
+    async function checkSafety() {
+      journey.safetyAt = Date.now();
+      try {
+        const res = await fetch("/api/safety/now");
+        if (!res.ok) return;
+        const s = await res.json();
+        jSafety.hidden = s.level !== "caution";
+        jSafety.textContent = s.level === "caution" ? `${s.title}: ${s.text}` : "";
+        if (s.level === "stop" && journeyActive()) safetyStop(s);
+      } catch (err) {
+        console.error("Safety check failed:", err);  // no connection: the band keeps its readings
+      }
+    }
+
+    function safetyStop(s) {
+      finishJourney(false);   // stop the clock; the hunt is not saved
+      endServerJourney();     // nothing to carry on after a reload
+      jSaved.textContent = "Hunt stopped for your safety.";
+      jSaved.classList.add("is-bad");
+      jSaved.hidden = false;
+      document.getElementById("safetyTitle").textContent = s.title;
+      document.getElementById("safetyText").textContent = s.text;
+      document.getElementById("safetyAdvice").replaceChildren(...s.advice.map(line => {
+        const li = document.createElement("li");
+        li.textContent = line;
+        return li;
+      }));
+      safetyBox.hidden = false;
+      document.getElementById("safetyOk").focus();
+      if (navigator.vibrate) navigator.vibrate([400, 150, 400]);
+    }
+
+    document.getElementById("safetyOk").addEventListener("click", () => { safetyBox.hidden = true; });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !safetyBox.hidden) safetyBox.hidden = true;
+    });
+
     let walkMode = "normal";
     const calmById = new Map();  // treasure id -> {kind, where, prompt}, from /api/calm-spots
     const modePicker = document.getElementById("modePicker");
@@ -879,6 +937,8 @@
       if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
       journey.tickAt = now;
       if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
+      // B: safety check every 10 s while you walk (Python reads the band and decides)
+      if (journey.state === "running" && now - (journey.safetyAt || 0) >= SAFETY_EVERY_MS) checkSafety();
       // B: calories also grow with time (speed / heart-rate formulas), so refresh every 15 s too
       if (journey.state === "running" && now - journey.statsAt >= STATS_EVERY_MS
           && (journey.meters !== journey.statsMeters || now - journey.statsAt >= 15000)) loadJourneyStats();
@@ -1002,6 +1062,7 @@
       jZone.hidden = true;
       jZoneWarn.hidden = true;
       jModeLine.hidden = true;  // B
+      jSafety.hidden = true;
       stopCooldown();
       document.body.classList.remove("is-journey");
       updateStartButton();
