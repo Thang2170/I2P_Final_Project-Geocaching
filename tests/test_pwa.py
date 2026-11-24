@@ -15,6 +15,21 @@ from tests import PROJECT_ROOT
 STATIC = Path(PROJECT_ROOT) / "static"
 
 
+def picture(png):
+    """(size header, pixel rows) of a PNG file: everything that decides what it looks like."""
+    assert png.startswith(b"\x89PNG\r\n\x1a\n"), "not a PNG file"
+    i, header, packed = 8, None, b""
+    while i < len(png):
+        length = struct.unpack(">I", png[i:i + 4])[0]
+        kind, body = png[i + 4:i + 8], png[i + 8:i + 8 + length]
+        if kind == b"IHDR":
+            header = body
+        elif kind == b"IDAT":
+            packed += body
+        i += 12 + length
+    return header, zlib.decompress(packed)
+
+
 class TestIcon(unittest.TestCase):
     def test_png_is_valid(self):
         data = png_bytes([[(255, 0, 0), (0, 255, 0)], [(0, 0, 255), (0, 0, 0)]])
@@ -26,6 +41,13 @@ class TestIcon(unittest.TestCase):
         raw = zlib.decompress(data[idat + 4:idat + 4 + length])
         self.assertEqual(raw, b"\x00\xff\x00\x00\x00\xff\x00\x00\x00\x00\xff\x00\x00\x00")
 
+    def test_extra_labels_are_ignored(self):
+        data = icon_files()["icon-192.png"]
+        label = b"caBX"
+        extra = struct.pack(">I", 3) + label + b"abc" + struct.pack(">I", zlib.crc32(label + b"abc"))
+        labelled = data[:33] + extra + data[33:]  # after the 8-byte signature and the 25-byte IHDR chunk
+        self.assertEqual(picture(labelled), picture(data))
+
     def test_coin_is_centred_on_the_background(self):
         grid = icon_pixels(COIN_FULL, 192)
         self.assertEqual(len(grid), 192)
@@ -33,10 +55,14 @@ class TestIcon(unittest.TestCase):
         self.assertNotEqual(grid[96][96], rgb(BACKGROUND))     # the middle: the coin
 
     def test_saved_icons_match_the_pixel_art(self):
-        """Fails if pixel_art.py's coin changed without running `python app_icon.py`."""
+        """Fails if pixel_art.py's coin changed without running `python app_icon.py`.
+
+        Only the picture is compared (size and pixels). Tools may add labels to a PNG, such as
+        a Content Credentials (C2PA) tag; those don't change the picture, so they're ignored.
+        """
         for name, data in icon_files().items():
             with self.subTest(name):
-                self.assertEqual((STATIC / "icons" / name).read_bytes(), data)
+                self.assertEqual(picture((STATIC / "icons" / name).read_bytes()), picture(data))
 
 
 class TestManifestAndPages(unittest.TestCase):
