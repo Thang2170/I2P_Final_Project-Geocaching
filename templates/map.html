@@ -40,6 +40,13 @@
       <p id="trailMsg" class="sheet__route trail-msg" hidden></p>
       <button type="button" id="trailEnd" class="btn btn--ghost" style="margin-top:8px" hidden>End trail</button>
       <div id="coinInfo" class="sheet__route coin-line" hidden></div>
+      <!-- B: walking mode: normal, try-hard (fast, big bonus) or calm walk (modes.py). Logged in only. -->
+      <div id="modePicker" class="mode-picker" role="group" aria-label="Walking mode" hidden>
+        <button type="button" class="mode-pick" data-mode="normal">Normal</button>
+        <button type="button" class="mode-pick" data-mode="tryhard">🔥 Try-hard</button>
+        <button type="button" class="mode-pick" data-mode="calm">🌿 Calm walk</button>
+      </div>
+      <p id="modeText" class="sheet__route mode-text" hidden></p>
       <!-- A: hunt race mode (/?hunt=<id>&treasure=<id>, from the Hunts page) -->
       <div id="huntInfo" class="sheet__route" hidden></div>
       <div id="teamInfo" class="sheet__route" hidden></div>
@@ -85,6 +92,7 @@
         <span id="jZoneText"></span>
       </p>
       <p id="jZoneWarn" class="journey__warn" role="alert" hidden></p>
+      <p id="jModeLine" class="journey__mode" hidden></p>{# B: try-hard pace or calm-walk reminder #}
       <p id="jMsg" class="journey__msg"></p>
       <p id="jNote" class="journey__note" hidden></p>
       <p id="jSaved" class="journey__saved" hidden></p>
@@ -109,6 +117,8 @@
       <p id="boardStars" class="board__stars"></p>
       <!-- B: what a find pays right now: more if nobody found it lately (treasure_value.py) -->
       <p id="boardWorth" class="board__worth"></p>
+      <!-- B: calm walk: a mindful moment at this spot instead of a riddle (modes.py) -->
+      <p id="boardCalm" class="board__calm" hidden></p>
       <!-- A: verified by an admin, or not yet (you can still go there) -->
       <p id="boardVerified" class="board__verified"></p>
       <!-- A: a QR collectible is hidden here (scan it for a 3D trophy) -->
@@ -243,6 +253,7 @@
         const wantedTreasure = list.find((t) => t.id === wanted);
         if (wantedTreasure && markersById.has(wanted)) selectTreasure(wantedTreasure, markersById.get(wanted));
         resumeJourney();  // A: carry on a journey the server remembers (after a reload or lost signal)
+        applyMode();  // B: calm walks mark the calm spots
       } catch (err) {
         console.error("Treasure markers failed:", err);
       }
@@ -278,6 +289,7 @@
       showBoardPhoto(t.id);
       showBoardStars(t.id);
       showBoardWorth(t.id);
+      showBoardCalm(t.id);  // B
       const info = infoById.get(t.id) || {};
       const verifiedLine = document.getElementById("boardVerified");
       verifiedLine.textContent = info.verified
@@ -666,6 +678,7 @@
 
     function renderJourney() {
       jEls.time.textContent = fmtTime(journey.elapsedMs);
+      jEls.pace.parentElement.hidden = walkMode === "calm";  // B: no clock pressure on a calm walk
       jEls.pace.textContent = fmtPace(journey.elapsedMs, journey.meters);
       jEls.dist.textContent = (journey.meters / 1000).toFixed(2);
       jEls.steps.textContent = journey.steps.toLocaleString();
@@ -713,7 +726,92 @@
         console.error("Journey stats failed:", err);
       }
       if (journey.state === "running") loadZone(Math.max(1, Math.round(journey.elapsedMs / 1000)));
+      if (journey.state === "running") showModeLine(Math.round(journey.meters), Math.max(1, Math.round(journey.elapsedMs / 1000)));
     }
+
+    // ------------------------------------------------------------ B: walking modes (modes.py)
+
+    let walkMode = "normal";
+    const calmById = new Map();  // treasure id -> {kind, where, prompt}, from /api/calm-spots
+    const modePicker = document.getElementById("modePicker");
+    const modeText = document.getElementById("modeText");
+
+    function showMode(data) {
+      walkMode = data.mode;
+      modePicker.hidden = false;
+      for (const b of modePicker.querySelectorAll(".mode-pick")) {
+        b.classList.toggle("is-on", b.dataset.mode === walkMode);
+        b.setAttribute("aria-pressed", b.dataset.mode === walkMode ? "true" : "false");
+      }
+      modeText.textContent = walkMode === "normal" ? "" : data.text;
+      modeText.hidden = walkMode === "normal";
+      applyMode();
+    }
+
+    async function loadMode() {
+      try {
+        const [mode, calm] = await Promise.all([fetch("/api/mode"), fetch("/api/calm-spots")]);
+        if (calm.ok) for (const s of (await calm.json()).spots) calmById.set(s.id, s);
+        if (mode.ok) showMode(await mode.json());  // logged out: no picker
+      } catch (err) {
+        console.error("Mode failed:", err);
+      }
+    }
+
+    modePicker.addEventListener("click", async event => {
+      const pick = event.target.closest(".mode-pick");
+      if (!pick || pick.dataset.mode === walkMode) return;
+      if (journeyActive()) { journeyNote("Finish this journey before you change mode."); return; }
+      try {
+        const res = await fetch("/api/mode", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: pick.dataset.mode })
+        });
+        if (res.ok) showMode(await res.json());
+      } catch (err) {
+        console.error("Mode change failed:", err);
+      }
+    });
+
+    // Calm walk: calm spots glow green, the others fade a little.
+    function applyMode() {
+      for (const [id, marker] of markersById) {
+        const pin = marker.getElement();
+        if (!pin) continue;
+        pin.classList.toggle("pin--calm", walkMode === "calm" && calmById.has(id));
+        pin.classList.toggle("pin--dim", walkMode === "calm" && !calmById.has(id));
+      }
+      if (selectedTreasure) showBoardCalm(selectedTreasure.id);
+    }
+
+    function showBoardCalm(treasureId) {
+      const line = document.getElementById("boardCalm");
+      const spot = calmById.get(treasureId);
+      line.hidden = walkMode !== "calm";
+      line.textContent = !spot ? "Not a calm spot. Green pins are parks, water and quiet places."
+        : `🌿 Mindful moment, ${spot.where}: ${spot.prompt}`;
+    }
+
+    // During a journey: try-hard shows your pace against the target (Python decides), calm a reminder.
+    const jModeLine = document.getElementById("jModeLine");
+    async function showModeLine(meters, seconds) {
+      jModeLine.hidden = walkMode === "normal";
+      jModeLine.dataset.mode = walkMode;
+      if (walkMode === "calm") {
+        jModeLine.textContent = "🌿 No rush. Breathe slowly and notice what is around you.";
+        return;
+      }
+      if (walkMode !== "tryhard") return;
+      try {
+        const res = await fetch(`/api/mode/pace?distance_m=${meters}&duration_s=${seconds}`);
+        if (!res.ok) return;
+        const p = await res.json();
+        jModeLine.textContent = p.text;
+        jModeLine.classList.toggle("is-slow", p.on_pace === false);
+      } catch (err) {
+        console.error("Pace failed:", err);
+      }
+    }
+    loadMode();
 
     // B: your heart-rate zone now (Python works it out from the band: zone_coach.py)
     const jZone = document.getElementById("jZone"), jZoneWarn = document.getElementById("jZoneWarn");
@@ -818,6 +916,7 @@
       keepScreenOn(true);
       updateStartButton();
       renderJourney();
+      showModeLine(Math.round(journey.meters), 1);  // B: try-hard target or calm reminder from the start
       // Zoom so the whole route shows above the panel (the panel is now on screen to measure).
       if (routeLine) map.fitBounds(routeLine.getBounds(), routePadding());
     }
@@ -875,6 +974,7 @@
         text = ok ? "Hunt saved." : (data.error || text);
         // B: coins for steady effort in the 60–80% heart-rate zone, then the cool-down quest
         if (ok && data.zone_bonus) text += ` +${data.zone_bonus} bonus coins for your heart-rate zone.`;
+        if (ok && data.mode_bonus) text += ` ${data.mode_bonus.text}`;  // B: try-hard or calm walk
         if (ok) startCooldown();
       } catch (err) {
         // A: no connection: keep it and send it when the phone is back online
@@ -901,6 +1001,7 @@
       jCool.hidden = true;  // B
       jZone.hidden = true;
       jZoneWarn.hidden = true;
+      jModeLine.hidden = true;  // B
       stopCooldown();
       document.body.classList.remove("is-journey");
       updateStartButton();

@@ -1971,3 +1971,27 @@ button.post__likes[hidden] { display: none; }
 .weather-line[data-kind="storm"] strong { color: var(--px-bad); }
 .weather-line[data-kind="heat"] { border-left-color: var(--px-gold); }
 .weather-line[data-kind="cold"], .weather-line[data-kind="wind"] { border-left-color: var(--px-muted); }
+
+
+/* ---------- B: walking modes: try-hard and calm walks (modes.py) ---------- */
+.mode-picker[hidden], .mode-text[hidden], .board__calm[hidden] { display: none; }
+.mode-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.mode-pick {
+  padding: 6px 4px; border: 4px solid var(--px-line); background: var(--px-paper); color: var(--px-ink);
+  font-family: var(--font-body); font-size: 17px; cursor: pointer;
+}
+.mode-pick:hover, .mode-pick:focus-visible { border-color: var(--px-gold); outline: none; }
+.mode-pick.is-on { border-color: var(--px-green); background: var(--px-green); color: var(--px-paper); }
+.mode-pick.is-on[data-mode="tryhard"] { border-color: var(--px-bad); background: var(--px-bad); }
+.mode-text { font-size: 16px; }
+
+.pin.pin--calm { filter: drop-shadow(0 0 5px #57d38c) drop-shadow(0 0 2px #57d38c); }
+.pin.pin--dim { opacity: .45; }
+
+.board__calm { margin: 6px 0; padding: 6px 8px; border-left: 6px solid #57d38c; background: rgba(87, 211, 140, .12); }
+
+.journey__mode { grid-column: 1 / 3; margin: 4px 0 0; font-size: 17px; text-align: center; color: var(--px-green); }
+.journey__mode[hidden] { display: none; }
+.journey__mode.is-slow { color: var(--px-gold-dark); }
+.journey__mode[data-mode="calm"] { color: #2f8f5b; }
+@media (max-width: 720px) { .journey__mode { grid-column: 1; } }

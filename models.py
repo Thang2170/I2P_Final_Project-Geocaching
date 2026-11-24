@@ -592,3 +592,24 @@ class GoalMilestone(db.Model):
     period_start = db.Column(db.Date, nullable=False)  # the day, or the Monday of the week
     coins = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class WalkMode(db.Model):
+    """The walking mode a player picked: normal, tryhard or calm (owner: B). Rules: modes.py."""
+
+    __tablename__ = "walk_modes"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    mode = db.Column(db.String(10), nullable=False)
+
+
+class ModeBonus(db.Model):
+    """A try-hard or calm bonus, paid once per saved hunt (owner: B). Rules: modes.py."""
+
+    __tablename__ = "mode_bonuses"
+
+    journey_id = db.Column(db.Integer, db.ForeignKey("journeys.id"), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    mode = db.Column(db.String(10), nullable=False)
+    coins = db.Column(db.Integer, nullable=False)   # may be 0 (the pace was too slow)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)

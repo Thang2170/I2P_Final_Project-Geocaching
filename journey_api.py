@@ -15,6 +15,7 @@ from location import FOUND_RADIUS_M, haversine_m
 from models import Journey, Treasure, User, db
 from walk_api import _saved_weight, energy_for
 from walk_input import DEFAULT_WEIGHT_KG
+from mode_api import pay_mode_bonus
 from zone_api import pay_zone_bonus
 
 journey_api = Blueprint("journey_api", __name__)
@@ -104,7 +105,9 @@ def save_journey():
         db.session.rollback()
         return jsonify(error="You already saved this hunt."), 409
     # B: bonus coins for time in the 60-80% heart-rate zone (zone_coach.py)
-    return jsonify(_journey_dict(journey) | {"zone_bonus": pay_zone_bonus(user, journey)}), 201
+    zone_bonus = pay_zone_bonus(user, journey)
+    mode_bonus = pay_mode_bonus(user, journey, treasure)  # B: try-hard or calm walk (modes.py)
+    return jsonify(_journey_dict(journey) | {"zone_bonus": zone_bonus, "mode_bonus": mode_bonus}), 201
 
 
 @journey_api.route("/api/journeys/mine")
