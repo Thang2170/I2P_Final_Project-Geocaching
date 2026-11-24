@@ -502,3 +502,32 @@ class ChallengeClaim(db.Model):
     week_start = db.Column(db.Date, nullable=False)
     challenge_id = db.Column(db.String(20), nullable=False)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class TeamChoice(db.Model):
+    """Which team a player walks for in "claim the campus" (owner: B). Rules: territory.py."""
+
+    __tablename__ = "team_choices"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    team = db.Column(db.String(10), nullable=False)
+    chosen_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class HexVisit(db.Model):
+    """A player walked through a hexagon on a day, for a team (owner: B). Rules: territory.py.
+
+    One row per player, hexagon and day, so standing still all day still counts once.
+    The team is saved with the visit: switching team later doesn't move old visits.
+    """
+
+    __tablename__ = "hex_visits"
+    __table_args__ = (db.UniqueConstraint("user_id", "day", "q", "r", name="one_visit_per_day"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    team = db.Column(db.String(10), nullable=False)
+    q = db.Column(db.Integer, nullable=False)
+    r = db.Column(db.Integer, nullable=False)
+    day = db.Column(db.Date, nullable=False)                   # Taiwan date
+    week_start = db.Column(db.Date, nullable=False, index=True)  # its Monday
