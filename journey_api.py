@@ -10,11 +10,10 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
-from calculator import calories_from_distance, steps_from_distance
 from journey_log import (format_duration, format_pace, parse_journey, rank_players, speed_problem)
 from location import FOUND_RADIUS_M, haversine_m
 from models import Journey, Treasure, User, db
-from walk_api import _saved_weight
+from walk_api import _saved_weight, energy_for
 from walk_input import DEFAULT_WEIGHT_KG
 
 journey_api = Blueprint("journey_api", __name__)
@@ -91,11 +90,12 @@ def save_journey():
         return jsonify(error=problem), 400
 
     weight_kg = _saved_weight(user) or DEFAULT_WEIGHT_KG
+    # B: the best formula we have data for: the band's heart rate, else your speed (energy.py)
+    energy = energy_for(user, hunt["distance_m"], weight_kg, hunt["duration_s"])
     journey = Journey(
         user_id=user.id, treasure_id=treasure.id,
         distance_m=hunt["distance_m"], duration_s=hunt["duration_s"],
-        steps=steps_from_distance(hunt["distance_m"]),
-        calories=round(calories_from_distance(hunt["distance_m"], weight_kg), 1))
+        steps=energy["steps"], calories=energy["calories"])
     db.session.add(journey)
     try:
         db.session.commit()

@@ -71,7 +71,8 @@
       </div>
       <div class="journey__sub">
         <div class="journey__stat"><strong id="jSteps">0</strong><span>Steps</span></div>
-        <div class="journey__stat"><strong id="jCal">0</strong><span>Calories (kcal)</span></div>
+        <div class="journey__stat"><strong id="jCal">0</strong><span>Calories (kcal)</span>
+          <small id="jCalFrom" class="journey__from"></small>{# B: which formula Python used (energy.py) #}</div>
         <div class="journey__stat"><strong id="jTo">–</strong><span>To treasure</span></div>
       </div>
       <p id="jMsg" class="journey__msg"></p>
@@ -671,11 +672,14 @@
       journey.statsAt = Date.now();
       journey.statsMeters = journey.meters;
       try {
-        const res = await fetch(`/api/walk-stats?distance_m=${Math.round(journey.meters)}`);
+        // B: with the time too, Python uses your speed, or your band's heart rate if it's on (energy.py)
+        const seconds = Math.max(1, Math.round(journey.elapsedMs / 1000));
+        const res = await fetch(`/api/walk-stats?distance_m=${Math.round(journey.meters)}&duration_s=${seconds}`);
         const data = await res.json();
         if (requestId !== journeyStatsId || !res.ok) return;
         journey.steps = data.steps;
         journey.calories = data.calories;
+        document.getElementById("jCalFrom").textContent = data.source_text || "";
         renderJourney();
       } catch (err) {
         console.error("Journey stats failed:", err);
@@ -687,8 +691,9 @@
       if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
       journey.tickAt = now;
       if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
-      if (journey.state === "running" && journey.meters !== journey.statsMeters
-          && now - journey.statsAt >= STATS_EVERY_MS) loadJourneyStats();
+      // B: calories also grow with time (speed / heart-rate formulas), so refresh every 15 s too
+      if (journey.state === "running" && now - journey.statsAt >= STATS_EVERY_MS
+          && (journey.meters !== journey.statsMeters || now - journey.statsAt >= 15000)) loadJourneyStats();
       renderJourney();
     }
 

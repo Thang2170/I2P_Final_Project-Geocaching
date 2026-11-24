@@ -81,18 +81,20 @@ class TestJourneyApi(unittest.TestCase):
         tid = self.treasure()
         data = self.save(self.player("ann"), tid).get_json()
         self.assertEqual(data["steps"], 1000)        # 750 m / 0.75 m per step
-        self.assertEqual(data["calories"], 24.4)     # 0.5 * 65 kg (default) * 0.75 km
+        # B: a saved hunt knows its time, so the speed formula is used (energy.py, ACSM walking):
+        # 750 m in 10 min = 75 m/min -> VO2 = 3.5 + 0.1 * 75 = 11 -> 11 * 65 kg / 1000 * 5 * 10 min
+        self.assertEqual(data["calories"], 35.8)
 
     def test_calories_use_the_saved_weight(self):
         tid = self.treasure()
         ann = self.player("ann")
         ann.post("/api/me/weight", json={"weight_kg": 80})
-        self.assertEqual(self.save(ann, tid).get_json()["calories"], 30.0)
+        self.assertEqual(self.save(ann, tid).get_json()["calories"], 44.0)  # 11 * 80 / 1000 * 5 * 10
 
     def test_numbers_sent_by_the_browser_for_steps_and_calories_are_ignored(self):
         tid = self.treasure()
         data = self.save(self.player("ann"), tid, steps=999999, calories=999999).get_json()
-        self.assertEqual((data["steps"], data["calories"]), (1000, 24.4))
+        self.assertEqual((data["steps"], data["calories"]), (1000, 35.8))
 
     def test_bad_numbers_are_rejected(self):
         tid = self.treasure()

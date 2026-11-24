@@ -113,7 +113,7 @@ class TestFeedApi(unittest.TestCase):
         hunt = posts[0]["hunt"]
         self.assertEqual((posts[0]["author"], hunt["treasure"], hunt["distance_km"], hunt["time"]),
                          ("ann", "Pond", 0.75, "10:00"))
-        self.assertEqual((hunt["steps"], hunt["calories"]), (1000, 24.4))
+        self.assertEqual((hunt["steps"], hunt["calories"]), (1000, 35.8))  # B: speed formula (energy.py)
 
     def test_a_hunt_gets_only_one_post(self):
         ann = self.player("ann")

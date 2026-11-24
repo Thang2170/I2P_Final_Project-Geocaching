@@ -16,6 +16,11 @@ def parse_distance_m(value):
     return parse_number(value, "distance_m", 0, MAX_DISTANCE_M)
 
 
+def parse_duration_s(value):
+    """How long a walk took, in seconds (up to a day), or raise ValueError."""
+    return parse_number(value, "duration_s", 1, 86_400)
+
+
 def parse_weight_kg(value):
     """Return a body weight in kilograms as a float, or raise ValueError."""
     return parse_number(value, "weight_kg", MIN_WEIGHT_KG, MAX_WEIGHT_KG)
