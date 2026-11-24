@@ -1960,3 +1960,14 @@ button.post__likes[hidden] { display: none; }
 @media (max-width: 720px) {
   .journey__zone, .journey__warn, .journey__cool { grid-column: 1; }
 }
+
+
+/* ---------- B: weather-aware routes (weather.py) ---------- */
+.weather-line[hidden] { display: none; }
+.weather-line { padding: 4px 8px; border-left: 6px solid var(--px-green); }
+.weather-line strong { font-weight: 400; color: var(--px-ink); }
+.weather-line span { color: var(--px-muted); }
+.weather-line[data-kind="rain"], .weather-line[data-kind="storm"] { border-left-color: #3b7dd8; }
+.weather-line[data-kind="storm"] strong { color: var(--px-bad); }
+.weather-line[data-kind="heat"] { border-left-color: var(--px-gold); }
+.weather-line[data-kind="cold"], .weather-line[data-kind="wind"] { border-left-color: var(--px-muted); }

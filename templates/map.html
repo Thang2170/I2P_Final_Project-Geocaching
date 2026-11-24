@@ -18,6 +18,10 @@
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
+      <!-- B: weather-aware routes: shortest in the rain, greener in the heat (weather.py) -->
+      <div id="weatherInfo" class="sheet__route weather-line" data-kind="" hidden>
+        <strong id="weatherHead"></strong> <span id="weatherTip"></span>
+      </div>
       <!-- A: Feature 6, a different walking route to the same treasure -->
       <button type="button" id="newRouteBtn" class="btn btn--ghost" style="margin-top:8px" hidden>New route</button>
       <!-- B: Treasure Trail, a loop through unfound treasures for a step or time goal (trail_planner.py) -->
@@ -407,6 +411,17 @@
       boardMin.textContent = `${min} min`;
       boardNote.textContent = data.warning ? "Straight-line estimate: no walking-route service right now." : "";
       showWalkStats(data.distance_m);
+      showWeather(data.weather);
+    }
+
+    // B: the weather and how Python picked the route (none = weather unknown: the normal route)
+    const weatherInfo = document.getElementById("weatherInfo");
+    function showWeather(w) {
+      weatherInfo.hidden = !w;
+      if (!w) return;
+      weatherInfo.dataset.kind = w.kind;
+      document.getElementById("weatherHead").textContent = w.headline;
+      document.getElementById("weatherTip").textContent = w.tip;
     }
 
     // Steps and calories: Python does the maths from the route length (/api/walk-stats).
@@ -572,6 +587,7 @@
           const names = data.stops.map(stop => `${stop.order}. ${stop.name}`).join(" → ");
           trailSay(`${data.message} ${km} km, about ${min} min, ${data.steps.toLocaleString()} steps` +
                    `${data.warning ? " (straight lines)" : ""}. ${names} → back here.`);
+          showWeather(data.weather);  // B
           trailBox.hidden = true;
           trailBtn.setAttribute("aria-expanded", "false");
           trailBtn.hidden = true;
