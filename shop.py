@@ -30,9 +30,14 @@ class Item(NamedTuple):
 ITEMS = (
     Item("bubble-tea", "Free bubble tea", "Demo voucher for one bubble tea near campus.", 50, "voucher", False),
     Item("cafe-10", "10% off at a campus cafe", "Demo voucher. Show the code at the counter.", 30, "voucher", False),
-    Item("explorer-badge", "Explorer badge", "A badge for your profile.", 20, "item", True),
-    Item("gold-pin", "Gold pin", "A shiny pin for your treasure map.", 40, "item", True),
+    Item("explorer-badge", "Explorer badge",
+         "An Explorer label next to your name on your profile and in the Community feed.", 20, "item", True),
+    Item("gold-pin", "Gold pin", "Your own marker on the map turns gold.", 40, "item", True),
 )
+
+# A: what the "item" kinds actually do once you own them
+BADGE = "explorer-badge"
+GOLD_PIN = "gold-pin"
 
 
 def find_item(item_id):
@@ -62,6 +67,12 @@ def purchase_problem(item, balance, owns_one):
     if balance < item.price:
         return NOT_ENOUGH_COINS
     return None
+
+
+def perks(owned_item_ids):
+    """A: what a player's items change in the app. owned_item_ids: the ids they bought."""
+    owned = set(owned_item_ids)
+    return {"badge": BADGE in owned, "gold_pin": GOLD_PIN in owned}
 
 
 def make_voucher_code():

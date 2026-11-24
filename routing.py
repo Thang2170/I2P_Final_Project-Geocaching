@@ -19,11 +19,19 @@ ORS_TIMEOUT_S = 10
 WALKING_SPEED_MPS = 1.4  # about 5 km/h
 MAX_POINTS = 10
 
-# Random routes (Feature 6): a "side-step" point off the straight line makes a new path.
+# Random routes (Feature 6). First choice: OpenRouteService's own alternative routes,
+# which are real, sensible paths. Only if it has just one, a "side-step" point is used.
+ALTERNATIVES = 3            # ask for up to 3 different routes
+ALT_WEIGHT_FACTOR = 1.6     # an alternative may be at most 1.6x as long as the best route
+ALT_SHARE_FACTOR = 0.6      # ...and share at most 60% of its path with the others
+SAME_ROUTE_M = 20           # two routes whose middles are this close count as the same route
+
 METERS_PER_DEGREE_LAT = 111_320  # one degree of latitude is about 111 km everywhere
 MIN_TRIP_M = 10        # closer than this, you are already at the treasure
-MIN_DETOUR_M = 40      # less than this and the walking path usually doesn't change
-MAX_DETOUR_M = 300     # more than this is a silly long walk
+MIN_DETOUR_M = 30      # less than this and the walking path usually doesn't change
+MAX_DETOUR_M = 200     # more than this the side-step can land on a far-away road
+MAX_DETOUR_RATIO = 1.8 # a side-step route longer than 1.8x the normal walk is refused
+DETOUR_TRIES = 3       # how many side-step points to try before taking the shortest
 VIA_REACHED_M = 20     # same as finding a treasure: within 20 m counts as "you got there"
 
 
@@ -98,14 +106,19 @@ def _error_message(response):
         return (response.text or "")[:200] or "no details"
 
 
-def get_walking_route(points, api_key=None):
-    """Real walking route from OpenRouteService. Raises RoutingError on any problem."""
+def _ask_service(points, api_key=None, extra=None):
+    """Send points to OpenRouteService and return EVERY route it sends back.
+
+    extra: more settings for the request body (used for alternative routes).
+    Raises RoutingError on any problem. The [lat, lon] <-> [lon, lat] swap is only here.
+    """
     pts = check_points(points)
     key = api_key or os.environ.get("ORS_API_KEY")
     if not key:
         raise RoutingError("No ORS_API_KEY set")
 
     body = {"coordinates": [[lon, lat] for lat, lon in pts]}  # ORS wants [lon, lat]
+    body.update(extra or {})
     headers = {
         "Authorization": key,
         "Content-Type": "application/json; charset=utf-8",
@@ -126,17 +139,39 @@ def get_walking_route(points, api_key=None):
         )
 
     try:
-        feature = response.json()["features"][0]
-        summary = feature["properties"]["summary"]
-        coords = feature["geometry"]["coordinates"]
-        return {
-            "distance_m": round(summary["distance"], 1),
-            "duration_s": round(summary["duration"]),
-            "path": [[c[1], c[0]] for c in coords],  # back to [lat, lon]
-            "source": "openrouteservice",
-        }
+        routes = []
+        for feature in response.json()["features"]:
+            summary = feature["properties"]["summary"]
+            coords = feature["geometry"]["coordinates"]
+            routes.append({
+                "distance_m": round(summary["distance"], 1),
+                "duration_s": round(summary["duration"]),
+                "path": [[c[1], c[0]] for c in coords],  # back to [lat, lon]
+                "source": "openrouteservice",
+            })
     except (KeyError, IndexError, TypeError, ValueError) as err:
         raise RoutingError("OpenRouteService sent an unexpected response") from err
+    if not routes:
+        raise RoutingError("OpenRouteService sent an unexpected response")
+    return routes
+
+
+def get_walking_route(points, api_key=None):
+    """Real walking route from OpenRouteService. Raises RoutingError on any problem."""
+    return _ask_service(points, api_key)[0]
+
+
+def get_alternative_routes(start, end, api_key=None):
+    """Up to ALTERNATIVES really different walking routes between two points.
+
+    OpenRouteService finds them itself: each one is a sensible path (no going out
+    and back), at most ALT_WEIGHT_FACTOR times longer than the best one, sharing at
+    most ALT_SHARE_FACTOR of its path with the others. Raises RoutingError.
+    """
+    extra = {"alternative_routes": {"target_count": ALTERNATIVES,
+                                    "weight_factor": ALT_WEIGHT_FACTOR,
+                                    "share_factor": ALT_SHARE_FACTOR}}
+    return _ask_service([start, end], api_key, extra)
 
 
 def get_route(points):
@@ -183,7 +218,9 @@ def random_via_point(start, end, rng=random):
     side_east = north_m / length_m
 
     along = rng.uniform(0.3, 0.7)  # somewhere in the middle part of the trip, not at the ends
-    sideways_m = rng.uniform(0.25, 0.5) * trip_m
+    # Small on purpose: a point far off the line can land on a far-away road,
+    # and the walk then goes out there and comes back the same way.
+    sideways_m = rng.uniform(0.15, 0.35) * trip_m
     sideways_m = min(max(sideways_m, MIN_DETOUR_M), MAX_DETOUR_M)
     sideways_m *= rng.choice([-1, 1])  # left or right of the line
 
@@ -195,16 +232,76 @@ def random_via_point(start, end, rng=random):
     )
 
 
-def get_random_route(start, end, rng=random):
-    """A different walking route to the same place: start -> random point -> end.
+def middle_point(path):
+    """The point halfway along a path (by walked distance), as [lat, lon].
 
-    Same fallback as get_route. The point is sent back as "via" so the map can
-    keep using it when it asks for a new route after you move.
+    It lies ON the route, so "start -> this point -> end" gives back the same route
+    when the map asks again after you move (and never a detour to nowhere).
     """
-    via = random_via_point(start, end, rng)
-    route = get_route([start, via, end])
-    route["via"] = list(via)
-    return route
+    if len(path) < 3:  # no point between start and end
+        return [round(path[-1][0], 6), round(path[-1][1], 6)]
+    # How far you have walked when you reach each point of the path
+    walked = [0.0]
+    for a, b in zip(path, path[1:]):
+        walked.append(walked[-1] + haversine_m(a[0], a[1], b[0], b[1]))
+    half = walked[-1] / 2
+    # The point in between (never the start or the treasure) closest to halfway
+    best = min(range(1, len(path) - 1), key=lambda i: abs(walked[i] - half))
+    return [round(path[best][0], 6), round(path[best][1], 6)]
+
+
+def _is_same_route(route, current_via):
+    """True if this route is the one the map is showing now (its middle is near the old via)."""
+    if current_via is None:
+        return False
+    mid = middle_point(route["path"])
+    return haversine_m(mid[0], mid[1], current_via[0], current_via[1]) <= SAME_ROUTE_M
+
+
+def _side_step_route(start, end, rng, normal_m):
+    """Fallback: try a few random side-step points, keep the first sensible one.
+
+    "Sensible" = at most MAX_DETOUR_RATIO times the normal walk. If none is,
+    the shortest one we tried is used, so you still get a different route.
+    """
+    tried = []
+    for _ in range(DETOUR_TRIES):
+        via = random_via_point(start, end, rng)
+        route = get_route([start, via, end])
+        route["via"] = list(via)
+        if route["distance_m"] <= MAX_DETOUR_RATIO * normal_m:
+            return route
+        tried.append(route)
+    return min(tried, key=lambda r: r["distance_m"])
+
+
+def get_random_route(start, end, rng=random, current_via=None):
+    """A different walking route to the same place.
+
+    1. Ask OpenRouteService for alternative routes. If it has 2 or more, pick one
+       at random that is not the route shown now (current_via = its middle point).
+    2. Otherwise (one route only, no key, no internet): a random side-step point,
+       kept small and checked so the walk can't double back (_side_step_route).
+    The answer is a normal route plus "via": a point the map sends back when it
+    asks for a new route after you move, so it keeps following the same path.
+    """
+    start, end = check_point(start), check_point(end)
+    if haversine_m(start[0], start[1], end[0], end[1]) < MIN_TRIP_M:
+        raise ValueError("You are already at the treasure")
+    try:
+        routes = get_alternative_routes(start, end)
+    except RoutingError:
+        routes = []
+
+    if len(routes) >= 2:
+        choices = [r for r in routes if not _is_same_route(r, current_via)] or routes
+        route = rng.choice(choices)
+        route["via"] = middle_point(route["path"])
+        return route
+
+    # How long the normal walk is, to judge a side-step: the service's route, else a straight line
+    normal_m = routes[0]["distance_m"] if routes else haversine_m(start[0], start[1], end[0], end[1])
+    return _side_step_route(start, end, rng, normal_m)
 
 
 def drop_reached_via(points, reached_m=VIA_REACHED_M):

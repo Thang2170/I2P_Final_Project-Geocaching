@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>QR code · StepQuest</title>
+  <style>
+    .qr { display: grid; place-items: center; margin: 20px auto; padding: 16px; width: min(80vw, 360px);
+          background: #fff; box-shadow: var(--px-edge); }
+    .qr svg { width: 100%; height: auto; }
+    .qr__code { margin: 8px 0 0; font-family: var(--font-pixel); font-size: 14px; letter-spacing: 2px; color: #000; }
+    @media print {
+      .topbar, .no-print { display: none !important; }
+      body { background: #fff; }
+      .qr { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  {% set active = "collection" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>{{ collectible.name }}</h1>
+    <p class="muted no-print">Print this and stick it at <b>{{ treasure.name }}</b>, out of the rain.
+      Players scan it with the StepQuest Scan page or their phone's camera.</p>
+    {# Python made this QR picture (qrcode library, collectible_api.qr_svg) #}
+    <div class="qr">
+      {{ svg | safe }}
+      <p class="qr__code">{{ collectible.code }}</p>
+      <p class="muted">StepQuest · {{ treasure.name }}</p>
+    </div>
+    <p class="no-print muted">The QR opens: {{ link }}</p>
+    <button type="button" class="btn no-print" onclick="window.print()">Print</button>
+    <a class="btn btn--ghost no-print" href="/collection">Back to your collection</a>
+  </main>
+</body>
+</html>

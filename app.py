@@ -12,6 +12,10 @@ from coin_api import coin_api, found_treasure_ids
 from coins import first_to_find
 from feed_api import feed_api
 from hunt_api import hunt_api
+from hunt_game_api import hunt_game_api  # A: hunt races
+from journey_resume_api import journey_resume_api  # A: carry on after losing signal
+from collectible_api import collectible_api  # A: QR collectibles and 3D trophies
+from health_api import health_api  # A: the ESP32 wearable and its health summary
 from journey_api import journey_api
 from leaderboard_api import leaderboard_api
 from notify_api import notify_api
@@ -74,6 +78,10 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(coin_api)
     app.register_blueprint(shop_api)
     app.register_blueprint(hunt_api)
+    app.register_blueprint(hunt_game_api)
+    app.register_blueprint(journey_resume_api)
+    app.register_blueprint(collectible_api)
+    app.register_blueprint(health_api)
     app.register_blueprint(chat_api)
     app.register_blueprint(notify_api)
     app.register_blueprint(rating_api)

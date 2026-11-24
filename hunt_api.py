@@ -3,11 +3,16 @@
 Rules live in queue_logic.py. Like route_api.py, this lives in its own Blueprint.
 """
 
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify, render_template, request
 from sqlalchemy.exc import IntegrityError
 
+from admin_api import online_user_ids  # A: "online now" reuses the live positions of the admin map
 from auth_api import current_user
 from hunt_chat import can_chat
+from hunt_game import join_problem  # A: hunt races (where the hunt goes, Start, winner)
+from hunt_game_api import HuntGame, game_dict, game_state_of, parse_treasure_id
 from hunt_input import parse_hunt
 from models import Hunt, HuntMember, db
 from notify_api import notify
@@ -33,9 +38,14 @@ def _hunt_dict(hunt, user):
         "capacity": hunt.capacity,
         "playing": playing,
         "waiting": waiting,
+        # A: members who had the map open in the last 2 minutes. Joining is still kept until
+        # "Leave" (so nobody loses their place by logging out); this only says who is around now.
+        "online": len(online_user_ids(member_ids, datetime.now(timezone.utc))),
         "me": queue_status(user.id, member_ids, hunt.capacity) if user else None,
         # B: unread group-chat messages, only for players who can open the chat (playing, not in line)
         "unread": _unread(user, hunt, member_ids),
+        # A: the race: its treasure, open/started/finished, the winner, and whether you may press Start
+        "game": game_dict(hunt, user),
     }
 
 
@@ -57,7 +67,9 @@ def list_hunts():
     """Every hunt, newest first. When logged in, each one says where you are in it."""
     user = current_user()
     hunts = db.session.execute(db.select(Hunt).order_by(Hunt.id.desc())).scalars().all()
-    return jsonify([_hunt_dict(h, user) for h in hunts])
+    result = [_hunt_dict(h, user) for h in hunts]
+    db.session.commit()  # A: an old hunt may have just been given its race (hunt_game_api.get_game)
+    return jsonify(result)
 
 
 @hunt_api.route("/api/hunts", methods=["POST"])
@@ -72,6 +84,7 @@ def create_hunt():
         data = request.form.to_dict()
     try:
         clean = parse_hunt(data)
+        treasure_id = parse_treasure_id(data.get("treasure_id"))  # A: where the hunt goes
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
@@ -79,6 +92,8 @@ def create_hunt():
     db.session.add(hunt)
     db.session.flush()  # gives the hunt its id
     db.session.add(HuntMember(hunt_id=hunt.id, user_id=user.id))  # the creator is the first to join
+    if treasure_id is not None:  # A: the race, not started yet (no treasures yet: it gets one later)
+        db.session.add(HuntGame(hunt_id=hunt.id, treasure_id=treasure_id))
     db.session.commit()
     return jsonify(_hunt_dict(hunt, user)), 201
 
@@ -93,6 +108,9 @@ def join_hunt(hunt_id):
         return jsonify(error="No such hunt"), 404
     if user.id in _member_ids(hunt_id):
         return jsonify(error="You already joined this hunt."), 409
+    problem = join_problem(game_state_of(hunt_id))  # A: no joining a race that already started
+    if problem:
+        return jsonify(error=problem), 409
 
     db.session.add(HuntMember(hunt_id=hunt_id, user_id=user.id))
     try:

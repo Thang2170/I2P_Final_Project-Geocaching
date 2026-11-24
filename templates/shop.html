@@ -76,18 +76,28 @@
       return res.json();
     }
 
+    // A: which sprite shows next to each shop item
+    const ITEM_ART = {
+      "bubble-tea": "bubble-tea", "cafe-10": "coffee", "explorer-badge": "badge", "gold-pin": "gold-pin"
+    };
+
     function renderItems(items) {
       const box = document.getElementById("items");
       box.replaceChildren();
       for (const item of items) {
         const row = el("div", undefined, "item");
+        // A: each item's own picture (sprites from pixel_art.py)
+        const art = el("div", undefined, "item__art");
+        art.append(el("span", undefined, `sprite sprite--${ITEM_ART[item.id] || "coin-spin"}`));
+        art.setAttribute("aria-hidden", "true");
         const info = el("div");
+        info.style.flex = "1";
         info.append(el("p", item.name, "item__name"), el("p", item.description, "muted item__text"));
         const button = el("button", item.owned ? "Owned" : `${item.price} coins`, "btn");
         button.type = "button";
         button.disabled = item.owned;
         button.addEventListener("click", () => buy(item, button));
-        row.append(info, button);
+        row.append(art, info, button);
         box.append(row);
       }
     }

@@ -9,8 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from auth_api import current_user
 from coin_api import get_balance
 from models import CoinTransaction, Purchase, db
-from shop import (ALREADY_OWNED, ITEMS, NOT_ENOUGH_COINS, UNKNOWN_ITEM, find_item,
-                  item_to_dict, make_voucher_code, purchase_problem)
+from shop import (ALREADY_OWNED, BADGE, ITEMS, NOT_ENOUGH_COINS, UNKNOWN_ITEM, find_item,
+                  item_to_dict, make_voucher_code, perks, purchase_problem)
 
 shop_api = Blueprint("shop_api", __name__)
 
@@ -27,6 +27,30 @@ PROBLEMS = {
 def _owned_item_ids(user_id):
     query = db.select(Purchase.item_id).where(Purchase.user_id == user_id)
     return set(db.session.execute(query).scalars().all())
+
+
+def has_badge(user_id):
+    """A: True if this player bought the Explorer badge.
+
+    The feed asks this for every post and comment, so the list of badge owners is
+    read ONCE per request and kept on that request, instead of one query per name.
+    (A new request always starts with a fresh list, so a new badge shows straight away.)
+    """
+    holders = getattr(request, "badge_holders", None)
+    if holders is None:
+        query = db.select(Purchase.user_id).where(Purchase.item_id == BADGE)
+        holders = set(db.session.execute(query).scalars().all())
+        request.badge_holders = holders
+    return user_id in holders
+
+
+@shop_api.route("/api/me/perks")
+def my_perks():
+    """A: what your items do: {"badge": true/false, "gold_pin": true/false}. The map uses gold_pin."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    return jsonify(perks(_owned_item_ids(user.id)))
 
 
 @shop_api.route("/shop")

@@ -13,12 +13,21 @@
     <div id="map"></div>
 
     <!-- Status card at the bottom: distance to the treasure and the route summary -->
+    <!-- A: "Zebra crossing in 14 m: look up from your phone!" (tap to close) -->
+    <div id="crossingAlert" class="crossing-alert" role="alert" hidden></div>
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
       <div id="routeInfo" class="sheet__route" hidden></div>
       <!-- A: Feature 6, a different walking route to the same treasure -->
       <button type="button" id="newRouteBtn" class="btn btn--ghost" style="margin-top:8px" hidden>New route</button>
       <div id="coinInfo" class="sheet__route coin-line" hidden></div>
+      <!-- A: hunt race mode (/?hunt=<id>&treasure=<id>, from the Hunts page) -->
+      <div id="huntInfo" class="sheet__route" hidden></div>
+      <div id="teamInfo" class="sheet__route" hidden></div>
+      <!-- A: shown when the phone has no connection (the journey keeps counting) -->
+      <div id="netInfo" class="sheet__route net-line" hidden></div>
+      <!-- A: how many street crossings this route has (Feature 7) -->
+      <div id="crossingInfo" class="sheet__route" hidden></div>
       <!-- B: after a find, rate the treasure 1-5 stars (Python checks you really found it) -->
       <div id="rateBox" class="rate-box" hidden>
         <p class="rate-box__ask">How was <span id="rateName"></span>?</p>
@@ -66,6 +75,10 @@
       <h2 id="boardName"></h2>
       <p id="boardHint" class="board__hint"></p>
       <p id="boardStars" class="board__stars"></p>
+      <!-- A: verified by an admin, or not yet (you can still go there) -->
+      <p id="boardVerified" class="board__verified"></p>
+      <!-- A: a QR collectible is hidden here (scan it for a 3D trophy) -->
+      <p id="boardCollectible" class="board__verified" hidden></p>
       <!-- The photo the hider took of the spot (loads only if the treasure has one) -->
       <img id="boardPhoto" class="board__photo" alt="Photo of the spot" hidden>
       <div class="board__stats">
@@ -136,7 +149,26 @@
       }).addTo(map);
       marker.on("click", () => selectTreasure(t, marker));
       markersById.set(t.id, marker);
+      addPinMarks(marker, t);
       return marker;
+    }
+
+    // A: little pixel marks on a pin: a green check if an admin verified the treasure,
+    // a gem if it has a collectible to scan. Python says which (verified / collectible).
+    const infoById = new Map();  // treasure id -> {verified, collectible}, from /api/treasures
+    function addPinMarks(marker, t) {
+      const pin = marker.getElement();
+      if (!pin) return;
+      pin.querySelector(".pin__marks")?.remove();
+      const marks = document.createElement("span");
+      marks.className = "pin__marks";
+      for (const [on, sprite] of [[t.verified, "mark-verified"], [t.collectible, "mark-collectible"]]) {
+        if (!on) continue;
+        const mark = document.createElement("span");
+        mark.className = `sprite sprite--${sprite}`;
+        marks.append(mark);
+      }
+      if (marks.childElementCount) pin.append(marks);
     }
 
     // The treasure you are hunting: its pin is orange and the status card
@@ -162,13 +194,16 @@
           ratingsById.set(t.id, { rating: t.rating, mine: t.my_rating });
           // B: Python marks the ones you were already paid for (found_by_me); they show a tick.
           if (t.found_by_me) foundIds.add(t.id);
+          infoById.set(t.id, { verified: t.verified, collectible: t.collectible, collected: t.collected_by_me });
           if (t.id !== treasure.id) addTreasurePin(t, t.found_by_me ? "found" : "treasure");
+          else addPinMarks(huntMarker, t);  // the first pin was drawn before the list arrived
         }
         if (foundIds.has(treasure.id)) showTick(huntMarker);  // you found them all: even this one is ticked
         // B: /?treasure=<id> (from the welcome page) opens that treasure's board.
         const wanted = Number(params.get("treasure"));
         const wantedTreasure = list.find((t) => t.id === wanted);
         if (wantedTreasure && markersById.has(wanted)) selectTreasure(wantedTreasure, markersById.get(wanted));
+        resumeJourney();  // A: carry on a journey the server remembers (after a reload or lost signal)
       } catch (err) {
         console.error("Treasure markers failed:", err);
       }
@@ -203,6 +238,17 @@
       document.getElementById("boardHint").textContent = t.description || "No hint for this one.";
       showBoardPhoto(t.id);
       showBoardStars(t.id);
+      const info = infoById.get(t.id) || {};
+      const verifiedLine = document.getElementById("boardVerified");
+      verifiedLine.textContent = info.verified
+        ? "✓ Verified by StepQuest"
+        : "Not verified yet: hidden by a player and not checked by an admin. You can still go.";
+      verifiedLine.classList.toggle("is-verified", Boolean(info.verified));
+      const collectibleLine = document.getElementById("boardCollectible");
+      collectibleLine.hidden = !info.collectible;
+      collectibleLine.textContent = info.collected
+        ? "◆ You collected this treasure's trophy"
+        : "◆ Has a collectible: find the QR code at the spot and scan it (Collection > Scan)";
       boardKm.textContent = "–";
       boardMin.textContent = "–";
       boardSteps.textContent = "–";
@@ -377,7 +423,7 @@
       // Keep going through the random point (if any) when we reroute after you move.
       const via = routeVia ? `;${routeVia[0]},${routeVia[1]}` : "";
       const url = newRandom
-        ? `/api/random-route?points=${start};${end}`
+        ? `/api/random-route?points=${start};${end}` + (routeVia ? `&current=${routeVia[0]},${routeVia[1]}` : "")
         : `/api/route?points=${start}${via};${end}`;
       try {
         const res = await fetch(url);
@@ -398,6 +444,7 @@
         ]).addTo(map);
         if (fit) map.fitBounds(routeLine.getBounds(), routePadding());
         showRoute(data);
+        loadCrossings(data.path);  // A: street crossings along this route
       } catch (err) {
         if (requestId !== routeRequestId) return;
         if (routeLine) { routeLine.remove(); routeLine = null; }  // don't leave an out-of-date line
@@ -527,6 +574,7 @@
       const now = Date.now();
       if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
       journey.tickAt = now;
+      if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
       if (journey.state === "running" && journey.meters !== journey.statsMeters
           && now - journey.statsAt >= STATS_EVERY_MS) loadJourneyStats();
       renderJourney();
@@ -544,12 +592,15 @@
       if (document.visibilityState === "visible" && journey.state === "running") keepScreenOn(true);
     });
 
-    function startJourney(t) {
+    // restored = the numbers the server kept (resumeJourney), or null for a brand-new journey
+    function startJourney(t, restored = null) {
       Object.assign(journey, {
         state: "running", targetId: t.id, name: t.name, target: [t.lat, t.lon],
-        elapsedMs: 0, meters: 0, steps: 0, calories: 0, statsAt: 0, statsMeters: 0, saveStarted: false,
+        elapsedMs: restored ? restored.elapsedMs : 0, meters: restored ? restored.meters : 0,
+        steps: 0, calories: 0, statsAt: 0, statsMeters: -1, saveStarted: false, progressAt: Date.now(),
         tickAt: Date.now(), last: currentPos ? { pos: currentPos, time: Date.now() } : null
       });
+      if (!restored) tellServerJourneyStarted(t);
       closeBoard();
       document.body.classList.add("is-journey");
       journeyBox.hidden = false;
@@ -606,17 +657,22 @@
         duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
         lat: currentPos[0], lon: currentPos[1]
       };
-      let ok = false, text = "Could not save this hunt.";
+      let ok = false, answered = false, text = "Could not save this hunt.";
       try {
         const res = await fetch("/api/journeys", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
         });
+        answered = true;  // saved or refused: either way this journey is over
         const data = await res.json();
         ok = res.ok;
         text = ok ? "Hunt saved." : (data.error || text);
       } catch (err) {
-        console.error("Saving the hunt failed:", err);
+        // A: no connection: keep it and send it when the phone is back online
+        queueForLater("/api/journeys", body);
+        queueForLater("/api/journeys/active", {}, "DELETE");
+        text = "No connection: this hunt will be saved as soon as you are back online.";
       }
+      if (answered) endServerJourney();  // A: the server shouldn't offer to "carry on" a finished journey
       jSaved.textContent = text;
       jSaved.classList.toggle("is-bad", !ok);
       if (ok) {
@@ -640,7 +696,11 @@
       if (!journeyActive() && currentPos && selectedTreasure) startJourney(selectedTreasure);
     });
     jPause.addEventListener("click", pauseOrResume);
-    jFinish.addEventListener("click", () => (journey.state === "finished" ? closeJourney() : finishJourney(false)));
+    jFinish.addEventListener("click", () => {
+      if (journey.state === "finished") return closeJourney();
+      finishJourney(false);
+      endServerJourney();  // A: stopped on purpose: nothing to carry on
+    });
 
     // The status card is hidden during a journey, so its messages ("123 m to Library",
     // "You found it", the coins you got) are copied into the panel.
@@ -656,6 +716,286 @@
     window.addEventListener("beforeunload", event => {
       if (journeyActive()) { event.preventDefault(); event.returnValue = ""; }
     });
+
+    // ------------------------------------------------------------ hunt race (A)
+
+    // Opened from "Go to the hunt": the map aims at the hunt's treasure (the ?treasure= part does that)
+    // and, once Python says you're there, tells the server. Python decides who won (hunt_game.py).
+    const raceHuntId = Number(params.get("hunt")) || null;
+    const raceTreasureId = Number(params.get("treasure")) || null;
+    const huntInfo = document.getElementById("huntInfo");
+    let raceOver = false;
+    let arrivalSent = false;
+
+    function showRace(data) {
+      const name = data.name ? `"${data.name}"` : "This hunt";
+      if (data.won) {
+        huntInfo.textContent = `You won ${name}! +${data.bonus} coins`;
+      } else if (data.state === "finished") {
+        huntInfo.textContent = `${name} is over · winner: ${data.winner}`;
+      } else if (data.state === "started") {
+        huntInfo.textContent = data.error || `Hunt race ${name}: be the first to reach ${data.treasure.name}`;
+      } else {
+        huntInfo.textContent = `${name} hasn't started yet`;
+      }
+      raceOver = data.state === "finished";
+      huntInfo.hidden = false;
+    }
+
+    async function loadRace() {
+      if (!raceHuntId || raceOver) return;
+      try {
+        const res = await fetch(`/api/hunts/${raceHuntId}/game`);
+        const data = await res.json();
+        if (res.ok) showRace(data);
+      } catch (err) {
+        console.error("Hunt race failed:", err);
+      }
+    }
+
+    async function reportArrival(lat, lon) {
+      if (!raceHuntId || raceOver || arrivalSent) return;
+      arrivalSent = true;  // ask once; a refusal while the race is still on lets you try again
+      try {
+        const res = await fetch(`/api/hunts/${raceHuntId}/arrived`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lon })
+        });
+        const data = await res.json();
+        showRace(data);
+        if (data.won) showBalance(data.balance, data.bonus);
+        if (!res.ok && data.state === "started") arrivalSent = false;
+      } catch (err) {
+        arrivalSent = false;
+        console.error("Hunt arrival failed:", err);
+      }
+    }
+
+    // A: the other players in this hunt, as little explorers with their names.
+    // Python decides who you may see (only your own hunt, only the last 2 minutes).
+    const teamInfo = document.getElementById("teamInfo");
+    const teammates = L.layerGroup().addTo(map);
+    const teammateIcon = L.divIcon({
+      className: "admin-player",
+      html: '<span class="sprite sprite--explorer"></span>',
+      iconSize: [48, 48],
+      iconAnchor: [24, 46]
+    });
+    if (raceHuntId) map.createPane("teammates").style.zIndex = 650;  // above the treasure chests
+
+    async function loadTeammates() {
+      try {
+        const res = await fetch(`/api/hunts/${raceHuntId}/players`);
+        if (!res.ok) return;  // not playing in this hunt: nothing to show
+        const data = await res.json();
+        teammates.clearLayers();
+        for (const p of data.players) {
+          L.marker([p.lat, p.lon], { icon: teammateIcon, pane: "teammates", interactive: false })
+            .bindTooltip(`${p.name} · ${p.seconds_ago}s ago`, { permanent: true, direction: "top", offset: [0, -44] })
+            .addTo(teammates);
+        }
+        const n = data.players.length;
+        teamInfo.textContent = n ? `${n} teammate${n === 1 ? "" : "s"} on the map` : "No teammates on the map right now";
+        teamInfo.hidden = false;
+      } catch (err) {
+        console.error("Teammates failed:", err);
+      }
+    }
+
+    if (raceHuntId) {
+      loadRace();
+      setInterval(loadRace, 10000);  // someone else may win while you walk
+      loadTeammates();
+      setInterval(loadTeammates, 10000);  // the same pace as positions are sent
+    }
+
+    // ------------------------------------------------------------ street crossings (A, Feature 7)
+
+    // Python finds the crossings along the route (OpenStreetMap, crossings.py) and decides when
+    // you are close enough to warn. The page draws a sign at each one and shows the warning.
+    let routeCrossings = [];
+    const warnedCrossings = new Set();  // warn once per crossing, not every 3 seconds
+    const crossingLayer = L.layerGroup().addTo(map);
+    const crossingAlert = document.getElementById("crossingAlert");
+    const crossingInfo = document.getElementById("crossingInfo");
+    const crossingIcon = L.divIcon({
+      className: "crossing-sign",
+      html: '<span class="sprite sprite--warning"></span>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 22]
+    });
+    let crossingRequestId = 0;
+
+    async function loadCrossings(path) {
+      const requestId = ++crossingRequestId;
+      try {
+        const res = await fetch("/api/crossings", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path })
+        });
+        const data = await res.json();
+        if (requestId !== crossingRequestId || !res.ok) return;  // a newer route came meanwhile
+        routeCrossings = data.crossings;
+        crossingLayer.clearLayers();
+        for (const c of routeCrossings) {
+          L.marker([c.lat, c.lon], { icon: crossingIcon, interactive: false, title: c.kind }).addTo(crossingLayer);
+        }
+        const n = routeCrossings.length;
+        crossingInfo.textContent = data.warning
+          || (n ? `${n} street crossing${n === 1 ? "" : "s"} on this route: we'll warn you before each one.`
+                : "No street crossings on this route.");
+        crossingInfo.hidden = false;
+      } catch (err) {
+        console.error("Crossings failed:", err);  // the route still works without warnings
+      }
+    }
+
+    let crossingAlertTimer = null;
+    async function checkCrossing(lat, lon) {
+      if (!routeCrossings.length) return;
+      try {
+        const res = await fetch("/api/crossings/warning", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lon, crossings: routeCrossings })
+        });
+        const data = await res.json();
+        const w = data.warning;
+        if (!res.ok || !w || warnedCrossings.has(w.id)) return;
+        warnedCrossings.add(w.id);
+        crossingAlert.textContent = w.text;
+        crossingAlert.hidden = false;
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);  // phones buzz, so you look up
+        clearTimeout(crossingAlertTimer);
+        crossingAlertTimer = setTimeout(() => { crossingAlert.hidden = true; }, 7000);
+      } catch (err) { /* offline: no new warnings until the connection is back */ }
+    }
+    crossingAlert.addEventListener("click", () => { crossingAlert.hidden = true; });
+
+    // ------------------------------------------------------------ lost connection (A)
+
+    // The server remembers your journey with a deadline that fits the walk (journey_resume.py),
+    // so you can carry on after losing signal or reloading. Anything that must reach the server
+    // while you are offline waits in an "outbox" on the phone and is sent when you are back.
+    const PROGRESS_EVERY_MS = 30000;
+    const OFFLINE_FOUND_M = 20;  // same as FOUND_RADIUS_M in location.py; Python checks again later
+    const OUTBOX_KEY = "stepquest.outbox";
+    const netInfo = document.getElementById("netInfo");
+
+    function showNet(text) {
+      netInfo.textContent = text;
+      netInfo.hidden = !text;
+    }
+
+    function readOutbox() {
+      try { return JSON.parse(localStorage.getItem(OUTBOX_KEY)) || []; } catch (err) { return []; }
+    }
+    function writeOutbox(list) {
+      try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(list)); } catch (err) { /* private mode */ }
+    }
+    function queueForLater(url, body, method = "POST") {
+      const list = readOutbox();
+      list.push({ url, body, method });
+      writeOutbox(list);
+      showNet(`No connection. ${list.length} thing(s) will be sent when you are back online.`);
+    }
+
+    // Send what waited. Any answer from the server (even "no") means it arrived; only a
+    // network error or a server crash (5xx) keeps it for the next try.
+    let flushing = false;
+    async function flushOutbox() {
+      const list = readOutbox();
+      if (flushing || !list.length) return;
+      flushing = true;
+      const keep = [];
+      const refused = [];  // the server answered "no" (too far, too fast, ...): say so, don't hide it
+      for (const item of list) {
+        try {
+          const res = await fetch(item.url, {
+            method: item.method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.body)
+          });
+          if (res.status >= 500) keep.push(item);
+          else if (!res.ok) refused.push((await res.json().catch(() => ({}))).error || `refused (${res.status})`);
+        } catch (err) {
+          keep.push(item);
+        }
+      }
+      writeOutbox(keep);
+      flushing = false;
+      if (keep.length < list.length) {
+        if (keep.length) showNet(`Sent ${list.length - keep.length}, ${keep.length} still waiting.`);
+        else if (refused.length) showNet(`Back online. Not saved: ${refused.join(" ")}`);
+        else showNet("Back online: everything you did offline is saved.");
+        loadBalance();
+        if (!keep.length && !refused.length) setTimeout(() => showNet(""), 6000);
+      }
+    }
+    window.addEventListener("online", flushOutbox);
+    window.addEventListener("offline", () => showNet("No connection. Your journey keeps counting."));
+    setInterval(flushOutbox, 30000);
+
+    async function tellServerJourneyStarted(t) {
+      if (!currentPos) return;
+      try {
+        const res = await fetch("/api/journeys/active", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ treasure_id: t.id, lat: currentPos[0], lon: currentPos[1] })
+        });
+        const data = await res.json();
+        if (res.ok) journeyNote(`If you lose signal you can carry on for ${Math.round(data.window_s / 60)} min.`);
+      } catch (err) {
+        console.error("Could not tell the server about the journey:", err);  // it still runs here
+      }
+    }
+
+    async function sendProgress() {
+      journey.progressAt = Date.now();
+      try {
+        await fetch("/api/journeys/active/progress", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ meters: Math.round(journey.meters), elapsed_s: Math.round(journey.elapsedMs / 1000) })
+        });
+      } catch (err) { /* offline: the next try in 30 s */ }
+    }
+
+    function endServerJourney() {
+      fetch("/api/journeys/active", { method: "DELETE" })
+        .catch(() => queueForLater("/api/journeys/active", {}, "DELETE"));
+    }
+
+    // After a reload (or the browser closed the page while you had no signal):
+    // carry on the journey the server remembers, with its distance and clock.
+    async function resumeJourney() {
+      if (journeyActive()) return;
+      try {
+        const res = await fetch("/api/journeys/active");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.expired) {
+          showNet(`Your journey to ${data.expired.treasure} ran out of time.`);
+          return;
+        }
+        const a = data.active;
+        if (!a || !a.treasure || !markersById.has(a.treasure.id)) return;
+        selectTreasure(a.treasure, markersById.get(a.treasure.id));
+        startJourney(a.treasure, { meters: a.meters, elapsedMs: (a.elapsed_s + a.since_update_s) * 1000 });
+        journeyNote(`Welcome back! Carrying on to ${a.treasure.name} (${Math.round(a.seconds_left / 60)} min left).`);
+      } catch (err) {
+        console.error("Could not check for a journey to carry on:", err);
+      }
+    }
+
+    // No signal but GPS still works: if you are at the treasure, count it now. Python
+    // checks the position again when the saved actions arrive.
+    function arrivedWhileOffline() {
+      if (!journeyActive() || !currentPos) return;
+      if (map.distance(currentPos, journey.target) > OFFLINE_FOUND_M) return;
+      const [lat, lon] = currentPos;
+      queueForLater(`/api/treasures/${journey.targetId}/claim`, { lat, lon });
+      if (raceHuntId && journey.targetId === raceTreasureId) queueForLater(`/api/hunts/${raceHuntId}/arrived`, { lat, lon });
+      finishJourney(true);  // saveJourney queues itself when the network fails
+      statusBox.textContent = `You reached ${journey.name} with no signal. Coins and saving happen when you are back online.`;
+    }
+    flushOutbox();
 
     // ------------------------------------------------------------ coins
 
@@ -730,6 +1070,17 @@
       });
     });
 
+    // A: arrived at a treasure with a collectible you don't have yet: the celebration
+    // (templates/_celebrate.html) collects it and asks camera or skip. Python checks the 20 m.
+    function maybeCelebrate(treasureId, name, lat, lon) {
+      const info = infoById.get(treasureId);
+      if (!info || !info.collectible || info.collected || !window.celebrateCollectible) return;
+      info.collected = true;  // ask once, even if this runs again on the next GPS update
+      window.celebrateCollectible(treasureId, name, lat, lon)
+        .then(isNew => { if (!isNew) info.collected = false; })
+        .catch(err => { info.collected = false; console.error("Collectible failed:", err); });
+    }
+
     async function claimCoins(treasureId, name, lat, lon) {
       if (triedClaim.has(treasureId)) return;
       triedClaim.add(treasureId);
@@ -745,10 +1096,12 @@
           showBalance(data.balance, data.coins_earned);
           collectPin(treasureId);
           showRateBox(treasureId, name);
+          maybeCelebrate(treasureId, name, lat, lon);
         } else {
           if (res.status === 409) {  // you had already found it
             collectPin(treasureId);
             showRateBox(treasureId, name);
+            maybeCelebrate(treasureId, name, lat, lon);  // a collectible added after your first visit
           }
           // Refused: say why (you hid it yourself, you already found it, ...) instead of staying silent.
           claimNotes.set(treasureId, data.error || "No coins this time.");
@@ -765,12 +1118,22 @@
 
     // You are a little walking explorer (the sprite is drawn in pixel.css).
     // The anchor is at the feet, so the explorer stands on your position.
+    // A: the Gold pin from the shop turns your own marker gold. Python says if you own it.
+    let goldPin = false;
+    fetch("/api/me/perks")
+      .then(res => res.ok ? res.json() : {})
+      .then(data => {
+        goldPin = Boolean(data.gold_pin);
+        if (goldPin && userDot) userDot.setIcon(youIcon());  // the marker may already be on the map
+      })
+      .catch(() => {});
+
     function youIcon() {
       return L.divIcon({
-        className: "you-marker",
-        html: '<span class="sprite sprite--hero"></span>',
-        iconSize: [24, 36],
-        iconAnchor: [12, 34]
+        className: goldPin ? "you-marker you-marker--gold" : "you-marker",
+        html: '<span class="sprite sprite--explorer"></span>',
+        iconSize: [48, 48],
+        iconAnchor: [24, 46]
       });
     }
 
@@ -778,6 +1141,20 @@
     let currentPos = null;  // [lat, lon] of the last known position
     let firstFix = true;
     let lastSent = 0;
+
+    // A: tell the server where you are, so the admin's live map can show you.
+    // Every 10 seconds, even if you stand still (GPS only reports when you move),
+    // because the admin map hides anyone not heard from for 2 minutes.
+    const POSITION_EVERY_MS = 10000;
+    function sendPosition() {
+      if (!currentPos) return;
+      fetch("/api/me/position", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: currentPos[0], lon: currentPos[1] })
+      }).catch(() => {});  // not part of the game, so never bother the player if it fails
+    }
+    setInterval(sendPosition, POSITION_EVERY_MS);
 
     async function showPosition(lat, lon, force = false) {
       currentPos = [lat, lon];
@@ -796,6 +1173,7 @@
         map.setView(currentPos, 17);
         firstFix = false;
         drawRoute(currentPos, routeTarget, true);
+        sendPosition();  // show up on the admin map straight away, not after 10 seconds
       } else if (!dragMode && routeFrom && map.distance(routeFrom, currentPos) > REROUTE_DISTANCE_M) {
         // Real GPS: the user walked away from where the route started, so make a new one.
         // (Drag mode reroutes when you let go of the marker instead, see "dragend" below.)
@@ -821,9 +1199,12 @@
           ? foundText(data.treasure, askedFor)
           : `${Math.round(data.meters)} m to ${data.treasure}`;
         sheet.classList.toggle("is-found", data.found);
+        checkCrossing(lat, lon);  // A: about to cross a street?
         if (data.found) claimCoins(askedFor, data.treasure, lat, lon);
+        if (data.found && askedFor === raceTreasureId) reportArrival(lat, lon);  // A: hunt race
       } catch (err) {
         statusBox.textContent = `Could not get distance: ${err.message}`;
+        arrivedWhileOffline();  // A: no signal at the treasure? still count it
       }
     }
 
@@ -868,5 +1249,6 @@
     }
   </script>
   {% include "_tour.html" %}
+  {% include "_celebrate.html" %}
 </body>
 </html>

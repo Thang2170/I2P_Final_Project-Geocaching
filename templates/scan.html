@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Scan · StepQuest</title>
+  {# A: jsQR reads QR codes from camera pictures. The camera itself is the browser's (getUserMedia),
+     which only works on https:// or localhost. #}
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    .scanner { position: relative; margin: 16px 0; background: var(--px-ink); box-shadow: var(--px-edge); }
+    .scanner video { display: block; width: 100%; max-height: 60vh; object-fit: cover; }
+    .scanner__frame { position: absolute; inset: 18%; border: 4px dashed var(--px-gold); pointer-events: none; }
+    .manual { display: flex; gap: 8px; }
+    .manual input { flex: 1; }
+    .manual .btn { width: auto; margin: 0; }
+  </style>
+</head>
+<body>
+  {% set active = "collection" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Scan a QR code</h1>
+    <p class="muted">Point your camera at the StepQuest QR code hidden at the treasure.</p>
+    <button type="button" id="startCamera" class="btn">Start camera</button>
+    <div class="scanner" id="scanner" hidden>
+      <video id="video" playsinline muted></video>
+      <div class="scanner__frame"></div>
+    </div>
+    <p id="message" class="message" role="status"></p>
+
+    <h2>No camera? Type the code</h2>
+    <form id="manual" class="manual">
+      <input id="code" name="code" placeholder="For example K7QX2MRT9C" maxlength="80" autocomplete="off">
+      <button type="submit" class="btn">Collect</button>
+    </form>
+  </main>
+
+  <script>
+    // The camera and jsQR only READ the code. Python checks it and gives you the trophy (/api/collect).
+    const message = document.getElementById("message");
+    const video = document.getElementById("video");
+    const canvas = document.createElement("canvas");
+    let stream = null;
+    let busy = false;
+
+    function show(text, ok) {
+      message.textContent = text;
+      message.className = "message " + (ok ? "ok" : "bad");
+    }
+
+    async function send(code) {
+      if (busy) return;
+      busy = true;
+      try {
+        const res = await fetch("/api/collect", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code })
+        });
+        if (res.status === 401) { location.href = "/login?next=/scan"; return; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "That code didn't work.");
+        stopCamera();
+        location.href = `/collection?${data.new ? "new" : "have"}=${data.item.id}`;
+      } catch (error) {
+        show(error.message, false);
+        setTimeout(() => { busy = false; }, 2000);  // don't repeat the same error every frame
+      }
+    }
+
+    function stopCamera() {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
+    function scanFrame() {
+      if (!stream) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA && !busy) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        context.drawImage(video, 0, 0);
+        const picture = context.getImageData(0, 0, canvas.width, canvas.height);
+        const found = jsQR(picture.data, picture.width, picture.height);
+        if (found && found.data) send(found.data);
+      }
+      requestAnimationFrame(scanFrame);
+    }
+
+    document.getElementById("startCamera").addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        await video.play();
+        document.getElementById("scanner").hidden = false;
+        show("Looking for a QR code…", true);
+        requestAnimationFrame(scanFrame);
+      } catch (error) {
+        show("Can't open the camera: " + error.message + ". You can type the code below instead.", false);
+      }
+    });
+
+    document.getElementById("manual").addEventListener("submit", event => {
+      event.preventDefault();
+      busy = false;
+      send(document.getElementById("code").value);
+    });
+    window.addEventListener("pagehide", stopCamera);
+  </script>
+</body>
+</html>

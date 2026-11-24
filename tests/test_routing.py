@@ -270,6 +270,75 @@ class TestGetRandomRoute(NoKeyMixin, unittest.TestCase):
         self.assertEqual(route["source"], "openrouteservice")
 
 
+def two_routes_payload():
+    """What OpenRouteService sends for alternative_routes: two different paths."""
+    west = [[120.994796, 24.795324], [120.9930, 24.7990], [120.9948, 24.8040]]
+    east = [[120.994796, 24.795324], [120.9970, 24.7990], [120.9948, 24.8040]]
+    return {"features": [
+        {"properties": {"summary": {"distance": 1000.0, "duration": 700}},
+         "geometry": {"type": "LineString", "coordinates": west}},
+        {"properties": {"summary": {"distance": 1100.0, "duration": 780}},
+         "geometry": {"type": "LineString", "coordinates": east}},
+    ]}
+
+
+class TestRealAlternatives(NoKeyMixin, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        os.environ["ORS_API_KEY"] = "test-key"
+
+    def test_asks_the_service_for_alternatives(self):
+        with patch("routing.requests.post", return_value=fake_response(payload=two_routes_payload())) as post:
+            get_random_route(NTHU, FAR, random.Random(1))
+        body = post.call_args.kwargs["json"]
+        self.assertEqual(len(body["coordinates"]), 2)  # only start and treasure: no side-step point
+        self.assertEqual(body["alternative_routes"]["target_count"], routing.ALTERNATIVES)
+
+    def test_picks_one_of_the_real_routes_with_its_middle_as_via(self):
+        with patch("routing.requests.post", return_value=fake_response(payload=two_routes_payload())):
+            route = get_random_route(NTHU, FAR, random.Random(1))
+        self.assertIn(route["distance_m"], (1000.0, 1100.0))
+        self.assertEqual(route["via"], routing.middle_point(route["path"]))
+        self.assertIn(route["via"], route["path"])  # the via lies ON the route
+
+    def test_never_the_route_shown_now(self):
+        with patch("routing.requests.post", return_value=fake_response(payload=two_routes_payload())):
+            first = get_random_route(NTHU, FAR, random.Random(1))
+            for seed in range(10):
+                again = get_random_route(NTHU, FAR, random.Random(seed), current_via=first["via"])
+                self.assertNotEqual(again["distance_m"], first["distance_m"])
+
+    def test_one_route_only_falls_back_to_a_side_step(self):
+        # GOOD_PAYLOAD has just one route, so a side-step point is used (3 points sent)
+        with patch("routing.requests.post", return_value=fake_response(payload=GOOD_PAYLOAD)) as post:
+            route = get_random_route(NTHU, FAR, random.Random(1))
+        self.assertEqual(len(post.call_args.kwargs["json"]["coordinates"]), 3)
+        self.assertIn("via", route)
+
+    def test_side_step_that_doubles_back_is_refused(self):
+        # Normal walk 1000 m. Side-step routes: 2500 m (too long, > 1.8x), then 1500 m (fine).
+        long_route = {"distance_m": 2500.0, "duration_s": 1, "path": [], "source": "openrouteservice"}
+        ok_route = {"distance_m": 1500.0, "duration_s": 1, "path": [], "source": "openrouteservice"}
+        with patch("routing.get_route", side_effect=[long_route, ok_route]):
+            route = routing._side_step_route(NTHU, FAR, random.Random(1), normal_m=1000.0)
+        self.assertEqual(route["distance_m"], 1500.0)
+
+    def test_if_every_side_step_is_long_the_shortest_is_used(self):
+        routes = [{"distance_m": d, "duration_s": 1, "path": [], "source": "x"} for d in (3000.0, 2600.0, 2900.0)]
+        with patch("routing.get_route", side_effect=routes):
+            route = routing._side_step_route(NTHU, FAR, random.Random(1), normal_m=1000.0)
+        self.assertEqual(route["distance_m"], 2600.0)
+
+
+class TestMiddlePoint(unittest.TestCase):
+    def test_middle_of_a_straight_path(self):
+        path = [[0.0, 0.0], [0.0, 0.001], [0.0, 0.002], [0.0, 0.003], [0.0, 0.004]]
+        self.assertEqual(routing.middle_point(path), [0.0, 0.002])
+
+    def test_one_point(self):
+        self.assertEqual(routing.middle_point([[24.79, 120.99]]), [24.79, 120.99])
+
+
 class TestDropReachedVia(unittest.TestCase):
     def test_keeps_a_point_not_reached_yet(self):
         points = [NTHU, NEARBY, FAR]  # NEARBY is 78 m away
