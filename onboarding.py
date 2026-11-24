@@ -6,6 +6,7 @@ To change what the tour says, change TOUR_STEPS below.
 """
 
 from coins import COINS_PER_FIND
+from treasure_value import MAX_COINS
 from location import FOUND_RADIUS_M
 
 # How a player left the tour. Both mean "don't show it again by itself".
@@ -26,8 +27,8 @@ TOUR_STEPS = (
     {"id": "journey", "sprite": "coin",
      "title": "Go and find it",
      "text": f"Press Start journey and walk. Your time, steps and calories count up as you go. "
-             f"Get within {FOUND_RADIUS_M} m and the treasure is yours: +{COINS_PER_FIND} coins, "
-             f"and your hunt is saved."},
+             f"Get within {FOUND_RADIUS_M} m and the treasure is yours: +{COINS_PER_FIND} coins "
+             f"(up to {MAX_COINS} if nobody has found it for a while), and your hunt is saved."},
     {"id": "hide", "sprite": "tree",
      "title": "Hide your own",
      "text": "Open Hide a treasure, tap the map where it goes, write a hint and add a photo. "
