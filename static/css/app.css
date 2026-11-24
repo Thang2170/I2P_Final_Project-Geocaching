@@ -1907,3 +1907,7 @@ button.post__likes[hidden] { display: none; }
 @keyframes pin-bounty { 0%, 100% { filter: drop-shadow(0 0 0 #f2c94c); } 50% { filter: drop-shadow(0 0 6px #f2c94c); } }
 .pin.pin--bounty { animation: pin-bounty 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .pin.pin--bounty { animation: none; filter: drop-shadow(0 0 4px #f2c94c); } }
+
+/* B: the "Install the app" button (static/js/install.js): hidden until the browser allows it */
+[data-install][hidden] { display: none !important; }
+.install-btn { margin-top: 10px; }

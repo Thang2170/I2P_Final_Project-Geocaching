@@ -29,6 +29,7 @@ from route_api import route_api
 from secret_key import KEY_FILE, choose_secret_key, new_key
 from shop_api import shop_api
 from challenge_api import challenge_api
+from pwa_api import pwa_api
 from riddle_api import riddle_api
 from trail_api import trail_api
 from treasure_api import treasure_api
@@ -102,6 +103,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(walk_proof_api)  # B: prove you walked (walk_proof.py)
     app.register_blueprint(riddle_api)  # B: riddle chains (riddles.py)
     app.register_blueprint(challenge_api)  # B: streaks and weekly challenges (streaks.py)
+    app.register_blueprint(pwa_api)  # B: install as an app (manifest, service worker)
     # B: login cookies are signed with this key. It is never a fixed text in the code any more
     # (anyone could read that in the repo); see secret_key.py.
     app.config["SECRET_KEY"] = _secret_key(app, database_uri)
