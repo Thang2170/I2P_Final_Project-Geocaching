@@ -240,6 +240,17 @@
 
       </section>
 
+      <!-- B: THIS WEEK: your daily streak and the weekly challenges (streaks.py). Logged in only. -->
+      <section class="stat-card week-card" id="weekCard" hidden aria-labelledby="weekTitle">
+        <div class="week-card__head">
+          <h2 id="weekTitle">This week</h2>
+          <span class="week-card__streak" id="streak"></span>
+        </div>
+        <p class="stat-note" id="streakNote"></p>
+        <ul class="challenges" id="challenges"></ul>
+        <p class="stat-note" id="weekMsg" role="status"></p>
+      </section>
+
       <!-- MAIN CONTENT GRID -->
       <div class="content-grid">
 
@@ -454,7 +465,57 @@
       document.getElementById("topEmpty").hidden = players.length > 0;
     }
 
+    // B: streak and weekly challenges. Python counts everything; the page shows it and sends claims.
+    function showWeek(week) {
+      if (!week) return;  // logged out: the card stays hidden
+      document.getElementById("weekCard").hidden = false;
+      const s = week.streak;
+      setText("streak", s.current ? `🔥 ${s.current}-day streak` : "No streak yet");
+      setText("streakNote", s.today_done
+        ? `You walked today. Best streak: ${s.best} day${s.best === 1 ? "" : "s"}.`
+        : s.current ? "Find a treasure or finish a hunt today to keep it going!"
+                    : "Find a treasure or finish a hunt today to start a streak.");
+      const list = document.getElementById("challenges");
+      list.replaceChildren();
+      for (const c of week.challenges) {
+        const li = document.createElement("li");
+        li.className = "challenge" + (c.claimed ? " challenge--claimed" : c.done ? " challenge--done" : "");
+        const title = document.createElement("span");
+        title.className = "challenge__title";
+        title.textContent = c.title;
+        const bar = document.createElement("progress");
+        bar.max = c.goal;
+        bar.value = c.progress;
+        bar.setAttribute("aria-label", `${c.title}: ${c.progress} of ${c.goal}`);
+        const end = document.createElement(c.done && !c.claimed ? "button" : "span");
+        end.className = c.done && !c.claimed ? "btn btn--small" : "challenge__state";
+        end.textContent = c.claimed ? "✓ Claimed" : c.done ? `Claim +${c.reward}` : c.text;
+        if (end.tagName === "BUTTON") {
+          end.type = "button";
+          end.addEventListener("click", () => claimChallenge(c.id, end));
+        }
+        li.append(title, bar, end);
+        list.append(li);
+      }
+    }
+
+    async function claimChallenge(id, button) {
+      button.disabled = true;
+      try {
+        const res = await fetch(`/api/challenges/${encodeURIComponent(id)}/claim`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not claim it");
+        setText("weekMsg", `+${data.coins_earned} coins! You have ${data.balance} now.`);
+        setText("statCoins", data.balance);
+        showWeek(data);
+      } catch (err) {
+        button.disabled = false;
+        setText("weekMsg", err.message);
+      }
+    }
+
     (async () => {
+      getJson("/api/challenges").then(showWeek);  // B
       const [me, coins, treasures, rankings, players] = await Promise.all([
         getJson("/api/me"), getJson("/api/coins"), getJson("/api/treasures"),
         getJson("/api/treasures/rankings"), getJson("/api/leaderboard")
