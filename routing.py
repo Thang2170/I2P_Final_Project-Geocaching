@@ -156,9 +156,12 @@ def _ask_service(points, api_key=None, extra=None):
     return routes
 
 
-def get_walking_route(points, api_key=None):
-    """Real walking route from OpenRouteService. Raises RoutingError on any problem."""
-    return _ask_service(points, api_key)[0]
+def get_walking_route(points, api_key=None, extra=None):
+    """Real walking route from OpenRouteService. Raises RoutingError on any problem.
+
+    extra: B: more settings, e.g. {"preference": "shortest"} in the rain (weather.py).
+    """
+    return _ask_service(points, api_key, extra)[0]
 
 
 def get_alternative_routes(start, end, api_key=None):
@@ -174,15 +177,22 @@ def get_alternative_routes(start, end, api_key=None):
     return _ask_service([start, end], api_key, extra)
 
 
-def get_route(points):
+def get_route(points, extra=None):
     """Best route we can get: real walking route, else straight lines.
 
     Bad input raises ValueError (the caller made a mistake). A service problem
     does not: we fall back to straight lines and say why in "warning", so the
     demo still works if the internet or the free API fails.
+    extra: B: weather settings (weather.py). If the service refuses them, the normal
+    walking route is used, never straight lines because of them.
     """
     pts = check_points(points)
     try:
+        if extra:
+            try:
+                return get_walking_route(pts, extra=extra)
+            except RoutingError:
+                pass  # try once more without the weather settings
         return get_walking_route(pts)
     except RoutingError as err:
         route = straight_line_route(pts)

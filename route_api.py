@@ -12,6 +12,7 @@ import time
 from flask import Blueprint, jsonify, request
 
 from routing import check_point, drop_reached_via, get_random_route, get_route, parse_points
+from weather_api import public_choice, weather_for
 
 route_api = Blueprint("route_api", __name__)
 
@@ -28,7 +29,11 @@ def api_route():
     except ValueError as err:
         return jsonify(error=str(err)), 400
     kept = drop_reached_via(points)
-    route = get_route(kept)
+    # B: weather-aware: shortest in the rain, greener in the heat (weather.py)
+    weather, choice = weather_for(*kept[0])
+    route = get_route(kept, extra=choice["route_options"])
+    if weather:
+        route["weather"] = public_choice(choice)
     if len(kept) < len(points):
         route["via_reached"] = True
     return jsonify(route)

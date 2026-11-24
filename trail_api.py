@@ -13,6 +13,7 @@ from coin_api import found_treasure_ids
 from models import Treasure, db
 from routing import get_route
 from trail_planner import parse_goal, plan_trail
+from weather_api import public_choice, weather_for
 from treasure_input import parse_number
 
 trail_api = Blueprint("trail_api", __name__)
@@ -46,7 +47,8 @@ def make_trail():
 
     by_id = {t.id: t for t in treasures}
     stops = [by_id[i] for i in plan["ids"]]
-    route = get_route([(lat, lon), *[(t.lat, t.lon) for t in stops], (lat, lon)])
+    weather, choice = weather_for(lat, lon)  # B: shortest in the rain, greener in the heat
+    route = get_route([(lat, lon), *[(t.lat, t.lon) for t in stops], (lat, lon)], extra=choice["route_options"])
     return jsonify(
         goal=label,
         stops=[{"order": n, "id": t.id, "name": t.name, "lat": t.lat, "lon": t.lon}
@@ -56,6 +58,7 @@ def make_trail():
         duration_s=route["duration_s"],
         steps=steps_from_distance(route["distance_m"]),
         warning=route.get("warning"),
+        weather=public_choice(choice) if weather else None,
         message=_message(len(stops), len(treasures), label),
     )
 
