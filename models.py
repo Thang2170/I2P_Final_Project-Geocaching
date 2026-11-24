@@ -628,3 +628,27 @@ class SafetyAlert(db.Model):
     reason = db.Column(db.String(20), nullable=False)    # low_spo2, high_hr or low_hr
     title = db.Column(db.String(80), nullable=False)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class StreakFreeze(db.Model):
+    """A streak freeze a player bought; used_on is the missed day it covered (owner: B). Rules: habits.py."""
+
+    __tablename__ = "streak_freezes"
+    __table_args__ = (db.UniqueConstraint("user_id", "used_on", name="one_freeze_per_day"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    bought_on = db.Column(db.Date, nullable=False)    # Taiwan date
+    used_on = db.Column(db.Date, nullable=True)       # empty until it covers a missed day
+
+
+class StreakShare(db.Model):
+    """A streak shared to the Community, once a day (owner: B). Rules: habits.py."""
+
+    __tablename__ = "streak_shares"
+    __table_args__ = (db.UniqueConstraint("user_id", "day", name="one_streak_share_per_day"),)
+
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    day = db.Column(db.Date, nullable=False)
+    streak = db.Column(db.Integer, nullable=False)

@@ -249,6 +249,25 @@
           <span class="week-card__streak" id="streak"></span>
         </div>
         <p class="stat-note" id="streakNote"></p>
+        <!-- B: today's goal ring, streak freezes and sharing your streak (habits.py) -->
+        <div class="habit-row" id="habitRow" hidden>
+          <svg class="ring" id="ring" viewBox="0 0 120 120" role="img" aria-labelledby="ringLabel">
+            <circle class="ring__track" cx="60" cy="60" r="48"></circle>
+            <circle class="ring__fill" id="ringFill" cx="60" cy="60" r="48" pathLength="100"
+                    stroke-dasharray="100" stroke-dashoffset="100"></circle>
+            <text class="ring__value" id="ringValue" x="60" y="62"></text>
+            <text class="ring__unit" id="ringUnit" x="60" y="82"></text>
+          </svg>
+          <div class="habit-info">
+            <p class="habit-info__ring" id="ringLabel"></p>
+            <p class="habit-info__freezes" id="freezeText"></p>
+            <div class="habit-info__buttons">
+              <button type="button" class="btn btn--small btn--ghost" id="buyFreeze">❄ Buy a freeze</button>
+              <button type="button" class="btn btn--small" id="shareStreak">Share my streak</button>
+            </div>
+            <p class="stat-note" id="habitMsg" role="status"></p>
+          </div>
+        </div>
         <ul class="challenges" id="challenges"></ul>
         <p class="stat-note" id="weekMsg" role="status"></p>
       </section>
@@ -489,8 +508,8 @@
       setText("streak", s.current ? `🔥 ${s.current}-day streak` : "No streak yet");
       setText("streakNote", s.today_done
         ? `You walked today. Best streak: ${s.best} day${s.best === 1 ? "" : "s"}.`
-        : s.current ? "Find a treasure or finish a hunt today to keep it going!"
-                    : "Find a treasure or finish a hunt today to start a streak.");
+        : s.current ? "Find a treasure, finish a hunt or close your ring today to keep it going!"
+                    : "Find a treasure, finish a hunt or close your ring today to start a streak.");
       const list = document.getElementById("challenges");
       list.replaceChildren();
       for (const c of week.challenges) {
@@ -631,6 +650,48 @@
       }
     }
 
+    // B: the daily goal ring, streak freezes and sharing (Python counts and decides)
+    function showHabits(h) {
+      if (!h) return;  // logged out
+      document.getElementById("habitRow").hidden = false;
+      const r = h.ring;
+      document.getElementById("ringFill").setAttribute("stroke-dashoffset", String(100 - r.percent));
+      document.getElementById("ring").classList.toggle("is-closed", r.closed);
+      setText("ringValue", r.closed ? "✓" : `${r.percent}%`);
+      setText("ringUnit", `${r.value.toLocaleString()} / ${r.target.toLocaleString()}`);
+      setText("ringLabel", `Today's ring: ${r.target.toLocaleString()} ${r.unit}. ${r.text}`);
+      const f = h.freezes;
+      let freezeLine = f.owned ? `❄ ${f.owned} of ${f.max} streak freezes ready: a missed day won't break your streak.`
+        : "❄ No streak freezes. One covers a missed day so your streak lives on.";
+      if (h.used_freeze_now.length) freezeLine = `❄ A freeze saved your streak (${h.used_freeze_now.join(", ")})! ` + freezeLine;
+      setText("freezeText", freezeLine);
+      const buy = document.getElementById("buyFreeze");
+      buy.textContent = `❄ Buy a freeze (${f.price} coins)`;
+      buy.disabled = f.owned >= f.max;
+      const share = document.getElementById("shareStreak");
+      share.disabled = h.shared_today || h.current === 0;
+      share.textContent = h.shared_today ? "✓ Shared today" : "Share my streak";
+      // the streak line on the card counts rings and freezes too
+      setText("streak", h.current ? `🔥 ${h.current}-day streak` : "No streak yet");
+    }
+
+    async function habitPost(url, okText) {
+      try {
+        const res = await fetch(url, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Something went wrong");
+        setText("habitMsg", okText(data));
+        if (data.balance !== undefined) setText("statCoins", data.balance);
+        showHabits(data);
+      } catch (err) {
+        setText("habitMsg", err.message);
+      }
+    }
+    document.getElementById("buyFreeze").addEventListener("click", () =>
+      habitPost("/api/habits/freeze", d => `Freeze bought. You have ${d.balance} coins left.`));
+    document.getElementById("shareStreak").addEventListener("click", () =>
+      habitPost("/api/habits/share", () => "Shared to the Community!"));
+
     async function claimChallenge(id, button) {
       button.disabled = true;
       try {
@@ -649,6 +710,7 @@
     (async () => {
       getJson("/api/challenges").then(showWeek);  // B
       getJson("/api/goal").then(showGoal);  // B: health goal
+      getJson("/api/habits").then(showHabits);  // B: ring and freezes
       const [me, coins, treasures, rankings, players] = await Promise.all([
         getJson("/api/me"), getJson("/api/coins"), getJson("/api/treasures"),
         getJson("/api/treasures/rankings"), getJson("/api/leaderboard")
