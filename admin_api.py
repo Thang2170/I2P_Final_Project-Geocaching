@@ -201,6 +201,8 @@ def save_position():
         db.session.add(position)
     position.lat, position.lon = lat, lon
     position.updated_at = datetime.now(timezone.utc)
+    from walk_proof_api import record_point  # B: the last 30 min of your trail, for "prove you walked"
+    record_point(user.id, lat, lon)
     db.session.commit()
     return jsonify(ok=True)
 

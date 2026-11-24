@@ -31,6 +31,8 @@ from shop_api import shop_api
 from trail_api import trail_api
 from treasure_api import treasure_api
 from walk_api import walk_api
+from walk_proof import parse_mode
+from walk_proof_api import walk_proof_api
 
 
 def get_current_treasure(user=None):
@@ -95,6 +97,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(admin_api)
     app.register_blueprint(onboarding_api)
     app.register_blueprint(trail_api)  # B: Treasure Trail loops (trail_planner.py)
+    app.register_blueprint(walk_proof_api)  # B: prove you walked (walk_proof.py)
     # B: login cookies are signed with this key. It is never a fixed text in the code any more
     # (anyone could read that in the repo); see secret_key.py.
     app.config["SECRET_KEY"] = _secret_key(app, database_uri)
@@ -104,6 +107,9 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     # many things quickly, so there the waits are off; tests of the waits switch them back on.
     testing = database_uri.startswith("sqlite:///:memory:")
     app.config["SPAM_GAPS"] = {kind: 0 for kind in MIN_GAP_S} if testing else dict(MIN_GAP_S)
+    # B: prove you walked. "flag" (default): suspicious finds are paid and listed for an admin.
+    # "block": they are refused. Set with the STEPQUEST_WALK_PROOF environment variable.
+    app.config["WALK_PROOF"] = parse_mode(os.environ.get("STEPQUEST_WALK_PROOF"))
     db.init_app(app)
 
     # Create the tables (if missing) and save the demo treasure on the first run.

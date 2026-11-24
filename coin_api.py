@@ -84,8 +84,16 @@ def claim_treasure(treasure_id):
         status, message = PROBLEMS[problem]
         return jsonify(error=message), status
 
+    # B: prove you walked (walk_proof.py). Does your GPS trail look like a real walk here?
+    from walk_proof_api import check_find, flag_find  # here: walk_proof_api imports this file
+    refusal, reasons = check_find(user, treasure, lat, lon)
+    if refusal:
+        return jsonify(error=refusal, reasons=reasons), 403
+
     db.session.add(CoinTransaction(user_id=user.id, amount=COINS_PER_FIND,
                                    reason=FOUND_REASON, treasure_id=treasure_id))
+    if reasons:
+        flag_find(user.id, treasure_id, reasons)  # paid, but an admin will look at it
     try:
         db.session.commit()
     except IntegrityError:  # a double tap: the other request was paid a moment ago

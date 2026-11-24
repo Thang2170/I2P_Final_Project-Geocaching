@@ -50,6 +50,13 @@
         <ol id="checks" class="feed"></ol>
         <p id="checksEmpty" class="muted" hidden>Every treasure is verified.</p>
       </section>
+
+      {# B: finds whose GPS trail looked faked (walk_proof.py). They were paid; decide if that was right. #}
+      <section class="admin__feed admin__checks">
+        <h2>Suspicious finds <span id="suspectCount" class="muted"></span></h2>
+        <ol id="suspects" class="feed"></ol>
+        <p id="suspectsEmpty" class="muted" hidden>No suspicious finds. Everyone walked.</p>
+      </section>
     </div>
   </main>
 
@@ -270,6 +277,50 @@
 
     function setText(id, value) { document.getElementById(id).textContent = value; }
 
+    // ------------------------------------------------ B: suspicious finds (prove you walked)
+
+    async function loadSuspects() {
+      const res = await fetch("/api/admin/suspicious-finds");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load suspicious finds");
+      const list = document.getElementById("suspects");
+      list.replaceChildren();
+      document.getElementById("suspectsEmpty").hidden = data.finds.length > 0;
+      setText("suspectCount", data.finds.length ? `(${data.finds.length})` : "");
+      for (const f of data.finds) {
+        const li = document.createElement("li");
+        const who = document.createElement("b");
+        who.textContent = f.player;
+        const keep = decideButton(f.id, "keep", "It's fine");
+        const reverse = decideButton(f.id, "reverse", "Take coins back");
+        li.append(who, ` found ${f.treasure} but ${f.why}. `, keep, " ", reverse);
+        list.append(li);
+      }
+    }
+
+    function decideButton(id, action, label) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn--small" + (action === "keep" ? " btn--ghost" : "");
+      button.textContent = label;
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const res = await fetch(`/api/admin/suspicious-finds/${id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action })
+          });
+          if (!res.ok) throw new Error((await res.json()).error || "Could not save");
+          await refresh();
+        } catch (error) {
+          button.disabled = false;
+          setText("updated", error.message);
+        }
+      });
+      return button;
+    }
+
     async function refresh() {
       try {
         const res = await fetch("/api/admin/summary");
@@ -284,6 +335,7 @@
         drawPlayers(data.live_players);
         drawCrossings(data.crossings || []);
         drawFeed(data.events);
+        await loadSuspects();  // B
         setText("updated", "Updated " + new Date().toLocaleTimeString());
       } catch (error) {
         setText("updated", error.message);
