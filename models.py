@@ -411,3 +411,38 @@ class CommentReply(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
     user = db.relationship("User")
+
+
+class WalkPoint(db.Model):
+    """One GPS point of a player's recent trail, for "prove you walked" (owner: B). Rules: walk_proof.py.
+
+    Only the last 30 minutes are kept; older points are deleted as new ones arrive.
+    """
+
+    __tablename__ = "walk_points"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    lat = db.Column(db.Float, nullable=False)
+    lon = db.Column(db.Float, nullable=False)
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class FindCheck(db.Model):
+    """A find whose GPS trail looked faked, waiting for an admin (owner: B). Rules: walk_proof.py.
+
+    decision: None (waiting), "kept" (it was fine) or "reversed" (the coins were taken back).
+    """
+
+    __tablename__ = "find_checks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False)
+    reasons = db.Column(db.String(100), nullable=False)  # e.g. "teleport,no_walk"
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    decision = db.Column(db.String(10), nullable=True)
+    decided_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    treasure = db.relationship("Treasure")
