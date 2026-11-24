@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
 from models import ChallengeClaim, CoinTransaction, Journey, db
-from streaks import (CHALLENGE_REWARD, challenge_list, claim_problem, local_day, streaks, week_numbers,
+from streaks import (CHALLENGE_REWARD, challenge_list, claim_problem, local_day, week_numbers,
                      week_start)
 
 challenge_api = Blueprint("challenge_api", __name__)
@@ -45,11 +45,12 @@ def _state(user):
     today = local_day(now)
     monday = week_start(today)
     finds, hunts = _activity(user.id)
-    days = {local_day(w) for w, _ in finds} | {local_day(w) for w, _ in hunts}
-    current, best = streaks(days, today)
+    # B: the streak also counts closed daily rings and streak freezes (habits.py, habit_api.py)
+    from habit_api import streak_info
+    info = streak_info(user, today)
     numbers = week_numbers(finds, hunts, monday)
     return monday, numbers, {
-        "streak": {"current": current, "best": best, "today_done": today in days},
+        "streak": {"current": info["current"], "best": info["best"], "today_done": info["today_done"]},
         "week": {"start": monday.isoformat(), "end": (monday + timedelta(days=6)).isoformat()},
         "challenges": challenge_list(numbers, _claimed(user.id, monday)),
     }
