@@ -613,3 +613,18 @@ class ModeBonus(db.Model):
     mode = db.Column(db.String(10), nullable=False)
     coins = db.Column(db.Integer, nullable=False)   # may be 0 (the pace was too slow)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class SafetyAlert(db.Model):
+    """A hunt the band's readings stopped: low SpO2 or an abnormal heart rate (owner: B).
+
+    Rules: safety.py. Kept so the player (and the Health page later) can see it happened.
+    """
+
+    __tablename__ = "safety_alerts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    reason = db.Column(db.String(20), nullable=False)    # low_spo2, high_hr or low_hr
+    title = db.Column(db.String(80), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
