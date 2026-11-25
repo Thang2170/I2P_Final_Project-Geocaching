@@ -136,3 +136,31 @@ def trail_progress(position, checkpoints, index, reach_m):
 
 def _straight_m(a, b):
     return haversine_m(a[0], a[1], b[0], b[1])
+
+
+def fmt_duration(seconds):
+    """1450 -> '24:10', 4000 -> '1:06:40'."""
+    h, rest = divmod(int(seconds), 3600)
+    m, s = divmod(rest, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def splits_text(splits):
+    """The time at each checkpoint, e.g. '1 at 3:05 · 2 at 7:40 · 🏁 12:31'. splits: seconds, in order."""
+    parts = [f"{n} at {fmt_duration(s)}" for n, s in enumerate(splits[:-1], start=1)]
+    if splits:
+        parts.append(f"🏁 {fmt_duration(splits[-1])}")
+    return " · ".join(parts)
+
+
+def trail_post_text(checkpoints, distance_m, duration_s, steps, calories, splits=()):
+    """The Community post for a finished trail, written by Python (like a run tracker)."""
+    pace = duration_s / (distance_m / 1000) if distance_m >= 20 else None
+    text = (f"🧭 Walked a Treasure Trail: {checkpoints} checkpoint{'s' if checkpoints != 1 else ''}, "
+            f"{distance_m / 1000:.2f} km in {fmt_duration(duration_s)}")
+    if pace:
+        text += f" ({fmt_duration(pace)} /km)"
+    text += f". {steps:,} steps, {calories:.0f} kcal."
+    if splits:
+        text += f" Splits: {splits_text(splits)}."
+    return text

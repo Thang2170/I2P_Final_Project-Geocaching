@@ -652,3 +652,22 @@ class StreakShare(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     day = db.Column(db.Date, nullable=False)
     streak = db.Column(db.Integer, nullable=False)
+
+
+class TrailWalk(db.Model):
+    """A Treasure Trail walked with the live panel, saved at the finish (owner: B).
+
+    Rules: trail_planner.py. A new table, so nobody has to delete their database.
+    """
+
+    __tablename__ = "trail_walks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    checkpoints = db.Column(db.Integer, nullable=False)
+    distance_m = db.Column(db.Float, nullable=False)
+    duration_s = db.Column(db.Integer, nullable=False)
+    steps = db.Column(db.Integer, nullable=False)
+    calories = db.Column(db.Float, nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True)  # its Community post
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)

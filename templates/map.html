@@ -28,6 +28,8 @@
         <button type="button" id="newRouteBtn" class="sheet__btn" hidden>↻ New route</button>
         <!-- B: Treasure Trail, a loop through unfound treasures for a step or time goal (trail_planner.py) -->
         <button type="button" id="trailBtn" class="sheet__btn" aria-expanded="false" aria-controls="trailBox">🧭 Plan a trail</button>
+        <!-- B: walk the trail with the live panel (time, pace, splits), saved at the finish -->
+        <button type="button" id="trailStartBtn" class="sheet__btn sheet__btn--go" hidden>▶ Start trail</button>
         <button type="button" id="trailEnd" class="sheet__btn" hidden>✕ End trail</button>
         <!-- B: everything else (coins, mode, team, crossings) folds away under "More" -->
         <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore">▴ More</button>
@@ -580,10 +582,13 @@
     const trailBox = document.getElementById("trailBox");
     const trailMsg = document.getElementById("trailMsg");
     const trailEnd = document.getElementById("trailEnd");
+    const trailStartBtn = document.getElementById("trailStartBtn");
 
     function trailSay(text) {
       trailMsg.textContent = text;
       trailMsg.hidden = !text;
+      // During a timed trail the status card is hidden: show the checkpoint line in the panel
+      if (journey.kind === "trail" && journey.state !== "idle" && text) jEls.msg.textContent = text;
     }
 
     trailBtn.addEventListener("click", () => {
@@ -599,10 +604,12 @@
     }
 
     function endTrail(message = "") {
+      if (journey.kind === "trail" && journeyActive()) finishJourney(false);  // stopped early: not saved
       trailActive = false;
       trail = null;
       if (trailLayer) { trailLayer.remove(); trailLayer = null; }
       trailEnd.hidden = true;
+      trailStartBtn.hidden = true;
       trailBtn.hidden = false;
       trailSay(message);
       if (currentPos && routeTarget) drawRoute(currentPos, routeTarget, !message);
@@ -652,9 +659,15 @@
         });
         const data = await res.json();
         if (!res.ok || trail !== asked) return;
-        if (data.done) { endTrail("🏁 Trail complete: you walked the whole loop!"); return; }
+        // Every checkpoint you just reached: collect its treasure (Python checks you are there)
+        for (const cp of asked.checkpoints.slice(asked.index, data.index)) {
+          if (cp.id) claimCoins(cp.id, cp.name, lat, lon);
+          trailSplit(cp);
+        }
+        if (data.done) { finishTrailWalk(lat, lon); return; }
         if (data.reached) {
           trail.index = data.index;
+          trailJourneyTarget();
           drawTrailLeg(true);
         } else if (trail.legFrom && map.distance(trail.legFrom, [lat, lon]) > REROUTE_DISTANCE_M) {
           drawTrailLeg();  // you walked off the route: a fresh route to the same checkpoint
@@ -686,19 +699,79 @@
             index: 0,
             legFrom: null,
             checkpoints: [
-              ...data.stops.map(stop => ({ lat: stop.lat, lon: stop.lon, name: stop.name, label: stop.order })),
+              ...data.stops.map(stop => ({ id: stop.id, lat: stop.lat, lon: stop.lon, name: stop.name, label: stop.order })),
               { lat: data.start[0], lon: data.start[1], name: "back to the start", label: "🏁" }
             ]
           };
           trailBox.hidden = true;
           trailBtn.setAttribute("aria-expanded", "false");
+          trail.start = data.start;
           trailBtn.hidden = true;
           trailEnd.hidden = false;
+          trailStartBtn.hidden = false;  // B: walk it with the live panel
           drawTrailLeg(true);
         } catch (err) {
           trailSay(err.message);
         }
       });
+    }
+
+    // ---- B: walk a trail with the live panel, like a run tracker (time, pace, splits)
+    function trailJourneyTarget() {
+      if (journey.kind !== "trail" || !trail) return;
+      const cp = trail.checkpoints[trail.index];
+      Object.assign(journey, { name: cp.name, target: [cp.lat, cp.lon], checkpoint: trail.index + 1 });
+      renderJourney();
+    }
+
+    function trailSplit(cp) {
+      if (journey.kind !== "trail" || !journeyActive()) return;
+      journey.splits.push(Math.round(journey.elapsedMs / 1000));
+      journeyNote(`✓ ${cp.label} ${cp.name} at ${fmtTime(journey.elapsedMs)}`);
+    }
+
+    trailStartBtn.addEventListener("click", () => {
+      if (!trail || journeyActive() || !currentPos) return;
+      const cp = trail.checkpoints[trail.index];
+      startJourney({ kind: "trail", id: null, name: cp.name, lat: cp.lat, lon: cp.lon });
+      Object.assign(journey, { checkpoint: trail.index + 1, checkpoints: trail.checkpoints.length, splits: [] });
+      trailStartBtn.hidden = true;
+      jEls.msg.textContent = trailMsg.textContent;
+      renderJourney();
+    });
+
+    // Back at the start: stop the clock and let Python check and save the walk.
+    async function finishTrailWalk(lat, lon) {
+      const walked = trail;
+      const timed = journey.kind === "trail" && journeyActive();
+      endTrail("🏁 Trail complete: you walked the whole loop!");
+      if (!timed) return;  // the trail was walked without the panel: nothing to save
+      const body = {
+        distance_m: Math.round(journey.meters), duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
+        lat, lon, start: walked.start, checkpoints: walked.checkpoints.length - 1, splits: journey.splits
+      };
+      let text = "Could not save this trail.", ok = false;
+      try {
+        const res = await fetch("/api/trail/walks", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        ok = res.ok;
+        text = ok ? "Trail saved and posted." : (data.error || text);
+        if (ok) startCooldown();  // B: the cool-down quest after a trail too
+      } catch (err) {
+        queueForLater("/api/trail/walks", body);  // A's outbox: sent when you are back online
+        text = "No connection: this trail will be saved as soon as you are back online.";
+      }
+      jSaved.textContent = text;
+      jSaved.classList.toggle("is-bad", !ok);
+      if (ok) {
+        const link = document.createElement("a");
+        link.href = "/community";
+        link.textContent = " See the Community";
+        jSaved.append(link);
+      }
+      jSaved.hidden = false;
     }
 
     // ------------------------------------------------------------ journey (live stats, like a run tracker)
@@ -775,9 +848,15 @@
       jEls.steps.textContent = journey.steps.toLocaleString();
       jEls.cal.textContent = journey.calories;
       jEls.to.textContent = currentPos ? fmtAway(map.distance(currentPos, journey.target)) : "–";
+      jEls.to.nextElementSibling.textContent = journey.kind === "trail" ? "To checkpoint" : "To treasure";  // B
       jPause.hidden = journey.state === "finished";
       jPause.textContent = journey.state === "paused" ? "Resume" : "Pause";
       jFinish.textContent = journey.state === "finished" ? "Close" : "Finish";
+      if (journey.kind === "trail") {  // B: a Treasure Trail walked with the panel
+        jEls.title.textContent = journey.state === "finished" ? "Treasure Trail: done"
+          : `Trail · ${journey.checkpoint} of ${journey.checkpoints}: ${journey.name}` + (journey.state === "paused" ? " (paused)" : "");
+        return;
+      }
       jEls.title.textContent = journey.state === "finished"
         ? `Journey to ${journey.name}: done`
         : `Journey to ${journey.name}` + (journey.state === "paused" ? " (paused)" : "");
@@ -1011,7 +1090,7 @@
       const now = Date.now();
       if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
       journey.tickAt = now;
-      if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
+      if (journey.state === "running" && journey.kind !== "trail" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
       // B: safety check every 10 s while you walk (Python reads the band and decides)
       if (journey.state === "running" && now - (journey.safetyAt || 0) >= SAFETY_EVERY_MS) checkSafety();
       // B: calories also grow with time (speed / heart-rate formulas), so refresh every 15 s too
@@ -1035,12 +1114,13 @@
     // restored = the numbers the server kept (resumeJourney), or null for a brand-new journey
     function startJourney(t, restored = null) {
       Object.assign(journey, {
+        kind: t.kind || "treasure",  // B: "trail" for a Treasure Trail
         state: "running", targetId: t.id, name: t.name, target: [t.lat, t.lon],
         elapsedMs: restored ? restored.elapsedMs : 0, meters: restored ? restored.meters : 0,
         steps: 0, calories: 0, statsAt: 0, statsMeters: -1, saveStarted: false, progressAt: Date.now(),
         tickAt: Date.now(), last: currentPos ? { pos: currentPos, time: Date.now() } : null
       });
-      if (!restored) tellServerJourneyStarted(t);
+      if (!restored && journey.kind === "treasure") tellServerJourneyStarted(t);
       closeBoard();
       document.body.classList.add("is-journey");
       journeyBox.hidden = false;
@@ -1053,7 +1133,8 @@
       renderJourney();
       showModeLine(Math.round(journey.meters), 1);  // B: try-hard target or calm reminder from the start
       // Zoom so the whole route shows above the panel (the panel is now on screen to measure).
-      if (routeLine) map.fitBounds(routeLine.getBounds(), routePadding());
+      const shown = journey.kind === "trail" ? trailLayer : routeLine;
+      if (shown) map.fitBounds(shown.getBounds(), routePadding());
     }
 
     // ▾ Less / ▴ More: hide the extra numbers and messages, or show them again.
@@ -1155,12 +1236,15 @@
 
     // The status card is hidden during a journey, so its messages ("123 m to Library",
     // "You found it", the coins you got) are copied into the panel.
-    new MutationObserver(() => { if (journey.state !== "idle") jEls.msg.textContent = statusBox.textContent; })
+    new MutationObserver(() => {
+      if (journey.state !== "idle" && journey.kind !== "trail") jEls.msg.textContent = statusBox.textContent;
+    })
       .observe(statusBox, { childList: true, characterData: true, subtree: true });
 
     // Python says you are within 20 m of the treasure (the status card turns gold): the journey is over.
     new MutationObserver(() => {
-      if (sheet.classList.contains("is-found") && journeyActive() && huntId === journey.targetId) finishJourney(true);
+      if (sheet.classList.contains("is-found") && journeyActive() && journey.kind === "treasure"
+          && huntId === journey.targetId) finishJourney(true);
     }).observe(sheet, { attributes: true, attributeFilter: ["class"] });
 
     // Closing the tab in the middle of a walk would lose it, so ask first.
@@ -1438,7 +1522,7 @@
     // No signal but GPS still works: if you are at the treasure, count it now. Python
     // checks the position again when the saved actions arrive.
     function arrivedWhileOffline() {
-      if (!journeyActive() || !currentPos) return;
+      if (!journeyActive() || !currentPos || journey.kind === "trail") return;
       if (map.distance(currentPos, journey.target) > OFFLINE_FOUND_M) return;
       const [lat, lon] = currentPos;
       queueForLater(`/api/treasures/${journey.targetId}/claim`, { lat, lon });
