@@ -39,7 +39,13 @@
         <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore">▴ More</button>
       </div>
       <div id="trailBox" class="trail-box" hidden>
-        <p class="trail-box__ask">How long do you want to walk? The loop starts and ends here.</p>
+        <p class="trail-box__ask">How long do you want to walk? <span id="trailShapeText">The loop starts and ends here.</span></p>
+        <!-- B: the trail's shape, and skipping treasures other players rated badly (trail_planner.py) -->
+        <div class="trail-shape" role="group" aria-label="Trail shape">
+          <button type="button" class="trail-shape__btn is-on" data-shape="loop" aria-pressed="true">↺ Loop back here</button>
+          <button type="button" class="trail-shape__btn" data-shape="oneway" aria-pressed="false">→ One way</button>
+        </div>
+        <label class="trail-box__skip"><input type="checkbox" id="trailSkipLow"> Skip low-rated treasures (2★ or less)</label>
         <div class="trail-box__choices">
           <button type="button" class="trail-pick" data-steps="1500">1,500 steps</button>
           <button type="button" class="trail-pick" data-steps="3000">3,000 steps</button>
@@ -601,6 +607,20 @@
       trailBtn.setAttribute("aria-expanded", String(!trailBox.hidden));
     });
 
+    // B: loop back here, or one way (ends at the last treasure, so the same steps reach further)
+    let trailShape = "loop";
+    for (const btn of document.querySelectorAll(".trail-shape__btn")) {
+      btn.addEventListener("click", () => {
+        trailShape = btn.dataset.shape;
+        for (const b of document.querySelectorAll(".trail-shape__btn")) {
+          b.classList.toggle("is-on", b === btn);
+          b.setAttribute("aria-pressed", String(b === btn));
+        }
+        document.getElementById("trailShapeText").textContent = trailShape === "loop"
+          ? "The loop starts and ends here." : "It starts here and ends at the last treasure.";
+      });
+    }
+
     function stopIcon(label, kind = "") {
       const number = document.createElement("span");  // an element, so no HTML text is ever parsed
       number.className = "trail-stop__n";
@@ -712,12 +732,13 @@
       pick.addEventListener("click", async () => {
         if (!currentPos) { trailSay("Waiting for your location…"); return; }
         const goal = pick.dataset.steps ? { steps: Number(pick.dataset.steps) } : { minutes: Number(pick.dataset.minutes) };
-        trailSay("Planning your loop…");
+        trailSay(trailShape === "loop" ? "Planning your loop…" : "Planning your trail…");
         try {
           const res = await fetch("/api/trail", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: currentPos[0], lon: currentPos[1], ...goal })
+            body: JSON.stringify({ lat: currentPos[0], lon: currentPos[1], ...goal, shape: trailShape,
+                                   skip_low: document.getElementById("trailSkipLow").checked })
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Could not plan a trail");
@@ -731,9 +752,11 @@
             legFrom: null,
             checkpoints: [
               ...data.stops.map(stop => ({ id: stop.id, lat: stop.lat, lon: stop.lon, name: stop.name, label: stop.order })),
-              { lat: data.start[0], lon: data.start[1], name: "back to the start", label: "🏁" }
+              // a loop ends back here; a one-way trail ends at its last treasure
+              ...(data.shape === "oneway" ? [] : [{ lat: data.start[0], lon: data.start[1], name: "back to the start", label: "🏁" }])
             ]
           };
+          trail.shape = data.shape || "loop";
           trailBox.hidden = true;
           trailBtn.setAttribute("aria-expanded", "false");
           trail.start = data.start;
@@ -780,7 +803,7 @@
       fetch("/api/trail/active", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          checkpoints: trail.checkpoints, index: trail.index, start: trail.start, splits: journey.splits,
+          checkpoints: trail.checkpoints, index: trail.index, start: trail.start, splits: journey.splits, shape: trail.shape,
           meters: Math.round(journey.meters), elapsed_s: Math.round(journey.elapsedMs / 1000)
         })
       }).catch(() => {});  // offline: the next try in 30 s
@@ -799,7 +822,7 @@
         if (data.expired) { showNet("Your trail ran out of time (no news for 30 minutes)."); return; }
         const a = data.active;
         if (!a || journeyActive()) return;
-        trail = { checkpoints: a.checkpoints, index: a.index, start: a.start, legFrom: null };
+        trail = { checkpoints: a.checkpoints, index: a.index, start: a.start, shape: a.shape, legFrom: null };
         trailActive = true;
         if (routeLine) { routeLine.remove(); routeLine = null; }
         routeInfo.hidden = true;
@@ -823,11 +846,14 @@
     async function finishTrailWalk(lat, lon) {
       const walked = trail;
       const timed = journey.kind === "trail" && journeyActive();
-      endTrail("🏁 Trail complete: you walked the whole loop!");
+      endTrail(walked.shape === "oneway" ? "🏁 Trail complete: you reached the last treasure!"
+                                         : "🏁 Trail complete: you walked the whole loop!");
       if (!timed) return;  // the trail was walked without the panel: nothing to save
       const body = {
         distance_m: Math.round(journey.meters), duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
-        lat, lon, start: walked.start, checkpoints: walked.checkpoints.length - 1, splits: journey.splits
+        lat, lon, shape: walked.shape, splits: journey.splits,
+        end: [walked.checkpoints.at(-1).lat, walked.checkpoints.at(-1).lon],  // where the trail finishes
+        checkpoints: walked.checkpoints.filter(cp => cp.id).length          // the treasures (not "back to the start")
       };
       let text = "Could not save this trail.", ok = false;
       try {

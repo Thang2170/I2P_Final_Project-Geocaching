@@ -2077,3 +2077,16 @@ button.post__likes[hidden] { display: none; }
 .trail-stop.trail-stop--later, .trail-stop.trail-stop--done { animation: none; opacity: .85; }
 .trail-stop--later .trail-stop__n, .trail-stop--done .trail-stop__n { font-size: 9px; }
 .trail-stop.trail-stop--done { background: var(--px-paper); }
+
+/* ---------- B: trail shape and "skip low-rated" in the trail box ---------- */
+.trail-shape { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 6px; }
+.trail-shape__btn {
+  padding: 6px 4px; border: 3px solid var(--px-line); background: var(--px-paper); color: var(--px-ink);
+  font-family: var(--font-body); font-size: 17px; cursor: pointer;
+}
+.trail-shape__btn.is-on { border-color: #4fc3b0; background: #4fc3b0; color: #14231f; }
+.trail-shape__btn:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+.trail-box__skip { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 17px; color: var(--px-muted); cursor: pointer; }
+.trail-box__skip input { width: 18px; height: 18px; margin: 0; accent-color: #4fc3b0; }
+/* While you plan a trail the card may grow, so all the choices fit without scrolling */
+.sheet:has(#trailBox:not([hidden])) { max-height: 60vh; }

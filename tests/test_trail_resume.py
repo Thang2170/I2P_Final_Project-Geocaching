@@ -25,7 +25,7 @@ class RulesTest(unittest.TestCase):
         self.assertIsNone(s["checkpoints"][1]["id"])
 
     def test_bad_state(self):
-        bad = [None, state(checkpoints=CPS[:1]), state(checkpoints=[CPS[0], "x"]), state(index=2),
+        bad = [None, state(checkpoints=[]), state(checkpoints=[CPS[0], "x"]), state(index=2),
                state(index=True), state(start=[1]), state(splits=[100, 50]), state(splits=[999]),
                state(meters=-1), state(meters=float("nan")), state(elapsed_s=1.5),
                state(checkpoints=[CPS[0] | {"name": ""}, CPS[1]]), state(checkpoints=[CPS[0] | {"lat": 95}, CPS[1]]),

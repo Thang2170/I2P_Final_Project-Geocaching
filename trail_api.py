@@ -15,13 +15,13 @@ from calculator import steps_from_distance
 from coin_api import found_treasure_ids
 from journey_log import speed_problem
 from location import haversine_m
-from models import ActiveTrail, Post, TrailWalk, Treasure, db
+from models import ActiveTrail, Post, TrailWalk, Treasure, TreasureRating, db
 from walk_api import _saved_weight, energy_for
 from walk_input import DEFAULT_WEIGHT_KG, parse_distance_m, parse_duration_s
 from routing import get_route
 from location import FOUND_RADIUS_M
-from trail_planner import (can_carry_on, parse_active_trail, parse_goal, plan_trail, trail_post_text,
-                           trail_progress)
+from trail_planner import (SHAPES, can_carry_on, low_rated, parse_active_trail, parse_goal, parse_shape, plan_trail,
+                           trail_post_text, trail_progress)
 from weather_api import public_choice, weather_for
 from treasure_input import parse_number
 
@@ -31,8 +31,10 @@ trail_api = Blueprint("trail_api", __name__)
 @trail_api.route("/api/trail", methods=["POST"])
 def make_trail():
     """Send JSON: lat, lon (where you are) and steps OR minutes.
+    B: optional shape ("loop", the default, or "oneway") and skip_low (true: leave out treasures
+    other players rated 2 stars or less on average).
 
-    Answers with the stops in walking order and the real walking path of the whole loop.
+    Answers with the stops in walking order and the real walking path of the whole trail.
     """
     user = current_user()
     if user is None:
@@ -42,14 +44,28 @@ def make_trail():
         lat = parse_number(data.get("lat"), "lat", -90, 90)
         lon = parse_number(data.get("lon"), "lon", -180, 180)
         budget_m, label = parse_goal(data)
+        shape = parse_shape(data.get("shape"))
+        skip_low = data.get("skip_low", False)
+        if not isinstance(skip_low, bool):
+            raise ValueError("skip_low must be true or false")
     except ValueError as err:
         return jsonify(error=str(err)), 400
+    loop = shape == "loop"
 
     # Only treasures you can still earn coins from: not found yet, and not your own.
     found = set(found_treasure_ids(user.id))
     treasures = [t for t in db.session.execute(db.select(Treasure)).scalars()
                  if t.id not in found and t.created_by != user.id]
-    plan = plan_trail((lat, lon), [{"id": t.id, "lat": t.lat, "lon": t.lon} for t in treasures], budget_m)
+    skipped = 0
+    if skip_low:  # B: leave out treasures other players didn't enjoy
+        ratings = {}
+        for tid, stars in db.session.execute(db.select(TreasureRating.treasure_id, TreasureRating.stars)):
+            ratings.setdefault(tid, []).append(stars)
+        low = low_rated(ratings)
+        skipped = sum(1 for t in treasures if t.id in low)
+        treasures = [t for t in treasures if t.id not in low]
+    plan = plan_trail((lat, lon), [{"id": t.id, "lat": t.lat, "lon": t.lon} for t in treasures], budget_m,
+                      loop=loop)
     if not plan["ids"]:
         return jsonify(goal=label, stops=[], message=(
             "No treasure you haven't found fits in that walk. Try a longer one.")), 200
@@ -57,7 +73,8 @@ def make_trail():
     by_id = {t.id: t for t in treasures}
     stops = [by_id[i] for i in plan["ids"]]
     weather, choice = weather_for(lat, lon)  # B: shortest in the rain, greener in the heat
-    route = get_route([(lat, lon), *[(t.lat, t.lon) for t in stops], (lat, lon)], extra=choice["route_options"])
+    back = [(lat, lon)] if loop else []  # B: a one-way trail ends at the last treasure
+    route = get_route([(lat, lon), *[(t.lat, t.lon) for t in stops], *back], extra=choice["route_options"])
     return jsonify(
         goal=label,
         stops=[{"order": n, "id": t.id, "name": t.name, "lat": t.lat, "lon": t.lon}
@@ -68,8 +85,9 @@ def make_trail():
         steps=steps_from_distance(route["distance_m"]),
         warning=route.get("warning"),
         weather=public_choice(choice) if weather else None,
-        message=_message(len(stops), len(treasures), label),
-        start=[lat, lon],  # B: the last checkpoint is back here
+        message=_message(len(stops), len(treasures), label, shape, skipped),
+        start=[lat, lon],  # B: a loop's last checkpoint is back here
+        shape=shape,
     )
 
 
@@ -99,12 +117,15 @@ def progress():
         return jsonify(error=str(err)), 400
 
 
-def _message(n_stops, n_left, label):
+def _message(n_stops, n_left, label, shape="loop", skipped=0):
     """What the map says above the stops. If every treasure you can still find is already on the
-    loop, the walk is shorter than your goal: say why, so it doesn't look like a mistake."""
-    text = f"{n_stops} treasure{'s' if n_stops != 1 else ''} on your {label} loop."
+    trail, the walk is shorter than your goal: say why, so it doesn't look like a mistake."""
+    kind = SHAPES[shape]
+    text = f"{n_stops} treasure{'s' if n_stops != 1 else ''} on your {label} {kind}."
     if n_stops == n_left:
-        text += " That's every treasure you haven't found yet, so the loop is shorter than your goal."
+        text += f" That's every treasure you haven't found yet, so the {kind} is shorter than your goal."
+    if skipped:
+        text += f" Skipped {skipped} low-rated treasure{'s' if skipped != 1 else ''}."
     return text
 
 
@@ -115,9 +136,10 @@ MAX_SPLITS = 20
 def save_trail_walk():
     """B: save a trail walked with the live panel, and post it to the Community.
 
-    Send JSON: distance_m, duration_s, lat, lon (where you finished), start ([lat, lon], where the
-    loop began and ends), checkpoints (how many) and splits (seconds at each checkpoint, optional).
-    Python checks you are back at the start and that the speed is a walk or a run, and works out
+    Send JSON: distance_m, duration_s, lat, lon (where you finished), end ([lat, lon], the last
+    checkpoint: back at the start for a loop; "start" is accepted too), shape ("loop" or "oneway"),
+    checkpoints (how many) and splits (seconds at each checkpoint, optional).
+    Python checks you are at the end and that the speed is a walk or a run, and works out
     the steps and calories itself.
     """
     user = current_user()
@@ -129,10 +151,11 @@ def save_trail_walk():
         duration_s = int(parse_duration_s(data.get("duration_s")))
         lat = parse_number(data.get("lat"), "lat", -90, 90)
         lon = parse_number(data.get("lon"), "lon", -180, 180)
-        start = data.get("start")
-        if not isinstance(start, list) or len(start) != 2:
-            raise ValueError("start must be [lat, lon]")
-        start = (parse_number(start[0], "lat", -90, 90), parse_number(start[1], "lon", -180, 180))
+        end = data.get("end", data.get("start"))
+        if not isinstance(end, list) or len(end) != 2:
+            raise ValueError("end must be [lat, lon]")
+        end = (parse_number(end[0], "lat", -90, 90), parse_number(end[1], "lon", -180, 180))
+        shape = parse_shape(data.get("shape"))
         checkpoints = data.get("checkpoints")
         if not isinstance(checkpoints, int) or isinstance(checkpoints, bool) or not 1 <= checkpoints <= 20:
             raise ValueError("checkpoints must be a whole number from 1 to 20")
@@ -145,16 +168,17 @@ def save_trail_walk():
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
-    away = haversine_m(lat, lon, start[0], start[1])
+    away = haversine_m(lat, lon, end[0], end[1])
     if away > FOUND_RADIUS_M:
-        return jsonify(error=f"You are {round(away)} m from the start. A trail ends back where it began."), 400
+        where = "the start. A loop ends back where it began" if shape == "loop" else "the last checkpoint"
+        return jsonify(error=f"You are {round(away)} m from {where}."), 400
     problem = speed_problem(distance_m, duration_s)
     if problem:
         return jsonify(error=problem), 400
 
     weight_kg = _saved_weight(user) or DEFAULT_WEIGHT_KG
     energy = energy_for(user, distance_m, weight_kg, duration_s)
-    text = trail_post_text(checkpoints, distance_m, duration_s, energy["steps"], energy["calories"], splits)
+    text = trail_post_text(checkpoints, distance_m, duration_s, energy["steps"], energy["calories"], splits, shape)
     post = Post(user_id=user.id, text=text)
     db.session.add(post)
     db.session.flush()
