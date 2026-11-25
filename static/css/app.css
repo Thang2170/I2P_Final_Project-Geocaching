@@ -2015,3 +2015,35 @@ button.post__likes[hidden] { display: none; }
 .safety__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .safety__buttons .btn { margin-top: 0; text-align: center; text-decoration: none; }
 .safety__call { background: var(--px-bad); color: var(--px-paper); }
+
+/* ---------- B: compact status card, so the map stays visible ---------- */
+/* Never taller than a third of the screen; anything more scrolls inside the card. */
+.sheet { max-height: 34vh; overflow-y: auto; padding: 10px 14px; }
+.sheet .sheet__route { font-size: 18px; line-height: 1.2; }
+.sheet__more[hidden] { display: none; }
+/* The weather tip is extra: shown only when the card is opened with "More" */
+.sheet:not(.is-more) #weatherTip { display: none; }
+
+.sheet__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sheet__btn {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border: 3px solid var(--px-ink);
+  background: var(--px-paper);
+  color: var(--px-ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  cursor: pointer;
+}
+.sheet__btn[hidden] { display: none; }
+.sheet__btn:hover { background: #fff; }
+.sheet__btn:focus-visible { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+.sheet__btn--more { flex: 0 0 auto; color: var(--px-muted); border-color: var(--px-line); }
+.sheet .trail-box__choices { grid-template-columns: repeat(3, 1fr); }
+.sheet .trail-pick { padding: 6px 4px; }
+
+/* The next trail checkpoint stands out */
+.trail-stop { animation: trail-pulse 1.2s steps(2) infinite; }
+@keyframes trail-pulse { 50% { box-shadow: 0 0 0 3px #14231f, 0 0 0 8px rgba(79, 195, 176, .55); } }
+@media (prefers-reduced-motion: reduce) { .trail-stop { animation: none; } }
+.trail-stop__n { font-size: 12px; }

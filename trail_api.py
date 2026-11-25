@@ -12,7 +12,8 @@ from calculator import steps_from_distance
 from coin_api import found_treasure_ids
 from models import Treasure, db
 from routing import get_route
-from trail_planner import parse_goal, plan_trail
+from location import FOUND_RADIUS_M
+from trail_planner import parse_goal, plan_trail, trail_progress
 from weather_api import public_choice, weather_for
 from treasure_input import parse_number
 
@@ -60,7 +61,34 @@ def make_trail():
         warning=route.get("warning"),
         weather=public_choice(choice) if weather else None,
         message=_message(len(stops), len(treasures), label),
+        start=[lat, lon],  # B: the last checkpoint is back here
     )
+
+
+@trail_api.route("/api/trail/progress", methods=["POST"])
+def progress():
+    """B: walking a trail one leg at a time. Python decides when you reached a checkpoint.
+
+    Send JSON: lat, lon (where you are), checkpoints ([[lat, lon], ...] in order, the last one
+    back at the start) and index (the checkpoint you were heading to).
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        lat = parse_number(data.get("lat"), "lat", -90, 90)
+        lon = parse_number(data.get("lon"), "lon", -180, 180)
+        raw = data.get("checkpoints")
+        if not isinstance(raw, list) or not 1 <= len(raw) <= 20:
+            raise ValueError("checkpoints must be a list of 1 to 20 [lat, lon] points")
+        checkpoints = [(parse_number(p[0], "lat", -90, 90), parse_number(p[1], "lon", -180, 180))
+                       for p in raw if isinstance(p, (list, tuple)) and len(p) == 2]
+        if len(checkpoints) != len(raw):
+            raise ValueError("each checkpoint must be [lat, lon]")
+        index = data.get("index")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise ValueError("index must be a whole number")
+        return jsonify(trail_progress((lat, lon), checkpoints, index, FOUND_RADIUS_M))
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
 
 
 def _message(n_stops, n_left, label):
