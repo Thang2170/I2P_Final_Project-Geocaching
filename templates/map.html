@@ -915,7 +915,8 @@
     // "you found it" (/api/distance): the browser only keeps the clock and adds up your steps.
     const MIN_STEP_M = 3;       // moves smaller than this are GPS wobble while standing still
     const MAX_SPEED_MS = 12;    // faster than this (m/s) is a GPS jump, not walking
-    const STATS_EVERY_MS = 3000;
+    const STATS_EVERY_MS = 5000;   // B: the live update while you move...
+    const LIVE_STILL_MS = 10000;   // ...and while you stand still (the safety check needs it this often)
 
     const journeyBox = document.getElementById("journey");
     const startBtn = document.getElementById("startBtn");
@@ -1010,48 +1011,44 @@
       journey.last = { pos: [lat, lon], time: now };
     }
 
-    // Steps and calories: Python does the maths from the distance (/api/walk-stats).
+    // B: ONE live update while you walk (/api/journey/live): steps and calories (from your speed, or
+    // your band's heart rate if it's on: energy.py), the heart-rate zone, the safety check and the
+    // try-hard pace. Python works all of it out; this only shows it.
     let journeyStatsId = 0;
     async function loadJourneyStats() {
       const requestId = ++journeyStatsId;
       journey.statsAt = Date.now();
       journey.statsMeters = journey.meters;
+      const running = journey.state === "running";
       try {
-        // B: with the time too, Python uses your speed, or your band's heart rate if it's on (energy.py)
         const seconds = Math.max(1, Math.round(journey.elapsedMs / 1000));
-        const res = await fetch(`/api/walk-stats?distance_m=${Math.round(journey.meters)}&duration_s=${seconds}`);
+        const res = await fetch(`/api/journey/live?distance_m=${Math.round(journey.meters)}&duration_s=${seconds}`);
         const data = await res.json();
         if (requestId !== journeyStatsId || !res.ok) return;
-        journey.steps = data.steps;
-        journey.calories = data.calories;
-        document.getElementById("jCalFrom").textContent = data.source_text || "";
+        journey.steps = data.stats.steps;
+        journey.calories = data.stats.calories;
+        document.getElementById("jCalFrom").textContent = data.stats.source_text || "";
         renderJourney();
+        if (!running) return;  // finished or paused: just the final numbers
+        if (data.zone) showZone(data.zone);
+        if (data.mode) showModeLine(data.mode);
+        if (data.safety) showSafety(data.safety);
       } catch (err) {
-        console.error("Journey stats failed:", err);
+        console.error("Live update failed:", err);  // no connection: the clock keeps counting
       }
-      if (journey.state === "running") loadZone(Math.max(1, Math.round(journey.elapsedMs / 1000)));
-      if (journey.state === "running") showModeLine(Math.round(journey.meters), Math.max(1, Math.round(journey.elapsedMs / 1000)));
     }
 
     // ------------------------------------------------------------ B: walking modes (modes.py)
 
     // ------------------------------------------------------------ B: safety alerts (safety.py)
 
-    const SAFETY_EVERY_MS = 10000;
+    // Checked at least every 10 s while you walk (part of the live update)
     const safetyBox = document.getElementById("safetyAlert");
     const jSafety = document.getElementById("jSafety");
-    async function checkSafety() {
-      journey.safetyAt = Date.now();
-      try {
-        const res = await fetch("/api/safety/now");
-        if (!res.ok) return;
-        const s = await res.json();
-        jSafety.hidden = s.level !== "caution";
-        jSafety.textContent = s.level === "caution" ? `${s.title}: ${s.text}` : "";
-        if (s.level === "stop" && journeyActive()) safetyStop(s);
-      } catch (err) {
-        console.error("Safety check failed:", err);  // no connection: the band keeps its readings
-      }
+    function showSafety(s) {
+      jSafety.hidden = s.level !== "caution";
+      jSafety.textContent = s.level === "caution" ? `${s.title}: ${s.text}` : "";
+      if (s.level === "stop" && journeyActive()) safetyStop(s);
     }
 
     function safetyStop(s) {
@@ -1139,33 +1136,18 @@
 
     // During a journey: try-hard shows your pace against the target (Python decides), calm a reminder.
     const jModeLine = document.getElementById("jModeLine");
-    async function showModeLine(meters, seconds) {
-      jModeLine.hidden = walkMode === "normal";
-      jModeLine.dataset.mode = walkMode;
-      if (walkMode === "calm") {
-        jModeLine.textContent = "🌿 No rush. Breathe slowly and notice what is around you.";
-        return;
-      }
-      if (walkMode !== "tryhard") return;
-      try {
-        const res = await fetch(`/api/mode/pace?distance_m=${meters}&duration_s=${seconds}`);
-        if (!res.ok) return;
-        const p = await res.json();
-        jModeLine.textContent = p.text;
-        jModeLine.classList.toggle("is-slow", p.on_pace === false);
-      } catch (err) {
-        console.error("Pace failed:", err);
-      }
+    function showModeLine(m) {
+      jModeLine.hidden = !m.text;
+      jModeLine.dataset.mode = m.mode;
+      jModeLine.textContent = m.text;
+      jModeLine.classList.toggle("is-slow", m.on_pace === false);
     }
     loadMode();
 
     // B: your heart-rate zone now (Python works it out from the band: zone_coach.py)
     const jZone = document.getElementById("jZone"), jZoneWarn = document.getElementById("jZoneWarn");
-    async function loadZone(seconds) {
-      try {
-        const res = await fetch(`/api/zone/now?duration_s=${seconds}`);
-        if (!res.ok) return;
-        const z = await res.json();
+    function showZone(z) {
+      {
         jZone.hidden = !z.has_band;
         jZoneWarn.hidden = !z.warning;
         jZoneWarn.textContent = z.warning || "";
@@ -1178,8 +1160,6 @@
           `${z.hr} bpm (${z.percent}% of max) · ${mins} min in the 60–80% zone` +
           (z.bonus_coins ? ` · +${z.bonus_coins} bonus coins` : "") +
           (z.in_bonus_zone ? " ✓" : "");
-      } catch (err) {
-        console.error("Zone failed:", err);
       }
     }
 
@@ -1227,11 +1207,10 @@
       if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) {
         if (journey.kind === "trail") keepTrail(); else sendProgress();  // B: trails are kept too
       }
-      // B: safety check every 10 s while you walk (Python reads the band and decides)
-      if (journey.state === "running" && now - (journey.safetyAt || 0) >= SAFETY_EVERY_MS) checkSafety();
-      // B: calories also grow with time (speed / heart-rate formulas), so refresh every 15 s too
+      // B: the live update: every 5 s while you move, and at least every 10 s when you stand still
+      // (calories grow with time, and the safety check must not wait longer than that)
       if (journey.state === "running" && now - journey.statsAt >= STATS_EVERY_MS
-          && (journey.meters !== journey.statsMeters || now - journey.statsAt >= 15000)) loadJourneyStats();
+          && (journey.meters !== journey.statsMeters || now - journey.statsAt >= LIVE_STILL_MS)) loadJourneyStats();
       renderJourney();
     }
 
@@ -1267,7 +1246,7 @@
       keepScreenOn(true);
       updateStartButton();
       renderJourney();
-      showModeLine(Math.round(journey.meters), 1);  // B: try-hard target or calm reminder from the start
+      loadJourneyStats();  // B: the zone, mode line and safety check from the start
       // Zoom so the whole route shows above the panel (the panel is now on screen to measure).
       const shown = journey.kind === "trail" ? trailLayer : routeLine;
       if (shown) map.fitBounds(shown.getBounds(), routePadding());

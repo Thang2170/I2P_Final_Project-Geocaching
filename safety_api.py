@@ -49,12 +49,17 @@ def safety_now():
     user = current_user()
     if user is None:
         return jsonify(error="Log in first"), 401
+    return jsonify(safety_report(user))
+
+
+def safety_report(user):
+    """ok, caution or stop from the band's last 2 minutes; a stop is saved (also used by /api/journey/live)."""
     now = _now()
     readings = recent_readings(user.id, now)
     result = check(readings, max_heart_rate(age_of(user.id)))
     if result["level"] == "stop":
         _remember(user, result, now)
-    return jsonify(result | {"has_band": bool(readings)})
+    return result | {"has_band": bool(readings)}
 
 
 @safety_api.route("/api/safety/alerts")

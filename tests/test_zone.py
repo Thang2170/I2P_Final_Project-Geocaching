@@ -174,7 +174,7 @@ class ApiTest(unittest.TestCase):
 
     def test_the_map_shows_the_zone(self):
         html = self.client.get("/").get_data(as_text=True)
-        for part in ('id="jZone"', 'id="jZoneWarn"', 'id="jCool"', "/api/zone/now", "/api/zone/cooldown"):
+        for part in ('id="jZone"', 'id="jZoneWarn"', 'id="jCool"', "/api/journey/live", "showZone(data.zone)", "/api/zone/cooldown"):
             self.assertIn(part, html)
 
 

@@ -107,7 +107,7 @@ class ApiTest(unittest.TestCase):
 
     def test_the_map_has_the_safety_stop(self):
         html = self.client.get("/").get_data(as_text=True)
-        for part in ('id="safetyAlert"', 'role="alertdialog"', 'href="tel:119"', "/api/safety/now", "safetyStop(s)"):
+        for part in ('id="safetyAlert"', 'role="alertdialog"', 'href="tel:119"', "/api/journey/live", "showSafety(data.safety)", "safetyStop(s)"):
             self.assertIn(part, html)
 
 

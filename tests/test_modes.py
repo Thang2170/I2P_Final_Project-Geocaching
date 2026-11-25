@@ -133,7 +133,7 @@ class ApiTest(unittest.TestCase):
     def test_the_map_has_the_modes(self):
         html = self.client.get("/").get_data(as_text=True)
         for part in ('id="modePicker"', 'data-mode="tryhard"', 'data-mode="calm"', 'id="boardCalm"',
-                     'id="jModeLine"', "/api/calm-spots", "/api/mode/pace"):
+                     'id="jModeLine"', "/api/calm-spots", "/api/journey/live", "showModeLine(data.mode)"):
             self.assertIn(part, html)
 
 

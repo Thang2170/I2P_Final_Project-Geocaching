@@ -13,8 +13,8 @@ from health import max_heart_rate
 from models import CoinTransaction, CooldownDone, Journey, ZoneBonus, db
 from walk_api import age_of
 from walk_input import parse_duration_s
-from zone_coach import (COOLDOWN_REWARD, COOLDOWN_S, COOLDOWN_WINDOW_S, bonus_coins, bonus_seconds,
-                        cooldown_bpm, cooldown_progress, now_report)
+from zone_coach import (HARD_LIMIT_S, COOLDOWN_REWARD, COOLDOWN_S, COOLDOWN_WINDOW_S, bonus_coins, bonus_seconds,
+                        cooldown_bpm, cooldown_progress, now_report, warning)
 
 zone_api = Blueprint("zone_api", __name__)
 
@@ -69,11 +69,31 @@ def zone_now():
         duration_s = parse_duration_s(request.args.get("duration_s"))
     except ValueError as err:
         return jsonify(error=str(err)), 400
+    return jsonify(zone_report(user, duration_s))
+
+
+WARN_LOOKBACK_S = HARD_LIMIT_S + 2 * 60  # the warnings look back at least 12 minutes
+
+
+def zone_report(user, duration_s):
+    """Your zone now, bonus so far and any warning (also used by /api/journey/live).
+
+    The bonus counts this journey only (the last duration_s seconds). The "too hard for too
+    long" warnings look back at least WARN_LOOKBACK_S, so they also count the minutes just
+    before you started this journey: your heart doesn't reset when you press Start.
+    """
     now = datetime.now(timezone.utc)
-    readings = readings_between(user.id, now - timedelta(seconds=duration_s), now)
-    report = now_report(readings, hr_max_of(user.id))
-    report["max_hr"] = hr_max_of(user.id)
-    return jsonify(report)
+    hr_max = hr_max_of(user.id)
+    readings = readings_between(user.id, now - timedelta(seconds=max(duration_s, WARN_LOOKBACK_S)), now)
+    journey_start = _naive(now) - timedelta(seconds=duration_s)
+    report = now_report([r for r in readings if r[0] >= journey_start], hr_max)
+    if readings:
+        report["warning"] = warning(readings, hr_max)
+        if not report["has_band"]:  # band readings from before this journey only
+            report = now_report(readings[-1:], hr_max) | {"bonus_seconds": 0, "bonus_coins": 0,
+                                                          "zone_seconds": [0] * 5, "warning": report["warning"]}
+    report["max_hr"] = hr_max
+    return report
 
 
 def _latest_journey(user):
