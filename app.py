@@ -38,6 +38,7 @@ from weather_api import weather_api
 from mode_api import mode_api
 from safety_api import safety_api
 from habit_api import habit_api
+from journey_live_api import journey_live_api
 from trail_api import trail_api
 from treasure_api import treasure_api
 from walk_api import walk_api
@@ -118,6 +119,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(mode_api)  # B: try-hard and calm walks (modes.py)
     app.register_blueprint(safety_api)  # B: safety alerts from the band (safety.py)
     app.register_blueprint(habit_api)  # B: daily ring, streak freezes, sharing (habits.py)
+    app.register_blueprint(journey_live_api)  # B: one live update while you walk
     # B: login cookies are signed with this key. It is never a fixed text in the code any more
     # (anyone could read that in the repo); see secret_key.py.
     app.config["SECRET_KEY"] = _secret_key(app, database_uri)

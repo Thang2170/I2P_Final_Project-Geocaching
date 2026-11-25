@@ -96,6 +96,22 @@ def pace_status(distance_m, duration_s):
     return {"on_pace": on_pace, "pace": fmt_pace(pace), "target": target, "text": text}
 
 
+CALM_LINE = "🌿 No rush. Breathe slowly and notice what is around you."
+
+
+def mode_line(mode, distance_m, duration_s):
+    """The line under the journey stats: the try-hard pace, the calm reminder, or nothing (normal).
+
+    Returns {"mode", "text", "on_pace"} (on_pace is None unless try-hard has enough to go on).
+    """
+    if mode == "tryhard":
+        status = pace_status(distance_m, duration_s)
+        return {"mode": mode, "text": status["text"], "on_pace": status["on_pace"]}
+    if mode == "calm":
+        return {"mode": mode, "text": CALM_LINE, "on_pace": None}
+    return {"mode": "normal", "text": "", "on_pace": None}
+
+
 def tryhard_bonus(distance_m, duration_s):
     """(coins, text) for a finished try-hard hunt. 0 coins if the pace was too slow."""
     if distance_m < TRYHARD_MIN_M:
