@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Weekly report · StepQuest</title>
+  <style>
+    /* B: the weekly health report (weekly_report.py). Python works out every number; this page draws them. */
+    .week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0 16px; }
+    .week-nav h2 { margin: 0; font-size: 20px; text-align: center; }
+    .week-nav .btn { width: auto; margin: 0; padding: 8px 12px; }
+    .week-nav .btn[disabled] { visibility: hidden; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .tile { padding: 10px 12px; box-shadow: 0 0 0 3px var(--px-ink); background: var(--px-paper); }
+    .tile span { display: block; color: var(--px-muted); font-size: 16px; }
+    .tile strong { display: block; font-size: 28px; line-height: 1.1; color: var(--px-ink); }
+    .tile small { display: block; color: var(--px-muted); font-size: 15px; min-height: 1em; }
+    .chart-box { position: relative; margin: 6px 0 20px; }
+    .chart { width: 100%; height: auto; display: block; }
+    .chart .grid { stroke: rgba(20, 35, 31, .12); stroke-width: 1; }
+    .chart .axis { stroke: rgba(20, 35, 31, .45); stroke-width: 1; }
+    .chart .bar { fill: #3a9e8c; }
+    .chart .bar.is-today { fill: #24705f; }
+    .chart .bar:hover, .chart .bar:focus { fill: #17332d; outline: none; }
+    .chart .ring { stroke: #b3412e; stroke-width: 2; stroke-dasharray: 6 5; }
+    .chart text { font-family: var(--font-body), monospace; font-size: 15px; fill: #59665f; }
+    .chart text.day.is-today { fill: #14231f; font-weight: 700; }
+    .chart text.ring-label { fill: #b3412e; }
+    .tip { position: absolute; pointer-events: none; padding: 4px 8px; background: var(--px-ink); color: var(--px-paper);
+           font-size: 16px; white-space: nowrap; transform: translate(-50%, -110%); }
+    .tip[hidden] { display: none; }
+    .zones { display: grid; grid-template-columns: max-content 1fr max-content; gap: 8px 10px; align-items: center; margin: 6px 0 20px; }
+    .zones .zone-bar { height: 18px; background: var(--px-line); }
+    .zones .zone-bar span { display: block; height: 100%; min-width: 2px; box-shadow: inset 0 0 0 2px var(--px-ink); }
+    .zones .z0 { background: #a8ddd2; } .zones .z1 { background: #6cc4b3; } .zones .z2 { background: #3a9e8c; }
+    .zones .z3 { background: #24705f; } .zones .z4 { background: #17332d; }
+    .zones .zone-min { font-size: 18px; text-align: right; }
+    .highlights { margin: 6px 0 20px; padding-left: 20px; font-size: 19px; }
+    .highlights li + li { margin-top: 4px; }
+    table.data { width: 100%; border-collapse: collapse; font-size: 17px; }
+    table.data th, table.data td { padding: 4px 6px; border-bottom: 1px solid var(--px-line); text-align: right; }
+    table.data th:first-child, table.data td:first-child { text-align: left; }
+    .share-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .share-row .btn { width: auto; margin: 0; }
+  </style>
+</head>
+<body>
+  {% set active = "health" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Weekly report</h1>
+    <p class="muted">Your week at a glance: steps, active minutes, heart-rate zones, hunts and trails.</p>
+
+    <nav class="week-nav" aria-label="Choose a week">
+      <button type="button" class="btn btn--ghost" id="prevWeek" aria-label="Earlier week">←</button>
+      <h2 id="weekTitle">This week</h2>
+      <button type="button" class="btn btn--ghost" id="nextWeek" aria-label="Later week">→</button>
+    </nav>
+
+    <section class="tiles" id="tiles" aria-label="Totals"></section>
+
+    <h2>Steps per day</h2>
+    <div class="chart-box" id="chartBox">
+      <svg class="chart" id="stepsChart" viewBox="0 0 700 240" role="img" aria-labelledby="stepsChartTitle">
+        <title id="stepsChartTitle">Steps per day this week</title>
+      </svg>
+      <div class="tip" id="tip" role="status" hidden></div>
+    </div>
+
+    <h2>Time in each heart-rate zone</h2>
+    <div class="zones" id="zones"></div>
+    <p class="muted" id="noZones" hidden>No band readings this week. Pair your band on the Health page.</p>
+
+    <h2>Highlights</h2>
+    <ul class="highlights" id="highlights"></ul>
+
+    <details>
+      <summary>Show the numbers as a table</summary>
+      <table class="data" id="table">
+        <thead><tr><th>Day</th><th>Steps</th><th>Active min</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+
+    <div class="share-row" style="margin-top: 20px">
+      <button type="button" class="btn" id="shareBtn" hidden>📊 Share my week</button>
+      <p class="muted" id="msg" role="status"></p>
+    </div>
+    <p><a href="/health">← Health page</a></p>
+  </main>
+
+  <script>
+    // B: everything shown here comes from Python (/api/report); text goes in with textContent.
+    const SVG = "http://www.w3.org/2000/svg";
+    const $ = id => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    let report = null;
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined && text !== null) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+    function svg(tag, attrs, text) {
+      const node = document.createElementNS(SVG, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+    const fmtDate = iso => new Date(iso + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" });
+
+    function tile(label, value, note) {
+      const box = el("div", undefined, "tile");
+      box.append(el("span", label), el("strong", value), el("small", note || ""));
+      return box;
+    }
+
+    // a "nice" top for the y axis: 1, 2 or 5 times a power of ten
+    function niceTop(max) {
+      if (max <= 0) return 1000;
+      const p = 10 ** Math.floor(Math.log10(max));
+      return [1, 2, 5, 10].map(m => m * p).find(v => v >= max);
+    }
+
+    // A bar with a 4 px rounded top, anchored square on the baseline
+    function barPath(x, y, w, h) {
+      const r = Math.min(4, h, w / 2);
+      return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
+    }
+
+    let W = 700;  // the chart is drawn at its real width, so its text is never shrunk
+    function drawSteps(r) {
+      const chart = $("stepsChart");
+      W = Math.max(300, Math.round($("chartBox").clientWidth));
+      chart.setAttribute("viewBox", `0 0 ${W} 240`);
+      chart.querySelectorAll(":scope > :not(title)").forEach(n => n.remove());
+      const L = 52, R = W - 6, T = 16, B = 200;          // plot area
+      const ringTarget = r.ring ? r.ring.target : 0;
+      const top = niceTop(Math.max(ringTarget, ...r.bars.map(b => b.steps)));
+      const y = v => B - (v / top) * (B - T);
+      for (const v of [0, top / 2, top]) {
+        chart.append(svg("line", { class: v ? "grid" : "axis", x1: L, x2: R, y1: y(v), y2: y(v) }));
+        chart.append(svg("text", { x: L - 8, y: y(v) + 5, "text-anchor": "end" }, v.toLocaleString()));
+      }
+      const slot = (R - L) / 7, w = Math.min(48, slot - 2);   // 2 px gap between bars at least
+      r.bars.forEach((b, i) => {
+        const cx = L + slot * i + slot / 2;
+        chart.append(svg("text", { x: cx, y: B + 22, "text-anchor": "middle", class: "day" + (b.today ? " is-today" : "") }, b.day));
+        if (b.future || !b.steps) return;
+        const h = B - y(b.steps);
+        const bar = svg("path", { d: barPath(cx - w / 2, y(b.steps), w, h), class: "bar" + (b.today ? " is-today" : ""),
+                                  tabindex: 0, role: "img",
+                                  "aria-label": `${b.day} ${fmtDate(b.date)}: ${b.steps.toLocaleString()} steps, ${b.active_min} active minutes` });
+        const show = () => showTip(b, cx, y(b.steps));
+        bar.addEventListener("mouseenter", show);
+        bar.addEventListener("focus", show);
+        bar.addEventListener("mouseleave", hideTip);
+        bar.addEventListener("blur", hideTip);
+        // a bigger, invisible hit area than the bar itself
+        const hit = svg("rect", { x: cx - slot / 2, y: T, width: slot, height: B - T, fill: "transparent" });
+        hit.addEventListener("mouseenter", show);
+        hit.addEventListener("mouseleave", hideTip);
+        chart.append(hit, bar);
+      });
+      if (r.ring) {
+        chart.append(svg("line", { class: "ring", x1: L, x2: R, y1: y(ringTarget), y2: y(ringTarget) }));
+        chart.append(svg("text", { x: R, y: y(ringTarget) - 6, "text-anchor": "end", class: "ring-label" },
+                         `Daily ring ${ringTarget.toLocaleString()}`));
+      }
+    }
+
+    function showTip(b, cx, yTop) {
+      const box = $("chartBox").getBoundingClientRect(), chart = $("stepsChart").getBoundingClientRect();
+      const scale = chart.width / W;
+      const tip = $("tip");
+      tip.textContent = `${b.day} ${fmtDate(b.date)} · ${b.steps.toLocaleString()} steps · ${b.active_min} active min`;
+      tip.style.left = `${cx * scale + (chart.left - box.left)}px`;
+      tip.style.top = `${yTop * scale + (chart.top - box.top)}px`;
+      tip.hidden = false;
+    }
+    function hideTip() { $("tip").hidden = true; }
+
+    function drawZones(zones) {
+      const box = $("zones");
+      $("noZones").hidden = zones.length > 0;
+      box.hidden = zones.length === 0;
+      const most = Math.max(1, ...zones.map(z => z.minutes));
+      box.replaceChildren(...zones.flatMap(z => {
+        const bar = el("div", undefined, "zone-bar");
+        const fill = el("span", undefined, `z${z.zone}`);
+        fill.style.width = `${(100 * z.minutes) / most}%`;
+        bar.append(fill);
+        bar.setAttribute("role", "img");
+        bar.setAttribute("aria-label", `${z.name}: ${z.minutes} minutes`);
+        bar.title = `${z.name}: ${z.minutes} min`;
+        return [el("span", z.name), bar, el("span", `${z.minutes} min`, "zone-min")];
+      }));
+    }
+
+    function draw(r) {
+      report = r;
+      $("weekTitle").textContent = `${r.is_current ? "This week" : "Week of"} ${fmtDate(r.week_start)}`;
+      $("prevWeek").disabled = !r.previous;
+      $("nextWeek").disabled = !r.next;
+      const t = r.totals;
+      const tiles = [
+        tile("Steps", t.steps.toLocaleString(), t.steps_change),
+        tile("Active minutes", t.active_min, t.active_change),
+        tile("Hunts and trails", `${t.hunts + t.trails}`, `${(t.distance_m / 1000).toFixed(1)} km`),
+        tile("Calories", `${t.calories}`, "kcal on hunts and trails"),
+      ];
+      if (t.streak !== null) tiles.push(tile("Streak", `🔥 ${t.streak}`, t.streak === 1 ? "day" : "days"));
+      $("tiles").replaceChildren(...tiles);
+      drawSteps(r);
+      drawZones(r.zones);
+      $("highlights").replaceChildren(...r.highlights.map(h => el("li", h)));
+      $("table").tBodies[0].replaceChildren(...r.bars.map(b => {
+        const row = el("tr");
+        row.append(el("td", `${b.day} ${fmtDate(b.date)}`), el("td", b.future ? "–" : b.steps.toLocaleString()),
+                   el("td", b.future ? "–" : String(b.active_min)));
+        return row;
+      }));
+      $("shareBtn").hidden = !r.is_current;
+      $("shareBtn").disabled = r.shared;
+      $("shareBtn").textContent = r.shared ? "✓ Shared this week" : "📊 Share my week";
+    }
+
+    async function load(week) {
+      const url = week ? `/api/report?week=${encodeURIComponent(week)}` : "/api/report";
+      const res = await fetch(url);
+      if (res.status === 401) { location.href = "/login?next=/report"; return; }
+      const data = await res.json();
+      if (!res.ok) { $("msg").textContent = data.error || "Could not load the report"; return; }
+      draw(data);
+      history.replaceState(null, "", data.is_current ? "/report" : `/report?week=${data.week_start}`);
+    }
+
+    window.addEventListener("resize", () => report && drawSteps(report));
+    $("prevWeek").addEventListener("click", () => report && report.previous && load(report.previous));
+    $("nextWeek").addEventListener("click", () => report && report.next && load(report.next));
+    $("shareBtn").addEventListener("click", async () => {
+      $("shareBtn").disabled = true;
+      const res = await fetch("/api/report/share", { method: "POST" });
+      const data = await res.json();
+      $("msg").textContent = res.ok ? "Shared to the Community!" : (data.error || "Could not share");
+      if (res.ok) { $("shareBtn").textContent = "✓ Shared this week"; } else { $("shareBtn").disabled = false; }
+    });
+    load(params.get("week"));
+  </script>
+</body>
+</html>
