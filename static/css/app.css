@@ -2090,3 +2090,4 @@ button.post__likes[hidden] { display: none; }
 .trail-box__skip input { width: 18px; height: 18px; margin: 0; accent-color: #4fc3b0; }
 /* While you plan a trail the card may grow, so all the choices fit without scrolling */
 .sheet:has(#trailBox:not([hidden])) { max-height: 60vh; }
+.trail-box__history { margin: 8px 0 0; font-size: 17px; }

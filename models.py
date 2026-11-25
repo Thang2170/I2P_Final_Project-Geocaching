@@ -685,3 +685,19 @@ class ActiveTrail(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
     state = db.Column(db.Text, nullable=False)       # JSON from parse_active_trail
     updated_at = db.Column(db.DateTime, nullable=False)
+
+
+class TrailWalkDetail(db.Model):
+    """More about a saved trail walk: which trail it was and the split times (owner: B).
+
+    Kept beside trail_walks (a new table, not new columns), so personal bests can be found:
+    walks with the same signature are the same trail. Rules: trail_planner.py.
+    """
+
+    __tablename__ = "trail_walk_details"
+
+    walk_id = db.Column(db.Integer, db.ForeignKey("trail_walks.id"), primary_key=True)
+    signature = db.Column(db.String(200), nullable=True, index=True)  # e.g. "loop:3-7-12"
+    shape = db.Column(db.String(10), nullable=False)
+    treasure_ids = db.Column(db.Text, nullable=False)                 # JSON list, in walking order
+    splits = db.Column(db.Text, nullable=False)                       # JSON list of seconds

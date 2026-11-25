@@ -8,20 +8,21 @@ for the real walking path of the loop.
 import json
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 
 from auth_api import current_user
 from calculator import steps_from_distance
 from coin_api import found_treasure_ids
 from journey_log import speed_problem
 from location import haversine_m
-from models import ActiveTrail, Post, TrailWalk, Treasure, TreasureRating, db
+from models import ActiveTrail, Post, TrailWalk, TrailWalkDetail, Treasure, TreasureRating, db
 from walk_api import _saved_weight, energy_for
 from walk_input import DEFAULT_WEIGHT_KG, parse_distance_m, parse_duration_s
 from routing import get_route
 from location import FOUND_RADIUS_M
-from trail_planner import (SHAPES, can_carry_on, low_rated, parse_active_trail, parse_goal, parse_shape, plan_trail,
-                           trail_post_text, trail_progress)
+from trail_planner import (SHAPES, best_change, best_text, can_carry_on, fmt_duration, low_rated, pace_text,
+                           parse_active_trail, parse_goal, parse_shape, plan_trail, splits_text, trail_post_text,
+                           trail_progress, trail_signature)
 from weather_api import public_choice, weather_for
 from treasure_input import parse_number
 
@@ -165,6 +166,10 @@ def save_trail_walk():
         splits = [int(parse_number(x, "split", 0, duration_s)) for x in splits]
         if splits != sorted(splits):
             raise ValueError("splits must go up")
+        treasure_ids = data.get("treasure_ids") or []  # B: which treasures, for personal bests
+        if (not isinstance(treasure_ids, list) or len(treasure_ids) > MAX_SPLITS
+                or not all(isinstance(i, int) and not isinstance(i, bool) and i > 0 for i in treasure_ids)):
+            raise ValueError(f"treasure_ids must be a list of at most {MAX_SPLITS} ids")
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
@@ -178,16 +183,88 @@ def save_trail_walk():
 
     weight_kg = _saved_weight(user) or DEFAULT_WEIGHT_KG
     energy = energy_for(user, distance_m, weight_kg, duration_s)
+    # B: your best time on this same trail so far, if you walked it before
+    signature = trail_signature(shape, treasure_ids)
+    previous = None
+    if signature:
+        previous = db.session.execute(
+            db.select(db.func.min(TrailWalk.duration_s))
+            .join(TrailWalkDetail, TrailWalkDetail.walk_id == TrailWalk.id)
+            .where(TrailWalk.user_id == user.id, TrailWalkDetail.signature == signature)).scalar()
+    change = best_change(previous, duration_s) if signature else None
     text = trail_post_text(checkpoints, distance_m, duration_s, energy["steps"], energy["calories"], splits, shape)
+    if change:
+        text += best_text(change)
     post = Post(user_id=user.id, text=text)
     db.session.add(post)
     db.session.flush()
     walk = TrailWalk(user_id=user.id, checkpoints=checkpoints, distance_m=distance_m, duration_s=duration_s,
                      steps=energy["steps"], calories=energy["calories"], post_id=post.id)
     db.session.add(walk)
+    db.session.flush()
+    db.session.add(TrailWalkDetail(walk_id=walk.id, signature=signature, shape=shape,
+                                   treasure_ids=json.dumps(treasure_ids), splits=json.dumps(splits)))
     db.session.commit()
     return jsonify(id=walk.id, post_id=post.id, text=text, steps=walk.steps, calories=walk.calories,
-                   distance_m=walk.distance_m, duration_s=walk.duration_s), 201
+                   distance_m=walk.distance_m, duration_s=walk.duration_s, best=change), 201
+
+
+# ---------------------------------------------------------------- B: trail history and personal bests
+
+HISTORY_SIZE = 50
+
+
+@trail_api.route("/trails")
+def trails_page():
+    return render_template("trails.html")
+
+
+@trail_api.route("/api/trail/walks", methods=["GET"])
+def my_trail_walks():
+    """Your saved trails, newest first, with pace, splits and personal bests (🏅)."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    rows = db.session.execute(
+        db.select(TrailWalk, TrailWalkDetail)
+        .outerjoin(TrailWalkDetail, TrailWalkDetail.walk_id == TrailWalk.id)
+        .where(TrailWalk.user_id == user.id)
+        .order_by(TrailWalk.created_at.desc(), TrailWalk.id.desc())).all()
+    # best time and number of walks for each trail (over all your walks, not only the ones shown)
+    best, count = {}, {}
+    for walk, detail in rows:
+        sig = detail.signature if detail else None
+        if sig:
+            count[sig] = count.get(sig, 0) + 1
+            if sig not in best or walk.duration_s < best[sig][0] or (
+                    walk.duration_s == best[sig][0] and walk.id < best[sig][1]):
+                best[sig] = (walk.duration_s, walk.id)  # a tie goes to the earlier walk
+    ids = {i for _, d in rows[:HISTORY_SIZE] if d for i in json.loads(d.treasure_ids)}
+    names = dict(db.session.execute(db.select(Treasure.id, Treasure.name).where(Treasure.id.in_(ids))).all()) if ids else {}
+    walks = []
+    for walk, detail in rows[:HISTORY_SIZE]:
+        sig = detail.signature if detail else None
+        splits = json.loads(detail.splits) if detail else []
+        walks.append({
+            "id": walk.id,
+            "at": _utc(walk.created_at).isoformat(),
+            "shape": detail.shape if detail else "loop",
+            "checkpoints": walk.checkpoints,
+            "treasures": [names.get(i, "a removed treasure") for i in json.loads(detail.treasure_ids)] if detail else [],
+            "distance_m": round(walk.distance_m),
+            "duration": fmt_duration(walk.duration_s),
+            "pace": pace_text(walk.distance_m, walk.duration_s),
+            "steps": walk.steps,
+            "calories": round(walk.calories),
+            "splits": splits_text(splits),
+            "personal_best": bool(sig) and best[sig][1] == walk.id and count[sig] > 1,
+            "times_walked": count.get(sig, 1),
+            "best": fmt_duration(best[sig][0]) if sig else None,
+            "post_id": walk.post_id,
+        })
+    totals = {"walks": len(rows), "distance_m": round(sum(w.distance_m for w, _ in rows)),
+              "steps": sum(w.steps for w, _ in rows)}
+    return jsonify(walks=walks, totals=totals)
 
 
 # ---------------------------------------------------------------- B: carry on a trail after a reload
@@ -242,3 +319,38 @@ def end_active_trail():
         db.session.delete(row)
         db.session.commit()
     return jsonify(ok=True)
+
+
+@trail_api.route("/api/trail/walks/<int:walk_id>/again")
+def walk_again(walk_id):
+    """B: set up one of your saved trails again: the same treasures in the same order, from where
+    you are now (lat, lon), so you can try to beat your time. Treasures you already found don't
+    pay again (coin_api refuses a second find)."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    try:
+        lat = parse_number(request.args.get("lat"), "lat", -90, 90)
+        lon = parse_number(request.args.get("lon"), "lon", -180, 180)
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    walk = db.session.get(TrailWalk, walk_id)
+    detail = db.session.get(TrailWalkDetail, walk_id)
+    if walk is None or walk.user_id != user.id:
+        return jsonify(error="That trail was not found"), 404
+    ids = json.loads(detail.treasure_ids) if detail else []
+    by_id = {t.id: t for t in db.session.execute(db.select(Treasure).where(Treasure.id.in_(ids))).scalars()} if ids else {}
+    stops = [by_id[i] for i in ids if i in by_id]
+    if not stops:
+        return jsonify(error="This trail can't be walked again: its treasures were removed."), 400
+    missing = len(ids) - len(stops)
+    message = f"Walk it again and beat your best time: {len(stops)} checkpoint{'s' if len(stops) != 1 else ''}."
+    if missing:
+        message += (f" {missing} treasure{'s were' if missing != 1 else ' was'} removed, "
+                    "so this one won't count as the same trail.")
+    return jsonify(
+        shape=detail.shape,
+        stops=[{"order": n, "id": t.id, "name": t.name, "lat": t.lat, "lon": t.lon} for n, t in enumerate(stops, start=1)],
+        start=[lat, lon],
+        message=message,
+    )

@@ -46,6 +46,7 @@
           <button type="button" class="trail-shape__btn" data-shape="oneway" aria-pressed="false">→ One way</button>
         </div>
         <label class="trail-box__skip"><input type="checkbox" id="trailSkipLow"> Skip low-rated treasures (2★ or less)</label>
+        <p class="trail-box__history"><a href="/trails">📜 My trails and personal bests</a></p>
         <div class="trail-box__choices">
           <button type="button" class="trail-pick" data-steps="1500">1,500 steps</button>
           <button type="button" class="trail-pick" data-steps="3000">3,000 steps</button>
@@ -743,6 +744,15 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Could not plan a trail");
           if (!data.stops.length) { trailSay(data.message); return; }
+          showPlannedTrail(data);
+        } catch (err) {
+          trailSay(err.message);
+        }
+      });
+    }
+
+    // Put a planned trail on the map (from 🧭 Plan a trail, or ↻ Walk it again on My trails).
+    function showPlannedTrail(data) {
           trailActive = true;
           if (routeLine) { routeLine.remove(); routeLine = null; }
           routeInfo.hidden = true;     // the one-treasure route summary doesn't apply now
@@ -764,11 +774,25 @@
           trailEnd.hidden = false;
           trailStartBtn.hidden = false;  // B: walk it with the live panel
           trailToggle.hidden = false;
+          if (data.message) trailSay(data.message);
           drawTrailLeg(true);
-        } catch (err) {
-          trailSay(err.message);
-        }
-      });
+    }
+
+    // B: /?trail=<walk id>, from "↻ Walk it again" on My trails: the same treasures in the same
+    // order, from where you are now, so you can beat your time. Asked once the GPS answers.
+    let againId = Number(params.get("trail")) || null;
+    async function walkAgain() {
+      const id = againId;
+      againId = null;
+      trailSay("Setting up your trail again…");
+      try {
+        const res = await fetch(`/api/trail/walks/${id}/again?lat=${currentPos[0]}&lon=${currentPos[1]}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not set up that trail again");
+        showPlannedTrail(data);
+      } catch (err) {
+        trailSay(err.message);
+      }
     }
 
     // ---- B: walk a trail with the live panel, like a run tracker (time, pace, splits)
@@ -853,7 +877,8 @@
         distance_m: Math.round(journey.meters), duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
         lat, lon, shape: walked.shape, splits: journey.splits,
         end: [walked.checkpoints.at(-1).lat, walked.checkpoints.at(-1).lon],  // where the trail finishes
-        checkpoints: walked.checkpoints.filter(cp => cp.id).length          // the treasures (not "back to the start")
+        checkpoints: walked.checkpoints.filter(cp => cp.id).length,         // the treasures (not "back to the start")
+        treasure_ids: walked.checkpoints.filter(cp => cp.id).map(cp => cp.id)  // which trail: for personal bests
       };
       let text = "Could not save this trail.", ok = false;
       try {
@@ -863,6 +888,10 @@
         const data = await res.json();
         ok = res.ok;
         text = ok ? "Trail saved and posted." : (data.error || text);
+        // B: personal best on this same trail (Python compares the times)
+        if (ok && data.best && data.best.personal_best && !data.best.first_time) {
+          text = `🏅 New personal best: ${fmtTime(data.best.faster_by_s * 1000)} faster! ` + text;
+        }
         if (ok) startCooldown();  // B: the cool-down quest after a trail too
       } catch (err) {
         queueForLater("/api/trail/walks", body);  // A's outbox: sent when you are back online
@@ -872,8 +901,8 @@
       jSaved.classList.toggle("is-bad", !ok);
       if (ok) {
         const link = document.createElement("a");
-        link.href = "/community";
-        link.textContent = " See the Community";
+        link.href = "/trails";  // B: your trail history and personal bests
+        link.textContent = " See My trails";
         jSaved.append(link);
       }
       jSaved.hidden = false;
@@ -1820,6 +1849,7 @@
         firstFix = false;
         drawRoute(currentPos, routeTarget, true);
         if (trail && !trailLayer) drawTrailLeg(true);  // B: a trail carried on before the GPS answered
+        else if (againId && !trail) walkAgain();      // B: ↻ Walk it again, from My trails
         sendPosition();  // show up on the admin map straight away, not after 10 seconds
       } else if (!dragMode && routeFrom && map.distance(routeFrom, currentPos) > REROUTE_DISTANCE_M) {
         // Real GPS: the user walked away from where the route started, so make a new one.
