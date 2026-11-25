@@ -15,6 +15,9 @@
     .ai__source { margin: 8px 0 0; font-size: 16px; }
     .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .row .btn { width: auto; margin: 0; padding: 10px 12px; font-size: 10px; }
+    .danger { margin-top: 12px; padding: 10px; border: 4px solid var(--px-bad); }
+    .danger label { flex-basis: 100%; }
+    .danger .btn { background: var(--px-bad); color: var(--px-paper); }
     .token { padding: 10px; background: var(--px-ink); color: var(--px-gold-light); word-break: break-all;
              font-family: var(--font-body); font-size: 20px; }
     .disclaimer { font-size: 16px; }
@@ -71,6 +74,20 @@
       <p>Put this token in <b>esp32/config.py</b> as <code>DEVICE_TOKEN</code>. It is shown only once:</p>
       <p id="token" class="token"></p>
     </div>
+
+    <!-- B: your data, your choice (privacy.py) -->
+    <h2>Your data</h2>
+    <p class="muted">Heart rate and blood oxygen are personal. You can take a copy of everything StepQuest
+      keeps about you, or delete what your band measured.</p>
+    <div class="row">
+      <a class="btn btn--ghost" id="exportLink" href="/api/me/export" download>⬇ Download my data</a>
+    </div>
+    <form id="deleteForm" class="row danger">
+      <label for="deleteWord">Delete my band data: readings, paired bands and safety stops (coins and hunts are kept).
+        Type <b>DELETE</b> to confirm:</label>
+      <input id="deleteWord" name="confirm" autocomplete="off" size="8">
+      <button type="submit" class="btn">Delete for good</button>
+    </form>
   </main>
 
   <script>
@@ -127,6 +144,21 @@
       }));
       document.getElementById("advice").replaceChildren(...data.advice.map(t => el("li", t)));
     }
+
+    // B: delete band data. Python checks the word DELETE (privacy.py), so a slip can't do it.
+    document.getElementById("deleteForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const word = document.getElementById("deleteWord");
+      try {
+        const data = await post("/api/me/band-data/delete", { confirm: word.value.trim() });
+        word.value = "";
+        show(data.message, true);
+        loadSummary();
+        loadDevices();
+      } catch (err) {
+        show(err.message, false);
+      }
+    });
 
     async function loadDevices() {
       const data = await json("/api/health/devices");
