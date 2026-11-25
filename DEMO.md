@@ -6,6 +6,14 @@
 3. Run `python seed_demo.py` (safe to run again; it only adds what is missing).
 4. Run `python app.py` and open http://127.0.0.1:5000
 
+## Reset between rehearsals (no need to stop the app)
+```powershell
+python reset_demo.py                          # demo_player, alice and ben back to the start
+python reset_demo.py --also stage_player      # ...and remove a player you registered on stage
+```
+It deletes the demo players with everything they did (coins, finds, hunts, trails, posts, the
+treasures they hid) and loads the demo again. Other players are kept. It asks first (`--yes` skips).
+
 ## Accounts (all use password `demo1234`)
 - `demo_player`: 60 coins, ready to shop. Log in with this one on stage.
 - `alice`: hid the extra treasures. Chats in "NTHU campus walk".
