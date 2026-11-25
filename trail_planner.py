@@ -267,3 +267,41 @@ def parse_active_trail(data):
 def can_carry_on(since_update_s):
     """A kept trail is carried on only if the phone reported recently."""
     return 0 <= since_update_s <= TRAIL_RESUME_S
+
+
+# ---------------------------------------------------------------- B: trail history and personal bests
+
+def trail_signature(shape, treasure_ids):
+    """Which trail this is, so walks of the same trail can be compared.
+
+    The same shape through the same treasures is the same trail, in whatever order you walked
+    them. None if there are no treasure ids (an older walk, before this was kept).
+    """
+    if not treasure_ids:
+        return None
+    return f"{parse_shape(shape)}:" + "-".join(str(i) for i in sorted(set(treasure_ids)))
+
+
+def best_change(previous_best_s, duration_s):
+    """Compare a new walk with your best time on the same trail.
+
+    Returns {"personal_best", "first_time", "previous_best_s", "faster_by_s"}.
+    The first walk of a trail is its first best; a tie is not a new best.
+    """
+    if previous_best_s is None:
+        return {"personal_best": True, "first_time": True, "previous_best_s": None, "faster_by_s": 0}
+    faster = previous_best_s - duration_s
+    return {"personal_best": faster > 0, "first_time": False, "previous_best_s": previous_best_s,
+            "faster_by_s": max(0, faster)}
+
+
+def best_text(change):
+    """The line added to the Community post, or "" if there is nothing to brag about."""
+    if change["personal_best"] and not change["first_time"]:
+        return f" 🏅 New personal best, {fmt_duration(change['faster_by_s'])} faster than before!"
+    return ""
+
+
+def pace_text(distance_m, duration_s):
+    pace = duration_s / (distance_m / 1000) if distance_m >= 20 else None
+    return f"{fmt_duration(pace)} /km" if pace else "–"

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>My trails · StepQuest</title>
+  <style>
+    /* B: trail history and personal bests (trail_api.py). Python works out every number. */
+    .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 20px; }
+    .totals div { padding: 10px; text-align: center; box-shadow: 0 0 0 3px var(--px-ink); }
+    .totals strong { display: block; font-size: 26px; }
+    .totals span { color: var(--px-muted); font-size: 16px; }
+    .walk { padding: 14px 0; border-top: 2px dashed var(--line); }
+    .walk__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .walk__title { margin: 0; font-size: 22px; }
+    .walk__when { color: var(--px-muted); font-size: 16px; }
+    .walk__stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0; font-size: 19px; }
+    .walk__stats b { font-weight: 700; }
+    .walk__line { margin: 4px 0; color: var(--px-muted); font-size: 17px; }
+    .walk__again { display: inline-block; width: auto; margin-top: 6px; }
+    .pb { font-family: var(--font-pixel); font-size: 9px; color: var(--px-ink); background: var(--px-gold);
+          padding: 4px 8px; box-shadow: 0 0 0 3px var(--px-ink); }
+    @media (max-width: 520px) { .totals { grid-template-columns: 1fr 1fr 1fr; } .totals strong { font-size: 20px; } }
+  </style>
+</head>
+<body>
+  {% set active = "map" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>My trails</h1>
+    <p class="muted">Every Treasure Trail you walked with ▶ Start trail. Walk the same trail again to beat your time: a 🏅 marks your personal best.</p>
+
+    <div class="totals" id="totals" hidden>
+      <div><strong id="tWalks"></strong><span>trails</span></div>
+      <div><strong id="tKm"></strong><span>km</span></div>
+      <div><strong id="tSteps"></strong><span>steps</span></div>
+    </div>
+    <section id="walks" aria-live="polite"></section>
+    <p id="empty" class="muted" hidden>No trails yet. On the map, tap 🧭 Plan a trail, then ▶ Start trail.</p>
+    <p id="msg" class="muted" role="status"></p>
+    <p><a class="btn btn--ghost" href="/">🧭 Plan a trail on the map</a></p>
+  </main>
+
+  <script>
+    // B: the page only shows what Python sends; everything is set with textContent.
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function walkCard(w) {
+      const card = el("article", "walk");
+      const head = el("div", "walk__head");
+      const title = el("h2", "walk__title",
+        `${w.shape === "oneway" ? "→ One-way" : "↺ Loop"} · ${w.checkpoints} checkpoint${w.checkpoints === 1 ? "" : "s"}`);
+      head.append(title);
+      if (w.personal_best) head.append(el("span", "pb", "🏅 Best"));
+      head.append(el("span", "walk__when", new Date(w.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })));
+      card.append(head);
+
+      const stats = el("p", "walk__stats");
+      for (const [label, value] of [["Time", w.duration], ["Distance", `${(w.distance_m / 1000).toFixed(2)} km`],
+                                    ["Pace", w.pace], ["Steps", w.steps.toLocaleString()], ["Calories", `${w.calories} kcal`]]) {
+        const part = el("span");
+        part.append(`${label} `, el("b", "", value));
+        stats.append(part);
+      }
+      card.append(stats);
+      if (w.treasures.length) card.append(el("p", "walk__line", `Through: ${w.treasures.join(" → ")}`));
+      if (w.splits) card.append(el("p", "walk__line", `Splits: ${w.splits}`));
+      if (w.times_walked > 1) card.append(el("p", "walk__line", `Walked ${w.times_walked} times · best ${w.best}`));
+      if (w.treasures.length) {
+        const again = el("a", "btn btn--small btn--ghost walk__again", "↻ Walk it again");
+        again.href = `/?trail=${encodeURIComponent(w.id)}`;  // the map sets the same trail up from where you are
+        card.append(again);
+      }
+      return card;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch("/api/trail/walks");
+        if (res.status === 401) { window.location.href = "/login?next=/trails"; return; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not load your trails");
+        document.getElementById("walks").replaceChildren(...data.walks.map(walkCard));
+        document.getElementById("empty").hidden = data.walks.length > 0;
+        document.getElementById("totals").hidden = data.walks.length === 0;
+        document.getElementById("tWalks").textContent = data.totals.walks;
+        document.getElementById("tKm").textContent = (data.totals.distance_m / 1000).toFixed(1);
+        document.getElementById("tSteps").textContent = data.totals.steps.toLocaleString();
+      } catch (err) {
+        document.getElementById("msg").textContent = err.message;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
