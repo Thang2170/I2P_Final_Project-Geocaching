@@ -11,6 +11,10 @@
 
   <div class="map-wrap">
     <div id="map"></div>
+    <!-- B: during a trail, choose whether the other checkpoints show (their routes stay hidden) -->
+    <label id="trailToggle" class="trail-toggle" hidden>
+      <input type="checkbox" id="trailShowAll"> Show all checkpoints
+    </label>
 
     <!-- Status card at the bottom: distance to the treasure and the route summary -->
     <!-- A: "Zebra crossing in 14 m: look up from your phone!" (tap to close) -->
@@ -596,12 +600,34 @@
       trailBtn.setAttribute("aria-expanded", String(!trailBox.hidden));
     });
 
-    function stopIcon(label) {
+    function stopIcon(label, kind = "") {
       const number = document.createElement("span");  // an element, so no HTML text is ever parsed
       number.className = "trail-stop__n";
       number.textContent = String(label);
-      return L.divIcon({ className: "trail-stop", html: number, iconSize: [30, 30], iconAnchor: [15, 15] });
+      const size = kind ? 22 : 30;  // the other checkpoints are smaller than the next one
+      return L.divIcon({ className: `trail-stop ${kind}`.trim(), html: number, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
     }
+
+    // B: "Show all checkpoints": the other checkpoints as small pins, with no route to them.
+    // Ones you already reached get a tick. The choice is remembered on this phone.
+    const trailToggle = document.getElementById("trailToggle");
+    const trailShowAll = document.getElementById("trailShowAll");
+    let trailOthers = null;
+    try { trailShowAll.checked = localStorage.getItem("trailShowAll") === "1"; } catch (err) { /* private mode */ }
+    function drawTrailOthers() {
+      if (trailOthers) { trailOthers.remove(); trailOthers = null; }
+      if (!trail || !trailShowAll.checked) return;
+      trailOthers = L.layerGroup(trail.checkpoints
+        .map((cp, i) => i === trail.index ? null : L.marker([cp.lat, cp.lon], {
+          icon: stopIcon(i < trail.index ? "✓" : cp.label, i < trail.index ? "trail-stop--done" : "trail-stop--later"),
+          interactive: false, zIndexOffset: 400
+        }))
+        .filter(Boolean)).addTo(map);
+    }
+    trailShowAll.addEventListener("change", () => {
+      try { localStorage.setItem("trailShowAll", trailShowAll.checked ? "1" : "0"); } catch (err) { /* private mode */ }
+      drawTrailOthers();
+    });
 
     function endTrail(message = "") {
       if (journey.kind === "trail" && journeyActive()) finishJourney(false);  // stopped early: not saved
@@ -610,6 +636,8 @@
       if (trailLayer) { trailLayer.remove(); trailLayer = null; }
       trailEnd.hidden = true;
       trailStartBtn.hidden = true;
+      trailToggle.hidden = true;  // B
+      drawTrailOthers();          // (trail is gone, so this removes the pins)
       trailBtn.hidden = false;
       trailSay(message);
       if (currentPos && routeTarget) drawRoute(currentPos, routeTarget, !message);
@@ -637,6 +665,7 @@
           L.marker([cp.lat, cp.lon], { icon: stopIcon(cp.label), interactive: false, zIndexOffset: 500 })
         ]).addTo(map);
         if (fit) map.fitBounds(trailLayer.getBounds(), routePadding());
+        drawTrailOthers();  // B: the other checkpoints, if you chose to see them
         const m = Math.round(data.distance_m);
         trailSay(`Checkpoint ${trail.index + 1} of ${total}: ${cp.name} · ${m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`}` +
                  ` · about ${Math.max(1, Math.round(data.duration_s / 60))} min${data.warning ? " (straight line)" : ""}`);
@@ -709,6 +738,7 @@
           trailBtn.hidden = true;
           trailEnd.hidden = false;
           trailStartBtn.hidden = false;  // B: walk it with the live panel
+          trailToggle.hidden = false;
           drawTrailLeg(true);
         } catch (err) {
           trailSay(err.message);

@@ -91,3 +91,26 @@ class MapPageTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShowAllCheckpointsTest(unittest.TestCase):
+    """B: a box on the map shows or hides the other checkpoints; their routes are never drawn."""
+
+    def setUp(self):
+        app = create_app("sqlite:///:memory:")
+        client = app.test_client()
+        client.post("/api/register", json={"username": "ann", "password": "secret1"})
+        self.html = client.get("/").get_data(as_text=True)
+        self.css = client.get("/static/css/app.css").get_data(as_text=True)
+
+    def test_the_box(self):
+        self.assertIn('id="trailToggle" class="trail-toggle" hidden', self.html)
+        self.assertIn('<input type="checkbox" id="trailShowAll">', self.html)
+        self.assertIn(".trail-toggle {", self.css)
+
+    def test_other_checkpoints_are_pins_only(self):
+        start = self.html.index("function drawTrailOthers()")
+        body = self.html[start:self.html.index("trailShowAll.addEventListener", start)]
+        self.assertIn("L.marker(", body)
+        self.assertNotIn("polyline", body)  # no route to them
+        self.assertIn("i === trail.index ? null", body)  # the next one is drawn with its route already

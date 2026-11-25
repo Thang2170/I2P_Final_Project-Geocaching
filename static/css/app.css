@@ -2051,3 +2051,29 @@ button.post__likes[hidden] { display: none; }
 /* B: "▶ Start trail": the main action while a trail is on the map */
 .sheet__btn--go { background: var(--px-green); color: var(--px-paper); border-color: var(--px-green); }
 .sheet__btn--go:hover { background: #2a5a4b; }
+
+/* ---------- B: "Show all checkpoints" box on the map during a trail ---------- */
+.trail-toggle {
+  position: absolute;
+  top: 130px;            /* under the Quests button */
+  left: 10px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--px-paper);
+  color: var(--px-ink);
+  box-shadow: var(--px-edge), var(--px-drop);
+  font-family: var(--font-body);
+  font-size: 17px;
+  cursor: pointer;
+  user-select: none;
+}
+.trail-toggle[hidden] { display: none; }
+.trail-toggle input { width: 18px; height: 18px; margin: 0; accent-color: #4fc3b0; cursor: pointer; }
+.trail-toggle:focus-within { outline: 4px solid var(--px-gold); outline-offset: 2px; }
+/* The other checkpoints: smaller and quieter than the next one, and they don't pulse */
+.trail-stop.trail-stop--later, .trail-stop.trail-stop--done { animation: none; opacity: .85; }
+.trail-stop--later .trail-stop__n, .trail-stop--done .trail-stop__n { font-size: 9px; }
+.trail-stop.trail-stop--done { background: var(--px-paper); }
