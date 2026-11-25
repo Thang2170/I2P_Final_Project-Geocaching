@@ -1,22 +1,71 @@
 {# Shared top bar. A page picks its highlighted link with: {% set active = "map" %}
-   Plain paths (not url_for) because test apps only register some blueprints. #}
+   Plain paths (not url_for) because test apps only register some blueprints.
+   B: the most used pages stay in the bar; the rest are in a "Menu" (too many for one row). #}
+{% set menu_groups = [
+  ("Play", [("/upload", "upload", "Hide a treasure"), ("/riddles", "riddles", "Riddles"),
+            ("/territory", "territory", "Territory"), ("/trails", "trails", "My trails")]),
+  ("You", [("/health", "health", "Health"), ("/report", "report", "Weekly report"),
+           ("/collection", "collection", "Collection"), ("/shop", "shop", "Shop"), ("/login", "account", "Account")]),
+  ("Players", [("/leaderboard", "leaderboard", "Leaderboard")]),
+] %}
+{% set main_links = [("/", "map", "Map"), ("/hunts", "hunts", "Hunts"), ("/community", "community", "Community")] %}
+{% set ns = namespace(here=None) %}
+{% for _, items in menu_groups %}{% for href, key, label in items %}{% if key == active %}{% set ns.here = label %}{% endif %}{% endfor %}{% endfor %}
 <header class="topbar">
   <a class="brand" href="/welcome">
     <span class="brand__mark sprite sprite--coin" aria-hidden="true"></span>
     <span class="brand__name">StepQuest</span>
   </a>
-  <nav class="topbar__nav">
-    <a href="/" class="{{ 'is-active' if active == 'map' }}">Map</a>
-    <a href="/upload" class="{{ 'is-active' if active == 'upload' }}">Hide a treasure</a>
-    <a href="/hunts" class="{{ 'is-active' if active == 'hunts' }}">Hunts</a>
-    <a href="/riddles" class="{{ 'is-active' if active == 'riddles' }}">Riddles</a>{# B: riddle chains #}
-    <a href="/territory" class="{{ 'is-active' if active == 'territory' }}">Territory</a>{# B: claim the campus #}
-    <a href="/community" class="{{ 'is-active' if active == 'community' }}">Community</a>
-    <a href="/leaderboard" class="{{ 'is-active' if active == 'leaderboard' }}">Leaderboard</a>
-    <a href="/shop" class="{{ 'is-active' if active == 'shop' }}">Shop</a>
-    <a href="/collection" class="{{ 'is-active' if active == 'collection' }}">Collection</a>{# A: QR trophies #}
-    <a href="/health" class="{{ 'is-active' if active == 'health' }}">Health</a>{# A: the ESP32 band #}
-    <a href="/login" class="{{ 'is-active' if active == 'account' }}">Account</a>
+  <nav class="topbar__nav" aria-label="Main">
+    {% for href, key, label in main_links %}
+    <a href="{{ href }}" class="{{ 'is-active' if active == key }}">{{ label }}</a>
+    {% endfor %}
+    <div class="menu" id="mainMenu">
+      <button type="button" class="menu__button{{ ' is-active' if ns.here }}" id="menuButton"
+              aria-expanded="false" aria-controls="menuPanel" aria-haspopup="true">
+        <span class="menu__icon" aria-hidden="true"></span>
+        <span class="menu__label">{{ ns.here or "Menu" }}</span>
+      </button>
+      <div class="menu__panel" id="menuPanel" hidden>
+        {# on a phone the bar only has room for the menu, so the main pages are here too #}
+        <p class="menu__group menu__small-only">Main</p>
+        <ul class="menu__small-only">
+          {% for href, key, label in main_links %}
+          <li><a href="{{ href }}" class="{{ 'is-active' if active == key }}">{{ label }}</a></li>
+          {% endfor %}
+        </ul>
+        {% for group, items in menu_groups %}
+        <p class="menu__group">{{ group }}</p>
+        <ul>
+          {% for href, key, label in items %}
+          <li><a href="{{ href }}" class="{{ 'is-active' if active == key }}">{{ label }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endfor %}
+      </div>
+    </div>
   </nav>
   {% include "_bell.html" %}{# B: notifications, only shown when logged in #}
 </header>
+<script>
+  // B: open and close the menu. It closes on Escape, on a click outside, and when you pick a page.
+  (function () {
+    const menu = document.getElementById("mainMenu");
+    const button = document.getElementById("menuButton");
+    const panel = document.getElementById("menuPanel");
+    if (!menu) return;
+    function setOpen(open, focus) {
+      panel.hidden = !open;
+      button.setAttribute("aria-expanded", String(open));
+      if (open && focus) [...panel.querySelectorAll("a")].find(a => a.offsetParent !== null)?.focus();
+    }
+    button.addEventListener("click", () => setOpen(panel.hidden, false));
+    button.addEventListener("keydown", event => {
+      if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true, true); }
+    });
+    document.addEventListener("click", event => { if (!menu.contains(event.target)) setOpen(false); });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !panel.hidden) { setOpen(false); button.focus(); }
+    });
+  })();
+</script>
