@@ -122,10 +122,13 @@ class ApiTest(unittest.TestCase):
         device = HealthDevice(user_id=self.ann.id, name="band", token_hash=f"{minutes}{hr}".ljust(64, "g"))
         db.session.add(device)
         db.session.flush()
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        # Noon today, Taiwan time (04:00 UTC), so all the minutes fall on "today" even when the
+        # tests run just after midnight (readings ending "now" at 00:04 were mostly yesterday's).
+        taiwan_today = (datetime.now(timezone.utc) + timedelta(hours=8)).date()
+        noon = datetime(taiwan_today.year, taiwan_today.month, taiwan_today.day, 4)
         for i in range(minutes * 12):
             db.session.add(HealthReading(user_id=self.ann.id, device_id=device.id,
-                                         at=now - timedelta(seconds=5 * i), hr=hr, steps=steps))
+                                         at=noon - timedelta(seconds=5 * i), hr=hr, steps=steps))
         db.session.commit()
 
     def coins(self):
