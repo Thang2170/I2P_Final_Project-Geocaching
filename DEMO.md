@@ -24,3 +24,21 @@ To show it on purpose, open `/?tour`.
 6. Walk stats: enter a weight to see steps and calories.
 
 `python -m unittest tests.test_demo_story` plays steps 1 to 5 automatically.
+
+## Show the band's live features without the band
+`simulate_band.py` pretends to be the band, sending one reading every 5 seconds while you demo.
+(A's `esp32/simulate_walk.py` sends a finished walk instead: use that for the Health page.)
+
+1. Log in, open the **Health** page, tap **Pair a new band** and copy the token.
+2. In a second terminal, with the app running:
+   ```powershell
+   $env:STEPQUEST_BAND_TOKEN = "PASTE-THE-TOKEN"
+   python simulate_band.py --list          # the scenarios and what each one shows
+   python simulate_band.py zone            # then start a journey on the map
+   ```
+3. Good ones for stage:
+   - `zone`: the map's journey panel shows the zone and bonus minutes; saving the hunt pays bonus coins.
+   - `hard` or `maximum`: the red "too hard for too long" warning appears straight away.
+   - `low-spo2`: start a journey first; after about 35 seconds the hunt stops with the safety warning.
+   - `cooldown`: save a hunt first; the cool-down quest fills up and pays +3 after 3 minutes.
+4. Ctrl+C stops it. If the zones look wrong, pass `--age` with the age saved on the Health page.
