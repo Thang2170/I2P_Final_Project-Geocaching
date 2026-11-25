@@ -282,6 +282,7 @@
         const wantedTreasure = list.find((t) => t.id === wanted);
         if (wantedTreasure && markersById.has(wanted)) selectTreasure(wantedTreasure, markersById.get(wanted));
         resumeJourney();  // A: carry on a journey the server remembers (after a reload or lost signal)
+        resumeTrail();    // B: ...or a timed Treasure Trail
         applyMode();  // B: calm walks mark the calm spots
       } catch (err) {
         console.error("Treasure markers failed:", err);
@@ -698,6 +699,7 @@
           trail.index = data.index;
           trailJourneyTarget();
           drawTrailLeg(true);
+          if (journey.kind === "trail" && journeyActive()) keepTrail();  // B: keep the new checkpoint
         } else if (trail.legFrom && map.distance(trail.legFrom, [lat, lon]) > REROUTE_DISTANCE_M) {
           drawTrailLeg();  // you walked off the route: a fresh route to the same checkpoint
         }
@@ -768,7 +770,54 @@
       trailStartBtn.hidden = true;
       jEls.msg.textContent = trailMsg.textContent;
       renderJourney();
+      keepTrail();  // B: the server keeps it, so a reload can carry on
     });
+
+    // ---- B: carry on a timed trail after a reload or a closed browser (trail_api.py)
+    function keepTrail() {
+      if (!trail || journey.kind !== "trail" || !journeyActive()) return;
+      journey.progressAt = Date.now();
+      fetch("/api/trail/active", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checkpoints: trail.checkpoints, index: trail.index, start: trail.start, splits: journey.splits,
+          meters: Math.round(journey.meters), elapsed_s: Math.round(journey.elapsedMs / 1000)
+        })
+      }).catch(() => {});  // offline: the next try in 30 s
+    }
+
+    function forgetTrail() {
+      fetch("/api/trail/active", { method: "DELETE" }).catch(() => queueForLater("/api/trail/active", {}, "DELETE"));
+    }
+
+    async function resumeTrail() {
+      if (journeyActive() || trail) return;
+      try {
+        const res = await fetch("/api/trail/active");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.expired) { showNet("Your trail ran out of time (no news for 30 minutes)."); return; }
+        const a = data.active;
+        if (!a || journeyActive()) return;
+        trail = { checkpoints: a.checkpoints, index: a.index, start: a.start, legFrom: null };
+        trailActive = true;
+        if (routeLine) { routeLine.remove(); routeLine = null; }
+        routeInfo.hidden = true;
+        newRouteBtn.hidden = true;
+        trailBtn.hidden = true;
+        trailEnd.hidden = false;
+        trailToggle.hidden = false;
+        const cp = trail.checkpoints[trail.index];
+        startJourney({ kind: "trail", id: null, name: cp.name, lat: cp.lat, lon: cp.lon },
+                     { meters: a.meters, elapsedMs: (a.elapsed_s + a.since_update_s) * 1000 });
+        Object.assign(journey, { checkpoint: trail.index + 1, checkpoints: trail.checkpoints.length, splits: a.splits });
+        renderJourney();
+        journeyNote(`Welcome back! Carrying on your trail: checkpoint ${trail.index + 1} of ${trail.checkpoints.length}.`);
+        if (currentPos) drawTrailLeg(true);  // otherwise the first GPS fix draws it
+      } catch (err) {
+        console.error("Could not check for a trail to carry on:", err);
+      }
+    }
 
     // Back at the start: stop the clock and let Python check and save the walk.
     async function finishTrailWalk(lat, lon) {
@@ -1120,7 +1169,9 @@
       const now = Date.now();
       if (journey.state === "running") journey.elapsedMs += now - journey.tickAt;
       journey.tickAt = now;
-      if (journey.state === "running" && journey.kind !== "trail" && now - journey.progressAt >= PROGRESS_EVERY_MS) sendProgress();
+      if (journey.state === "running" && now - journey.progressAt >= PROGRESS_EVERY_MS) {
+        if (journey.kind === "trail") keepTrail(); else sendProgress();  // B: trails are kept too
+      }
       // B: safety check every 10 s while you walk (Python reads the band and decides)
       if (journey.state === "running" && now - (journey.safetyAt || 0) >= SAFETY_EVERY_MS) checkSafety();
       // B: calories also grow with time (speed / heart-rate formulas), so refresh every 15 s too
@@ -1190,6 +1241,7 @@
     // (the Finish button on its own just stops the clock).
     function finishJourney(arrived = false) {
       if (!journeyActive()) return;
+      if (journey.kind === "trail") forgetTrail();  // B: a stopped or finished trail can't be carried on
       journey.state = "finished";
       clearInterval(journeyTimer);
       keepScreenOn(false);
@@ -1741,6 +1793,7 @@
         map.setView(currentPos, 17);
         firstFix = false;
         drawRoute(currentPos, routeTarget, true);
+        if (trail && !trailLayer) drawTrailLeg(true);  // B: a trail carried on before the GPS answered
         sendPosition();  // show up on the admin map straight away, not after 10 seconds
       } else if (!dragMode && routeFrom && map.distance(routeFrom, currentPos) > REROUTE_DISTANCE_M) {
         // Real GPS: the user walked away from where the route started, so make a new one.
