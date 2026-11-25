@@ -719,3 +719,14 @@ class StreakReminder(db.Model):
     streak = db.Column(db.Integer, nullable=False)
     freezes = db.Column(db.Integer, nullable=False)
     notification_id = db.Column(db.Integer, db.ForeignKey("notifications.id"), nullable=True, index=True)
+
+
+class ReportShare(db.Model):
+    """A weekly report shared to the Community, once per week (owner: B). Rules: weekly_report.py."""
+
+    __tablename__ = "report_shares"
+    __table_args__ = (db.UniqueConstraint("user_id", "week_start", name="one_report_share_per_week"),)
+
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    week_start = db.Column(db.Date, nullable=False)  # the Monday (Taiwan time)
