@@ -22,10 +22,16 @@
       <div id="weatherInfo" class="sheet__route weather-line" data-kind="" hidden>
         <strong id="weatherHead"></strong> <span id="weatherTip"></span>
       </div>
-      <!-- A: Feature 6, a different walking route to the same treasure -->
-      <button type="button" id="newRouteBtn" class="btn btn--ghost" style="margin-top:8px" hidden>New route</button>
-      <!-- B: Treasure Trail, a loop through unfound treasures for a step or time goal (trail_planner.py) -->
-      <button type="button" id="trailBtn" class="btn btn--ghost" style="margin-top:8px" aria-expanded="false" aria-controls="trailBox">🧭 Plan a trail</button>
+      <!-- B: one compact row of actions, so the card stays small and the map stays visible -->
+      <div class="sheet__actions">
+        <!-- A: Feature 6, a different walking route to the same treasure -->
+        <button type="button" id="newRouteBtn" class="sheet__btn" hidden>↻ New route</button>
+        <!-- B: Treasure Trail, a loop through unfound treasures for a step or time goal (trail_planner.py) -->
+        <button type="button" id="trailBtn" class="sheet__btn" aria-expanded="false" aria-controls="trailBox">🧭 Plan a trail</button>
+        <button type="button" id="trailEnd" class="sheet__btn" hidden>✕ End trail</button>
+        <!-- B: everything else (coins, mode, team, crossings) folds away under "More" -->
+        <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore">▴ More</button>
+      </div>
       <div id="trailBox" class="trail-box" hidden>
         <p class="trail-box__ask">How long do you want to walk? The loop starts and ends here.</p>
         <div class="trail-box__choices">
@@ -38,7 +44,11 @@
         </div>
       </div>
       <p id="trailMsg" class="sheet__route trail-msg" hidden></p>
-      <button type="button" id="trailEnd" class="btn btn--ghost" style="margin-top:8px" hidden>End trail</button>
+      <!-- A: shown when the phone has no connection (the journey keeps counting) -->
+      <div id="netInfo" class="sheet__route net-line" hidden></div>
+      <!-- A: hunt race mode (/?hunt=<id>&treasure=<id>, from the Hunts page) -->
+      <div id="huntInfo" class="sheet__route" hidden></div>
+      <div id="sheetMore" class="sheet__more" hidden>
       <div id="coinInfo" class="sheet__route coin-line" hidden></div>
       <!-- B: walking mode: normal, try-hard (fast, big bonus) or calm walk (modes.py). Logged in only. -->
       <div id="modePicker" class="mode-picker" role="group" aria-label="Walking mode" hidden>
@@ -47,13 +57,10 @@
         <button type="button" class="mode-pick" data-mode="calm">🌿 Calm walk</button>
       </div>
       <p id="modeText" class="sheet__route mode-text" hidden></p>
-      <!-- A: hunt race mode (/?hunt=<id>&treasure=<id>, from the Hunts page) -->
-      <div id="huntInfo" class="sheet__route" hidden></div>
       <div id="teamInfo" class="sheet__route" hidden></div>
-      <!-- A: shown when the phone has no connection (the journey keeps counting) -->
-      <div id="netInfo" class="sheet__route net-line" hidden></div>
       <!-- A: how many street crossings this route has (Feature 7) -->
       <div id="crossingInfo" class="sheet__route" hidden></div>
+      </div>
       <!-- B: after a find, rate the treasure 1-5 stars (Python checks you really found it) -->
       <div id="rateBox" class="rate-box" hidden>
         <p class="rate-box__ask">How was <span id="rateName"></span>?</p>
@@ -546,11 +553,29 @@
       if (currentPos && routeTarget) drawRoute(currentPos, routeTarget, true, true);
     });
 
+    // ------------------------------------------------------------ B: compact status card
+    // The card shows the essentials; "More" opens coins, walking mode, team and crossings.
+    // The choice is remembered on this phone.
+    const sheetMore = document.getElementById("sheetMore");
+    const sheetMoreBtn = document.getElementById("sheetMoreBtn");
+    function setSheetMore(open) {
+      sheetMore.hidden = !open;
+      sheet.classList.toggle("is-more", open);
+      sheetMoreBtn.setAttribute("aria-expanded", String(open));
+      sheetMoreBtn.textContent = open ? "▾ Less" : "▴ More";
+      try { localStorage.setItem("sheetMore", open ? "1" : "0"); } catch (err) { /* private mode */ }
+    }
+    sheetMoreBtn.addEventListener("click", () => setSheetMore(sheetMore.hidden));
+    try { setSheetMore(localStorage.getItem("sheetMore") === "1"); } catch (err) { setSheetMore(false); }
+
     // ------------------------------------------------------------ Treasure Trail (B)
-    // You pick a goal; Python plans a loop through treasures you haven't found (trail_planner.py)
-    // and sends the stops in order plus the walking path. The page only draws it.
+    // You pick a goal; Python plans a loop through treasures you haven't found (trail_planner.py).
+    // The map shows ONE leg at a time: the next checkpoint and the route to it. Python decides
+    // when you reached it (/api/trail/progress); then the next leg appears. The last checkpoint
+    // is back where you started.
     let trailActive = false;
     let trailLayer = null;
+    let trail = null;  // {checkpoints: [{lat, lon, name, label}], index, legFrom}
     const trailBtn = document.getElementById("trailBtn");
     const trailBox = document.getElementById("trailBox");
     const trailMsg = document.getElementById("trailMsg");
@@ -566,22 +591,78 @@
       trailBtn.setAttribute("aria-expanded", String(!trailBox.hidden));
     });
 
-    function stopIcon(n) {
+    function stopIcon(label) {
       const number = document.createElement("span");  // an element, so no HTML text is ever parsed
       number.className = "trail-stop__n";
-      number.textContent = String(n);
-      return L.divIcon({ className: "trail-stop", html: number, iconSize: [26, 26], iconAnchor: [13, 13] });
+      number.textContent = String(label);
+      return L.divIcon({ className: "trail-stop", html: number, iconSize: [30, 30], iconAnchor: [15, 15] });
     }
 
-    function endTrail() {
+    function endTrail(message = "") {
       trailActive = false;
+      trail = null;
       if (trailLayer) { trailLayer.remove(); trailLayer = null; }
       trailEnd.hidden = true;
       trailBtn.hidden = false;
-      trailSay("");
-      if (currentPos && routeTarget) drawRoute(currentPos, routeTarget, true);
+      trailSay(message);
+      if (currentPos && routeTarget) drawRoute(currentPos, routeTarget, !message);
     }
-    trailEnd.addEventListener("click", endTrail);
+    trailEnd.addEventListener("click", () => endTrail());
+
+    // Draw only the next checkpoint and the walking route from you to it.
+    async function drawTrailLeg(fit = false) {
+      if (!trail || !currentPos) return;
+      const cp = trail.checkpoints[trail.index];
+      const requestId = ++routeRequestId;  // an older route still on its way must not replace this leg
+      trail.legFrom = currentPos;
+      const total = trail.checkpoints.length;
+      trailSay(`Checkpoint ${trail.index + 1} of ${total}: ${cp.name}`);
+      try {
+        const res = await fetch(`/api/route?points=${currentPos[0]},${currentPos[1]};${cp.lat},${cp.lon}`);
+        const data = await res.json();
+        if (requestId !== routeRequestId || !trail) return;
+        if (!res.ok) throw new Error(data.error || "Route request failed");
+        if (trailLayer) trailLayer.remove();
+        const dash = data.warning ? "10 10" : null;
+        trailLayer = L.featureGroup([
+          L.polyline(data.path, { color: "#14231f", weight: 10, opacity: 0.9, dashArray: dash, lineCap: "square", lineJoin: "miter" }),
+          L.polyline(data.path, { color: "#4fc3b0", weight: 6, opacity: 1, dashArray: dash, lineCap: "square", lineJoin: "miter" }),
+          L.marker([cp.lat, cp.lon], { icon: stopIcon(cp.label), interactive: false, zIndexOffset: 500 })
+        ]).addTo(map);
+        if (fit) map.fitBounds(trailLayer.getBounds(), routePadding());
+        const m = Math.round(data.distance_m);
+        trailSay(`Checkpoint ${trail.index + 1} of ${total}: ${cp.name} · ${m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`}` +
+                 ` · about ${Math.max(1, Math.round(data.duration_s / 60))} min${data.warning ? " (straight line)" : ""}`);
+        showWeather(data.weather);
+      } catch (err) {
+        if (requestId === routeRequestId) trailSay(`Could not get the route to the next checkpoint: ${err.message}`);
+      }
+    }
+
+    // Python checks whether you reached the checkpoint; if so, the next leg is drawn.
+    async function checkTrail(lat, lon) {
+      if (!trail) return;
+      const asked = trail;
+      try {
+        const res = await fetch("/api/trail/progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lon, index: asked.index,
+                                 checkpoints: asked.checkpoints.map(c => [c.lat, c.lon]) })
+        });
+        const data = await res.json();
+        if (!res.ok || trail !== asked) return;
+        if (data.done) { endTrail("🏁 Trail complete: you walked the whole loop!"); return; }
+        if (data.reached) {
+          trail.index = data.index;
+          drawTrailLeg(true);
+        } else if (trail.legFrom && map.distance(trail.legFrom, [lat, lon]) > REROUTE_DISTANCE_M) {
+          drawTrailLeg();  // you walked off the route: a fresh route to the same checkpoint
+        }
+      } catch (err) {
+        console.error("Trail check failed:", err);
+      }
+    }
 
     for (const pick of document.querySelectorAll(".trail-pick")) {
       pick.addEventListener("click", async () => {
@@ -598,28 +679,22 @@
           if (!res.ok) throw new Error(data.error || "Could not plan a trail");
           if (!data.stops.length) { trailSay(data.message); return; }
           trailActive = true;
-          routeRequestId++;  // an old route still on its way must not replace the trail
           if (routeLine) { routeLine.remove(); routeLine = null; }
           routeInfo.hidden = true;     // the one-treasure route summary doesn't apply now
           newRouteBtn.hidden = true;   // (both come back with the route when the trail ends)
-          if (trailLayer) trailLayer.remove();
-          const dash = data.warning ? "10 10" : null;
-          trailLayer = L.featureGroup([
-            L.polyline(data.path, { color: "#14231f", weight: 10, opacity: 0.9, dashArray: dash, lineCap: "square", lineJoin: "miter" }),
-            L.polyline(data.path, { color: "#4fc3b0", weight: 6, opacity: 1, dashArray: dash, lineCap: "square", lineJoin: "miter" }),
-            ...data.stops.map(stop => L.marker([stop.lat, stop.lon], { icon: stopIcon(stop.order), interactive: false, zIndexOffset: 500 }))
-          ]).addTo(map);
-          map.fitBounds(trailLayer.getBounds(), routePadding());
-          const km = (data.distance_m / 1000).toFixed(2);
-          const min = Math.max(1, Math.round(data.duration_s / 60));
-          const names = data.stops.map(stop => `${stop.order}. ${stop.name}`).join(" → ");
-          trailSay(`${data.message} ${km} km, about ${min} min, ${data.steps.toLocaleString()} steps` +
-                   `${data.warning ? " (straight lines)" : ""}. ${names} → back here.`);
-          showWeather(data.weather);  // B
+          trail = {
+            index: 0,
+            legFrom: null,
+            checkpoints: [
+              ...data.stops.map(stop => ({ lat: stop.lat, lon: stop.lon, name: stop.name, label: stop.order })),
+              { lat: data.start[0], lon: data.start[1], name: "back to the start", label: "🏁" }
+            ]
+          };
           trailBox.hidden = true;
           trailBtn.setAttribute("aria-expanded", "false");
           trailBtn.hidden = true;
           trailEnd.hidden = false;
+          drawTrailLeg(true);
         } catch (err) {
           trailSay(err.message);
         }
@@ -1564,6 +1639,7 @@
       if (!force && now - lastSent < 3000) return;
       lastSent = now;
       updateDistance(lat, lon);
+      checkTrail(lat, lon);  // B: reached the next trail checkpoint?
     }
 
     // Ask Python how far you are from the treasure you are hunting

@@ -113,3 +113,26 @@ def plan_trail(start, treasures, budget_m, max_stops=MAX_STOPS):
         left.remove(tid)
         order = two_opt(order[:pos] + [tid] + order[pos:], length)
     return {"ids": order, "estimate_m": round(length(order), 1)}
+
+
+def trail_progress(position, checkpoints, index, reach_m):
+    """Which checkpoint is next, walking a trail one leg at a time (B).
+
+    checkpoints: [(lat, lon), ...] in order, the last one is back at the start.
+    index: the checkpoint you were heading to. Every checkpoint you are within reach_m of
+    is ticked off, so you move on to the next one.
+    Returns {"index", "meters" (to the next one, None when done), "reached" (how many
+    were ticked off now), "done"}.
+    """
+    if not 0 <= index <= len(checkpoints):
+        raise ValueError("index is outside the trail")
+    start = index
+    while index < len(checkpoints) and _straight_m(position, checkpoints[index]) <= reach_m:
+        index += 1
+    done = index >= len(checkpoints)
+    meters = None if done else round(_straight_m(position, checkpoints[index]))
+    return {"index": index, "meters": meters, "reached": index - start, "done": done}
+
+
+def _straight_m(a, b):
+    return haversine_m(a[0], a[1], b[0], b[1])
