@@ -164,3 +164,73 @@ def trail_post_text(checkpoints, distance_m, duration_s, steps, calories, splits
     if splits:
         text += f" Splits: {splits_text(splits)}."
     return text
+
+
+# ---------------------------------------------------------------- B: carry on a trail after a reload
+
+TRAIL_RESUME_S = 30 * 60   # carry on if the phone reported within the last 30 minutes
+MAX_CHECKPOINTS = 21       # MAX_STOPS treasures plus "back to the start", with room to spare
+
+
+def _number(value, field, low, high):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a number")
+    if not low <= value <= high:  # also refuses nan
+        raise ValueError(f"{field} must be between {low} and {high}")
+    return float(value)
+
+
+def _whole(value, field, low, high):
+    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+        raise ValueError(f"{field} must be a whole number from {low} to {high}")
+    return value
+
+
+def parse_active_trail(data):
+    """Check the state of a timed trail sent by the map, so it can be kept and carried on.
+
+    Returns a clean dict: checkpoints ([{id, lat, lon, name, label}]), index, start, splits,
+    meters, elapsed_s. Raises ValueError with a clear message.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("send JSON")
+    raw = data.get("checkpoints")
+    if not isinstance(raw, list) or not 2 <= len(raw) <= MAX_CHECKPOINTS:
+        raise ValueError(f"checkpoints must be a list of 2 to {MAX_CHECKPOINTS} points")
+    checkpoints = []
+    for cp in raw:
+        if not isinstance(cp, dict):
+            raise ValueError("each checkpoint must be an object")
+        cid = cp.get("id")
+        if cid is not None:
+            cid = _whole(cid, "checkpoint id", 1, 10**9)
+        name = cp.get("name")
+        if not isinstance(name, str) or not 1 <= len(name) <= 100:
+            raise ValueError("each checkpoint needs a name of 1 to 100 characters")
+        label = str(cp.get("label", ""))[:4]
+        checkpoints.append({"id": cid, "lat": _number(cp.get("lat"), "lat", -90, 90),
+                            "lon": _number(cp.get("lon"), "lon", -180, 180), "name": name, "label": label})
+    start = data.get("start")
+    if not isinstance(start, list) or len(start) != 2:
+        raise ValueError("start must be [lat, lon]")
+    start = [_number(start[0], "lat", -90, 90), _number(start[1], "lon", -180, 180)]
+    elapsed_s = _whole(data.get("elapsed_s"), "elapsed_s", 0, 86_400)
+    splits = data.get("splits", [])
+    if not isinstance(splits, list) or len(splits) > MAX_CHECKPOINTS:
+        raise ValueError("splits must be a list of times")
+    splits = [_whole(s, "split", 0, elapsed_s) for s in splits]
+    if splits != sorted(splits):
+        raise ValueError("splits must go up")
+    return {
+        "checkpoints": checkpoints,
+        "index": _whole(data.get("index"), "index", 0, len(checkpoints) - 1),
+        "start": start,
+        "splits": splits,
+        "meters": _number(data.get("meters"), "meters", 0, 100_000),
+        "elapsed_s": elapsed_s,
+    }
+
+
+def can_carry_on(since_update_s):
+    """A kept trail is carried on only if the phone reported recently."""
+    return 0 <= since_update_s <= TRAIL_RESUME_S

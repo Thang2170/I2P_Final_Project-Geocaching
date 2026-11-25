@@ -5,6 +5,9 @@ picks the treasures you can still find, and asks routing.get_route (A's file, un
 for the real walking path of the loop.
 """
 
+import json
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify, request
 
 from auth_api import current_user
@@ -12,12 +15,13 @@ from calculator import steps_from_distance
 from coin_api import found_treasure_ids
 from journey_log import speed_problem
 from location import haversine_m
-from models import Post, TrailWalk, Treasure, db
+from models import ActiveTrail, Post, TrailWalk, Treasure, db
 from walk_api import _saved_weight, energy_for
 from walk_input import DEFAULT_WEIGHT_KG, parse_distance_m, parse_duration_s
 from routing import get_route
 from location import FOUND_RADIUS_M
-from trail_planner import parse_goal, plan_trail, trail_post_text, trail_progress
+from trail_planner import (can_carry_on, parse_active_trail, parse_goal, plan_trail, trail_post_text,
+                           trail_progress)
 from weather_api import public_choice, weather_for
 from treasure_input import parse_number
 
@@ -160,3 +164,57 @@ def save_trail_walk():
     db.session.commit()
     return jsonify(id=walk.id, post_id=post.id, text=text, steps=walk.steps, calories=walk.calories,
                    distance_m=walk.distance_m, duration_s=walk.duration_s), 201
+
+
+# ---------------------------------------------------------------- B: carry on a trail after a reload
+
+def _utc(when):
+    return when if when.tzinfo else when.replace(tzinfo=timezone.utc)  # SQLite drops the zone
+
+
+@trail_api.route("/api/trail/active", methods=["POST"])
+def keep_active_trail():
+    """Keep the timed trail you are walking (start, each checkpoint, and every 30 s)."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    try:
+        state = parse_active_trail(request.get_json(silent=True))
+    except ValueError as err:
+        return jsonify(error=str(err)), 400
+    row = db.session.get(ActiveTrail, user.id) or ActiveTrail(user_id=user.id)
+    row.state = json.dumps(state)
+    row.updated_at = datetime.now(timezone.utc)
+    db.session.add(row)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@trail_api.route("/api/trail/active", methods=["GET"])
+def get_active_trail():
+    """The trail to carry on after a reload, or {"active": null}. A stale one is forgotten."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    row = db.session.get(ActiveTrail, user.id)
+    if row is None:
+        return jsonify(active=None)
+    since = int((datetime.now(timezone.utc) - _utc(row.updated_at)).total_seconds())
+    if not can_carry_on(since):
+        db.session.delete(row)
+        db.session.commit()
+        return jsonify(active=None, expired=True)
+    return jsonify(active=json.loads(row.state) | {"since_update_s": since})
+
+
+@trail_api.route("/api/trail/active", methods=["DELETE"])
+def end_active_trail():
+    """Finished, saved or stopped: nothing to carry on."""
+    user = current_user()
+    if user is None:
+        return jsonify(error="Log in first"), 401
+    row = db.session.get(ActiveTrail, user.id)
+    if row:
+        db.session.delete(row)
+        db.session.commit()
+    return jsonify(ok=True)

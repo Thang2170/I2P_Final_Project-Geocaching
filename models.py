@@ -671,3 +671,17 @@ class TrailWalk(db.Model):
     calories = db.Column(db.Float, nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True)  # its Community post
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class ActiveTrail(db.Model):
+    """A timed Treasure Trail in progress, so it survives a reload or a lost phone (owner: B).
+
+    One row per player at most. The state (checkpoints, splits...) is checked by
+    trail_planner.parse_active_trail and kept as JSON. A new table: no database to delete.
+    """
+
+    __tablename__ = "active_trails"
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    state = db.Column(db.Text, nullable=False)       # JSON from parse_active_trail
+    updated_at = db.Column(db.DateTime, nullable=False)
