@@ -2047,3 +2047,7 @@ button.post__likes[hidden] { display: none; }
 @keyframes trail-pulse { 50% { box-shadow: 0 0 0 3px #14231f, 0 0 0 8px rgba(79, 195, 176, .55); } }
 @media (prefers-reduced-motion: reduce) { .trail-stop { animation: none; } }
 .trail-stop__n { font-size: 12px; }
+
+/* B: "▶ Start trail": the main action while a trail is on the map */
+.sheet__btn--go { background: var(--px-green); color: var(--px-paper); border-color: var(--px-green); }
+.sheet__btn--go:hover { background: #2a5a4b; }
