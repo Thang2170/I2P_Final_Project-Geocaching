@@ -16,7 +16,8 @@ FRIEND_ACCEPTED = "friend_accepted"  # someone said yes to your friend request
 SHARE = "share"          # someone shared your post
 REPLY = "reply"          # someone replied to your comment
 HUNT_WON = "hunt_won"    # A: someone won a hunt race you were in
-KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY, HUNT_WON)
+STREAK_RISK = "streak_risk"  # B: your streak ends at midnight (habits.py writes the words)
+KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY, HUNT_WON, STREAK_RISK)
 
 SHOWN = 20  # how many notifications the bell lists
 
@@ -48,6 +49,8 @@ def message(kind, actor_name, subject):
         return f"{actor_name} accepted your friend request"
     if kind == HUNT_WON:
         return f'{actor_name} won the hunt "{subject}"'
+    if kind == STREAK_RISK:
+        return subject  # the whole sentence, from habits.streak_risk_text
     raise ValueError(f"Unknown notification kind: {kind}")
 
 
@@ -62,6 +65,8 @@ def link(kind, post_id=None, hunt_id=None, actor_name=None):
         return f"/players/{quote(actor_name or '')}"
     if kind == HUNT_WON:
         return "/hunts"
+    if kind == STREAK_RISK:
+        return "/welcome"  # the home page: your ring and streak
     raise ValueError(f"Unknown notification kind: {kind}")
 
 

@@ -9,8 +9,8 @@ from flask import Blueprint, jsonify
 
 from auth_api import current_user
 from feed_rules import avatar, time_ago
-from models import Hunt, Notification, Post, db
-from notify_rules import FRIEND_REQUEST, SHOWN, link, message, short, should_notify
+from models import Hunt, Notification, Post, StreakReminder, db
+from notify_rules import FRIEND_REQUEST, SHOWN, STREAK_RISK, link, message, short, should_notify
 
 notify_api = Blueprint("notify_api", __name__)
 
@@ -42,6 +42,10 @@ def _item(n, me_id=None):
     elif n.hunt_id is not None:
         hunt = db.session.get(Hunt, n.hunt_id)
         subject = hunt.name if hunt else "a hunt"
+    elif n.kind == STREAK_RISK:  # B: the words come from the streak and freezes of that evening
+        from habits import streak_risk_text
+        r = db.session.execute(db.select(StreakReminder).where(StreakReminder.notification_id == n.id)).scalar()
+        subject = streak_risk_text(r.streak, r.freezes) if r else "🔥 Your streak ends at midnight!"
     actor = n.actor.username if n.actor else None
     friend_request = None
     if n.kind == FRIEND_REQUEST and actor:
@@ -67,6 +71,8 @@ def notifications():
     user = current_user()
     if user is None:
         return jsonify(error="Log in first"), 401
+    from habit_api import remind_if_at_risk  # here, not at the top: habit_api imports feed_api
+    remind_if_at_risk(user)  # B: the evening "streak at risk" reminder, checked once a day
     items = db.session.execute(db.select(Notification).where(Notification.user_id == user.id)
                                .order_by(Notification.id.desc()).limit(SHOWN)).scalars().all()
     unseen = db.session.execute(db.select(db.func.count()).select_from(Notification).where(

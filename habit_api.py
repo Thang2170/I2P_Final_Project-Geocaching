@@ -12,9 +12,9 @@ from flask import Blueprint, jsonify
 from sqlalchemy.exc import IntegrityError
 
 from auth_api import current_user
-from habits import (FREEZE_PRICE, LOOKBACK_DAYS, MAX_FREEZES, freeze_problem, freezes_to_use, ring, ring_days,
-                    share_text)
-from models import CoinTransaction, GoalChoice, Post, StreakFreeze, StreakShare, db
+from habits import (FREEZE_PRICE, LOOKBACK_DAYS, MAX_FREEZES, REMIND_FROM_HOUR, freeze_problem, freezes_to_use,
+                    ring, ring_days, share_text, streak_at_risk)
+from models import CoinTransaction, GoalChoice, Notification, Post, StreakFreeze, StreakReminder, StreakShare, db
 from streaks import local_day, streaks
 
 habit_api = Blueprint("habit_api", __name__)
@@ -135,3 +135,40 @@ def share_streak():
         db.session.rollback()
         return jsonify(error="You already shared your streak today."), 400
     return jsonify(_state(user) | {"post_id": post.id, "text": text}), 201
+
+
+# ---------------------------------------------------------------- the evening "streak at risk" reminder
+
+def _local_now():
+    return datetime.now(timezone.utc) + timedelta(hours=8)  # Taiwan time
+
+
+def remind_if_at_risk(user):
+    """From 8 p.m., once a day: if your streak would end at midnight, tell the bell.
+
+    Called when the bell asks for notifications (every 30 s while the app is open), so no
+    background job is needed. The first check after 8 p.m. is saved, so it runs once a day.
+    """
+    from notify_rules import STREAK_RISK  # here, not at the top: notify_api imports this file
+    local = _local_now()
+    if local.hour < REMIND_FROM_HOUR:
+        return None
+    today = local.date()
+    if db.session.execute(db.select(StreakReminder.id).where(
+            StreakReminder.user_id == user.id, StreakReminder.day == today)).first():
+        return None
+    info = streak_info(user, today)
+    owned = info["freezes"]["owned"]
+    reminder = StreakReminder(user_id=user.id, day=today, streak=info["current"], freezes=owned)
+    if streak_at_risk(info["current"], info["today_done"], local.hour):
+        note = Notification(user_id=user.id, kind=STREAK_RISK)
+        db.session.add(note)
+        db.session.flush()
+        reminder.notification_id = note.id
+    db.session.add(reminder)
+    try:
+        db.session.commit()
+    except IntegrityError:  # two bells asked at the same moment
+        db.session.rollback()
+        return None
+    return reminder
