@@ -122,3 +122,23 @@ def share_text(current, best, ring_closed):
     if ring_closed:
         text += " Today's ring is closed too. ⭕"
     return text + " Who's walking with me?"
+
+
+# ---------------------------------------------------------------- streak at risk (the evening reminder)
+
+REMIND_FROM_HOUR = 20  # 8 p.m. Taiwan time: late enough to matter, early enough to still walk
+
+
+def streak_at_risk(current, today_done, local_hour):
+    """True if the bell should warn you tonight: you have a streak and nothing counted today yet."""
+    return local_hour >= REMIND_FROM_HOUR and current >= 1 and not today_done
+
+
+def streak_risk_text(current, freezes):
+    """What the evening reminder says."""
+    days = "1-day streak" if current == 1 else f"{current}-day streak"
+    text = (f"🔥 Your {days} ends at midnight! Find a treasure, finish a hunt or close your ring "
+            "today to keep it.")
+    if freezes:
+        text += f" (You have {freezes} freeze{'s' if freezes != 1 else ''} ready, so a missed day won't break it.)"
+    return text

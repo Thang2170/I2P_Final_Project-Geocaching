@@ -701,3 +701,21 @@ class TrailWalkDetail(db.Model):
     shape = db.Column(db.String(10), nullable=False)
     treasure_ids = db.Column(db.Text, nullable=False)                 # JSON list, in walking order
     splits = db.Column(db.Text, nullable=False)                       # JSON list of seconds
+
+
+class StreakReminder(db.Model):
+    """The evening "streak at risk" check, once a day per player (owner: B). Rules: habits.py.
+
+    A row means "checked today"; notification_id is set if the bell was told. Keeping the streak
+    and freezes of that moment lets the bell's words stay the same later.
+    """
+
+    __tablename__ = "streak_reminders"
+    __table_args__ = (db.UniqueConstraint("user_id", "day", name="one_streak_check_per_day"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    day = db.Column(db.Date, nullable=False)                 # Taiwan date
+    streak = db.Column(db.Integer, nullable=False)
+    freezes = db.Column(db.Integer, nullable=False)
+    notification_id = db.Column(db.Integer, db.ForeignKey("notifications.id"), nullable=True, index=True)
