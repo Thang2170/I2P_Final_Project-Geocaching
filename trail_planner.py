@@ -60,8 +60,38 @@ def walk_m(a, b):
 
 def loop_length(start, points):
     """Length of the loop start -> points... -> start (estimated walking metres)."""
-    stops = [start, *points, start]
+    return path_length(start, points, loop=True)
+
+
+def path_length(start, points, loop=True):
+    """start -> points..., and back to start if loop (estimated walking metres)."""
+    stops = [start, *points, start] if loop else [start, *points]
     return sum(walk_m(stops[i], stops[i + 1]) for i in range(len(stops) - 1))
+
+
+# B: the trail's shape. A loop comes back to where you started; a one-way trail ends at the
+# last treasure (the same steps reach further, so it can visit more).
+SHAPES = {"loop": "loop", "oneway": "one-way trail"}
+
+
+def parse_shape(value):
+    if value is None:
+        return "loop"  # what trails always were
+    if value not in SHAPES:
+        raise ValueError(f"shape must be one of: {', '.join(SHAPES)}")
+    return value
+
+
+# B: skip treasures other players rated badly (you can only rate treasures you found, and a
+# trail goes to ones you haven't, so it is other players' stars that count).
+LOW_RATING = 2.0     # an average of 2 stars or less...
+MIN_RATINGS = 2      # ...from at least 2 players (one grumpy rating is not enough)
+
+
+def low_rated(ratings):
+    """ids whose average rating is LOW_RATING or less. ratings: {treasure_id: [stars, ...]}."""
+    return {tid for tid, stars in ratings.items()
+            if len(stars) >= MIN_RATINGS and sum(stars) / len(stars) <= LOW_RATING}
 
 
 def two_opt(items, length):
@@ -84,20 +114,21 @@ def two_opt(items, length):
     return best
 
 
-def plan_trail(start, treasures, budget_m, max_stops=MAX_STOPS):
-    """Plan the loop.
+def plan_trail(start, treasures, budget_m, max_stops=MAX_STOPS, loop=True):
+    """Plan the trail: a loop back to start, or (loop=False) one way, ending at the last treasure.
 
     start: (lat, lon) of the player. treasures: dicts with "id", "lat", "lon".
-    Returns {"ids": [treasure ids in walking order], "estimate_m": loop length}.
+    Returns {"ids": [treasure ids in walking order], "estimate_m": its length}.
     An empty "ids" means no treasure fits in this walk.
     """
     by_id = {t["id"]: (t["lat"], t["lon"]) for t in treasures}
 
     def length(ids):
-        return loop_length(start, [by_id[i] for i in ids])
+        return path_length(start, [by_id[i] for i in ids], loop)
 
-    # Only treasures you could reach and come back from on their own are worth trying.
-    left = sorted(i for i, p in by_id.items() if 2 * walk_m(start, p) <= budget_m)
+    # Only treasures you could reach (and, for a loop, come back from) on their own are worth trying.
+    there_and_back = 2 if loop else 1
+    left = sorted(i for i, p in by_id.items() if there_and_back * walk_m(start, p) <= budget_m)
     order = []  # treasure ids, in walking order
     while left and len(order) < max_stops:
         now = length(order)
@@ -153,10 +184,11 @@ def splits_text(splits):
     return " · ".join(parts)
 
 
-def trail_post_text(checkpoints, distance_m, duration_s, steps, calories, splits=()):
+def trail_post_text(checkpoints, distance_m, duration_s, steps, calories, splits=(), shape="loop"):
     """The Community post for a finished trail, written by Python (like a run tracker)."""
     pace = duration_s / (distance_m / 1000) if distance_m >= 20 else None
-    text = (f"🧭 Walked a Treasure Trail: {checkpoints} checkpoint{'s' if checkpoints != 1 else ''}, "
+    kind = "Treasure Trail" if shape == "loop" else "one-way Treasure Trail"
+    text = (f"🧭 Walked a {kind}: {checkpoints} checkpoint{'s' if checkpoints != 1 else ''}, "
             f"{distance_m / 1000:.2f} km in {fmt_duration(duration_s)}")
     if pace:
         text += f" ({fmt_duration(pace)} /km)"
@@ -195,8 +227,8 @@ def parse_active_trail(data):
     if not isinstance(data, dict):
         raise ValueError("send JSON")
     raw = data.get("checkpoints")
-    if not isinstance(raw, list) or not 2 <= len(raw) <= MAX_CHECKPOINTS:
-        raise ValueError(f"checkpoints must be a list of 2 to {MAX_CHECKPOINTS} points")
+    if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_CHECKPOINTS:  # one-way to 1 treasure: 1
+        raise ValueError(f"checkpoints must be a list of 1 to {MAX_CHECKPOINTS} points")
     checkpoints = []
     for cp in raw:
         if not isinstance(cp, dict):
@@ -228,6 +260,7 @@ def parse_active_trail(data):
         "splits": splits,
         "meters": _number(data.get("meters"), "meters", 0, 100_000),
         "elapsed_s": elapsed_s,
+        "shape": parse_shape(data.get("shape")),
     }
 
 
