@@ -8,8 +8,8 @@ import requests
 
 import weather_api
 from app import create_app
-from weather import (A_BIT_GREEN, GREEN, SHORTEST, WeatherError, area_key, fetch_weather, parse_weather,
-                     route_choice)
+from weather import (A_BIT_GREEN, GREEN, SHORTEST, WEATHER_ICONS, WeatherError, area_key, fetch_weather,
+                     parse_weather, route_choice, weather_icon)
 
 NTHU = (24.795324, 120.994796)
 NEARBY = (24.7960, 120.9950)
@@ -69,6 +69,17 @@ class RulesTest(unittest.TestCase):
     def test_nice_and_unknown(self):
         self.assertEqual(route_choice(weather())["route_options"], A_BIT_GREEN)
         self.assertEqual(route_choice(None), {"kind": "unknown", "headline": "", "tip": "", "route_options": {}})
+
+    def test_icons_not_emoji(self):
+        # A: the map draws a pixel icon; the headline is plain words
+        cases = [weather(), weather(feels=8), weather(wind=50), weather(rain=2.0, code=63), weather(feels=40)]
+        for w in cases:
+            choice = route_choice(w)
+            with self.subTest(kind=choice["kind"]):
+                self.assertTrue(choice["headline"][0].isalpha())   # starts with a word, not an emoji
+                self.assertIn(choice["kind"], WEATHER_ICONS)
+        self.assertEqual(weather_icon("rain"), "rain")
+        self.assertEqual(weather_icon("unknown"), "")
 
     def test_area_key(self):
         self.assertEqual(area_key(24.7953, 120.9948), (24.8, 120.99))
@@ -148,6 +159,7 @@ class ApiTest(unittest.TestCase):
             data = self.client.get(f"/api/route?points={NTHU[0]},{NTHU[1]};{NEARBY[0]},{NEARBY[1]}").get_json()
         self.assertEqual(post.call_args.kwargs["json"]["preference"], "shortest")
         self.assertEqual(data["weather"]["kind"], "rain")
+        self.assertEqual(data["weather"]["icon"], "rain")
         self.assertEqual(data["source"], "openrouteservice")
 
     @patch("routing.requests.post")

@@ -72,5 +72,28 @@ class TestPagesUseTheSprites(unittest.TestCase):
             self.assertIn(f'"{sprite}"', html)
 
 
+class TestIcons(unittest.TestCase):
+    """A: the small interface icons that replace emoji."""
+
+    def test_icons_are_small_and_sharp(self):
+        self.assertIn("icon-flame", pixel_art.ICONS)
+        for name in pixel_art.ICONS:
+            with self.subTest(icon=name):
+                width, height = check_sprite(name, SPRITES[name])
+                self.assertLessEqual(max(width, height), 12)            # about 20 px on screen
+                self.assertEqual(pixel_art.PIXEL_SIZE[name], pixel_art.SMALL_PIXEL)
+                self.assertIn(f".sprite--{name}::before {{ left: -2px;", sprite_css(name, SPRITES[name]))
+
+    def test_the_flame_flickers_but_not_for_less_motion(self):
+        css = sprite_css("icon-flame", SPRITES["icon-flame"])
+        self.assertIn("animation: sprite-icon-flame", css)
+        self.assertIn("prefers-reduced-motion", css)
+
+    def test_every_weather_icon_exists(self):
+        from weather import WEATHER_ICONS
+        for icon in WEATHER_ICONS.values():
+            self.assertIn(f"icon-{icon}", SPRITES)
+
+
 if __name__ == "__main__":
     unittest.main()
