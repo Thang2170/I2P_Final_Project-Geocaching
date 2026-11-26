@@ -29,7 +29,15 @@ body {
 
 /* ---------- top bar (every page) ---------- */
 
+/* B: the top bar stays at the top while you scroll. Its height is kept here once, so things that
+   stick below it (Community's side columns, the home sidebar) and jump links stop right under it. */
+:root { --topbar-h: 64px; }
+html { scroll-padding-top: calc(var(--topbar-h) + 8px); }
+
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2400;  /* above the map's panels (1000-1200); below the tour, pop-ups and open drop-downs */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -147,7 +155,7 @@ body {
   .topbar__nav > a { display: none; }
   .menu__small-only { display: block; }
   .menu__button { font-size: 20px; }
-  .menu__panel { position: fixed; right: 8px; left: 8px; top: 62px; }
+  .menu__panel { position: fixed; right: 8px; left: 8px; top: var(--topbar-h); }
 }
 
 /* ---------- buttons and forms (login, upload, hunts, shop) ---------- */
@@ -924,7 +932,7 @@ input[type="file"]:focus-visible::file-selector-button { outline: 4px solid var(
 .fb__left,
 .fb__right {
   position: sticky;  /* the side columns stay put while the feed scrolls */
-  top: 16px;
+  top: calc(var(--topbar-h) + 16px);  /* B: just under the sticky top bar */
   display: grid;
   gap: 20px;
 }
