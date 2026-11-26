@@ -1,0 +1,70 @@
+{# B: presenter mode (presenter.py). Shown on every page while you present; Python picks the step. #}
+<aside class="presenter" id="presenter" aria-label="Presenter notes">
+  <div class="presenter__top">
+    <span class="presenter__step">{{ presenter.number }}/{{ presenter.total }}</span>
+    <span class="presenter__who">{{ presenter.who }} talks</span>
+    <button type="button" class="presenter__fold" id="presenterFold" aria-expanded="true" aria-controls="presenterBody">Hide</button>
+  </div>
+  <div id="presenterBody">
+    <p class="presenter__title">{{ presenter.title }}</p>
+    <ul class="presenter__say">
+      {% for line in presenter.say %}<li>{{ line }}</li>{% endfor %}
+    </ul>
+    <div class="presenter__buttons">
+      <button type="button" class="btn btn--ghost" data-present="back" {{ "disabled" if presenter.first }}>Back</button>
+      <button type="button" class="btn" data-present="next">{{ presenter.next_label }}</button>
+    </div>
+    <button type="button" class="presenter__stop" data-present="stop">Stop presenting</button>
+  </div>
+</aside>
+<script>
+  (() => {
+    // The browser only asks Python for the next step and opens its page.
+    const look = {{ presenter.look | tojson }};
+    const page = {{ presenter.page | tojson }};
+    const here = location.pathname + location.search;
+    // The top bar comes before the rest of the page, so outline once the page is built.
+    if (look) document.addEventListener("DOMContentLoaded", () =>
+      document.querySelector(look)?.classList.add("is-presenting"));
+
+    async function go(action) {
+      const res = await fetch("/api/present", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      if (res.ok) location.href = data.url;
+    }
+    document.querySelectorAll("[data-present]").forEach(button =>
+      button.addEventListener("click", () => go(button.dataset.present)));
+
+    // A presentation clicker sends Page Down / Page Up. Arrow keys work too, but only when
+    // nothing else has the focus (so typing, menus and the map's own arrow keys still work).
+    document.addEventListener("keydown", event => {
+      const free = event.target === document.body;
+      if (event.key === "PageDown" || (free && event.key === "ArrowRight")) { event.preventDefault(); go("next"); }
+      if (event.key === "PageUp" || (free && event.key === "ArrowLeft")) { event.preventDefault(); go("back"); }
+    });
+
+    const fold = document.getElementById("presenterFold");
+    const body = document.getElementById("presenterBody");
+    fold.addEventListener("click", () => {
+      body.hidden = !body.hidden;
+      fold.setAttribute("aria-expanded", String(!body.hidden));
+      fold.textContent = body.hidden ? "Show" : "Hide";
+    });
+
+    // Opened a different page by hand? The panel says which page this step is meant for.
+    if (here !== page && location.pathname !== page.split("?")[0] && !page.startsWith("/hunts/demo-replay")) {
+      const p = document.createElement("p");
+      p.className = "presenter__elsewhere";
+      p.textContent = "This step is on another page. ";
+      const a = document.createElement("a");
+      a.href = page;
+      a.textContent = "Open it";
+      p.append(a);
+      body.prepend(p);
+    }
+  })();
+</script>

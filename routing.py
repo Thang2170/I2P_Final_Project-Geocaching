@@ -14,7 +14,9 @@ import requests
 from location import haversine_m
 
 # B: api.openrouteservice.org was shut down in Nov 2026. Same paths, same keys, new host.
-ORS_URL = "https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson"
+ORS_BASE = "https://api.heigit.org/openrouteservice/v2/directions"
+ORS_URL = f"{ORS_BASE}/foot-walking/geojson"  # the normal walking routes
+WALKING_PROFILE = "foot-walking"
 ORS_TIMEOUT_S = 10
 WALKING_SPEED_MPS = 1.4  # about 5 km/h
 MAX_POINTS = 10
@@ -106,10 +108,16 @@ def _error_message(response):
         return (response.text or "")[:200] or "no details"
 
 
-def _ask_service(points, api_key=None, extra=None):
+def ors_url(profile=WALKING_PROFILE):
+    """B: the address for this ORS profile (foot-walking, or wheelchair: see route_access.py)."""
+    return ORS_URL if profile == WALKING_PROFILE else f"{ORS_BASE}/{profile}/geojson"
+
+
+def _ask_service(points, api_key=None, extra=None, profile=WALKING_PROFILE):
     """Send points to OpenRouteService and return EVERY route it sends back.
 
     extra: more settings for the request body (used for alternative routes).
+    profile: B: foot-walking (normal) or wheelchair (step-free, route_access.py).
     Raises RoutingError on any problem. The [lat, lon] <-> [lon, lat] swap is only here.
     """
     pts = check_points(points)
@@ -126,7 +134,7 @@ def _ask_service(points, api_key=None, extra=None):
     }
     try:
         response = requests.post(
-            ORS_URL, json=body, headers=headers, timeout=ORS_TIMEOUT_S
+            ors_url(profile), json=body, headers=headers, timeout=ORS_TIMEOUT_S
         )
     except requests.RequestException as err:
         raise RoutingError(
@@ -156,15 +164,15 @@ def _ask_service(points, api_key=None, extra=None):
     return routes
 
 
-def get_walking_route(points, api_key=None, extra=None):
+def get_walking_route(points, api_key=None, extra=None, profile=WALKING_PROFILE):
     """Real walking route from OpenRouteService. Raises RoutingError on any problem.
 
     extra: B: more settings, e.g. {"preference": "shortest"} in the rain (weather.py).
     """
-    return _ask_service(points, api_key, extra)[0]
+    return _ask_service(points, api_key, extra, profile)[0]
 
 
-def get_alternative_routes(start, end, api_key=None):
+def get_alternative_routes(start, end, api_key=None, profile=WALKING_PROFILE):
     """Up to ALTERNATIVES really different walking routes between two points.
 
     OpenRouteService finds them itself: each one is a sensible path (no going out
@@ -174,10 +182,10 @@ def get_alternative_routes(start, end, api_key=None):
     extra = {"alternative_routes": {"target_count": ALTERNATIVES,
                                     "weight_factor": ALT_WEIGHT_FACTOR,
                                     "share_factor": ALT_SHARE_FACTOR}}
-    return _ask_service([start, end], api_key, extra)
+    return _ask_service([start, end], api_key, extra, profile)
 
 
-def get_route(points, extra=None):
+def get_route(points, extra=None, profile=WALKING_PROFILE):
     """Best route we can get: real walking route, else straight lines.
 
     Bad input raises ValueError (the caller made a mistake). A service problem
@@ -185,15 +193,17 @@ def get_route(points, extra=None):
     demo still works if the internet or the free API fails.
     extra: B: weather settings (weather.py). If the service refuses them, the normal
     walking route is used, never straight lines because of them.
+    profile: B: "wheelchair" for step-free routes (route_access.py). It is never swapped
+    for foot-walking: a wheelchair user gets straight lines and a warning instead of steps.
     """
     pts = check_points(points)
     try:
         if extra:
             try:
-                return get_walking_route(pts, extra=extra)
+                return get_walking_route(pts, extra=extra, profile=profile)
             except RoutingError:
                 pass  # try once more without the weather settings
-        return get_walking_route(pts)
+        return get_walking_route(pts, profile=profile)
     except RoutingError as err:
         route = straight_line_route(pts)
         route["warning"] = f"Using straight lines instead of real paths: {err}"
@@ -268,7 +278,7 @@ def _is_same_route(route, current_via):
     return haversine_m(mid[0], mid[1], current_via[0], current_via[1]) <= SAME_ROUTE_M
 
 
-def _side_step_route(start, end, rng, normal_m):
+def _side_step_route(start, end, rng, normal_m, profile=WALKING_PROFILE):
     """Fallback: try a few random side-step points, keep the first sensible one.
 
     "Sensible" = at most MAX_DETOUR_RATIO times the normal walk. If none is,
@@ -277,7 +287,7 @@ def _side_step_route(start, end, rng, normal_m):
     tried = []
     for _ in range(DETOUR_TRIES):
         via = random_via_point(start, end, rng)
-        route = get_route([start, via, end])
+        route = get_route([start, via, end], profile=profile)
         route["via"] = list(via)
         if route["distance_m"] <= MAX_DETOUR_RATIO * normal_m:
             return route
@@ -285,7 +295,7 @@ def _side_step_route(start, end, rng, normal_m):
     return min(tried, key=lambda r: r["distance_m"])
 
 
-def get_random_route(start, end, rng=random, current_via=None):
+def get_random_route(start, end, rng=random, current_via=None, profile=WALKING_PROFILE):
     """A different walking route to the same place.
 
     1. Ask OpenRouteService for alternative routes. If it has 2 or more, pick one
@@ -299,7 +309,7 @@ def get_random_route(start, end, rng=random, current_via=None):
     if haversine_m(start[0], start[1], end[0], end[1]) < MIN_TRIP_M:
         raise ValueError("You are already at the treasure")
     try:
-        routes = get_alternative_routes(start, end)
+        routes = get_alternative_routes(start, end, profile=profile)
     except RoutingError:
         routes = []
 
@@ -311,7 +321,7 @@ def get_random_route(start, end, rng=random, current_via=None):
 
     # How long the normal walk is, to judge a side-step: the service's route, else a straight line
     normal_m = routes[0]["distance_m"] if routes else haversine_m(start[0], start[1], end[0], end[1])
-    return _side_step_route(start, end, rng, normal_m)
+    return _side_step_route(start, end, rng, normal_m, profile)
 
 
 def drop_reached_via(points, reached_m=VIA_REACHED_M):

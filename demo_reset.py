@@ -16,13 +16,14 @@ from sqlalchemy import delete, select, update
 
 from demo_content import DEMO_FULL_HUNT, DEMO_USERS
 from demo_data import seed_demo_story
+from demo_extras import DEMO_RACE, DEMO_WALKERS
 from models import Hunt, User, db
 
 KEEP_AND_CLEAR = {"winner_id", "verified_by"}  # links set to empty instead of deleting the row
 
 
 def demo_usernames(extra=()):
-    return [u["username"] for u in DEMO_USERS] + [name for name in extra if name]
+    return [u["username"] for u in DEMO_USERS] + list(DEMO_WALKERS) + [name for name in extra if name]
 
 
 def wipe_players(user_ids, hunt_ids=()):
@@ -73,7 +74,8 @@ def reset_demo(extra_usernames=()):
     names = demo_usernames(extra_usernames)
     users = db.session.execute(select(User.id, User.username).where(User.username.in_(names))).all()
     # the full demo hunt is seeded with its members only when it is missing, so it goes too
-    hunts = list(db.session.execute(select(Hunt.id).where(Hunt.name == DEMO_FULL_HUNT["name"])).scalars())
+    hunts = list(db.session.execute(select(Hunt.id).where(
+        Hunt.name.in_([DEMO_FULL_HUNT["name"], DEMO_RACE["name"]]))).scalars())  # B: and the demo race
     deleted = wipe_players([uid for uid, _ in users], hunts)
     db.session.commit()
     added = seed_demo_story()

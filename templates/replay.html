@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Replay: {{ hunt_name }} · StepQuest</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    /* B: hunt race replay (replay.py). Python sends the paths, the speed and every sentence;
+       this page only moves the dots. One fixed colour per player, in the order Python lists them. */
+    .map-card { max-width: 920px; }
+    .replay-map { height: 58vh; min-height: 320px; margin: 12px 0; box-shadow: 0 0 0 3px var(--px-ink); }
+    .replay-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .replay-bar .btn { width: auto; margin: 0; min-width: 96px; }
+    .replay-bar input[type=range] { flex: 1 1 200px; accent-color: var(--px-ink); }
+    .replay-clock { font-family: var(--font-pixel); font-size: 11px; min-width: 9ch; }
+    .replay-speed { color: var(--px-muted); font-size: 16px; }
+    .racers { list-style: none; padding: 0; margin: 14px 0 0; }
+    .racers li { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 19px; }
+    .racers__dot { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px var(--px-ink); flex: none; }
+    .racer-label { background: var(--px-paper); border: 0; box-shadow: 0 0 0 2px var(--px-ink); border-radius: 0;
+                   font-family: var(--font-body), monospace; font-size: 14px; padding: 1px 6px; }
+    .racer-label::before { display: none; }
+    .s1 { --c: #257de0; } .s2 { --c: #f47230; } .s3 { --c: #00b894; } .s4 { --c: #f2a600; }
+    .s5 { --c: #ee7fac; } .s6 { --c: #008a17; } .s7 { --c: #6a4ce2; } .s8 { --c: #ec4647; } .s0 { --c: #8a8a8a; }
+    .racers__dot { background: var(--c); }
+  </style>
+</head>
+<body>
+  {% set active = "hunts" %}
+  {% include "_topbar.html" %}
+
+  <main class="card map-card">
+    <p class="board__eyebrow"><a href="/hunts">← Hunts</a></p>
+    <h1>Replay: {{ hunt_name }}</h1>
+    <p id="headline" class="muted" role="status">Loading the race…</p>
+
+    <div id="replayMap" class="replay-map" aria-label="Map of the race"></div>
+
+    <div class="replay-bar">
+      <button type="button" id="play" class="btn" disabled>▶ Play</button>
+      <input type="range" id="scrub" min="0" max="1" step="0.1" value="0" aria-label="Race time" disabled>
+      <span id="clock" class="replay-clock">0:00</span>
+      <span id="speed" class="replay-speed"></span>
+    </div>
+
+    <ul id="racers" class="racers" aria-label="Players"></ul>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const HUNT_ID = {{ hunt_id | tojson }};
+    const COLOURS = ["#8a8a8a", "#257de0", "#f47230", "#00b894", "#f2a600", "#ee7fac", "#008a17", "#6a4ce2", "#ec4647"];
+
+    const map = L.map("replayMap", { zoomControl: true });
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(map);
+
+    const headline = document.getElementById("headline");
+    const play = document.getElementById("play");
+    const scrub = document.getElementById("scrub");
+    const clock = document.getElementById("clock");
+    const racers = [];  // {player, dot, line}
+    let race = null, t = 0, playing = false, lastFrame = null;
+
+    function mmss(s) {
+      s = Math.max(0, Math.floor(s));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    }
+
+    // Where a player is at time t: between two saved points, part of the way along.
+    function positionAt(points, time) {
+      if (!points.length || time < points[0][0]) return null;
+      for (let i = 1; i < points.length; i++) {
+        const [t1, lat1, lon1] = points[i - 1], [t2, lat2, lon2] = points[i];
+        if (time <= t2) {
+          const k = t2 > t1 ? (time - t1) / (t2 - t1) : 1;
+          return [lat1 + (lat2 - lat1) * k, lon1 + (lon2 - lon1) * k];
+        }
+      }
+      const last = points[points.length - 1];
+      return [last[1], last[2]];
+    }
+
+    function draw() {
+      for (const r of racers) {
+        const here = positionAt(r.player.points, t);
+        if (!here) { r.dot.remove(); r.line.setLatLngs([]); continue; }
+        if (!map.hasLayer(r.dot)) r.dot.addTo(map);
+        r.dot.setLatLng(here);
+        const walked = r.player.points.filter(p => p[0] <= t).map(p => [p[1], p[2]]);
+        r.line.setLatLngs([...walked, here]);
+      }
+      clock.textContent = `${mmss(t)} / ${race.length}`;
+      scrub.value = String(t);
+    }
+
+    function frame(now) {
+      if (!playing) return;
+      if (lastFrame !== null) t = Math.min(race.duration_s, t + (now - lastFrame) / 1000 * race.speed);
+      lastFrame = now;
+      draw();
+      if (t >= race.duration_s) { setPlaying(false); return; }
+      requestAnimationFrame(frame);
+    }
+
+    function setPlaying(on) {
+      playing = on;
+      play.textContent = on ? "❚❚ Pause" : (t >= race.duration_s ? "↺ Again" : "▶ Play");
+      lastFrame = null;
+      if (on) requestAnimationFrame(frame);
+    }
+
+    play.addEventListener("click", () => {
+      if (!playing && t >= race.duration_s) t = 0;
+      setPlaying(!playing);
+    });
+    scrub.addEventListener("input", () => { t = Number(scrub.value); draw(); });
+
+    async function load() {
+      const res = await fetch(`/api/hunts/${HUNT_ID}/replay`);
+      const data = await res.json();
+      if (!res.ok) { headline.textContent = data.error || "Could not load the replay."; map.setView([24.7955, 120.9965], 16); return; }
+      race = data;
+      headline.textContent = data.headline;
+      document.getElementById("speed").textContent = data.speed > 1 ? `${data.speed}× speed` : "real speed";
+
+      const chest = L.divIcon({ className: "", html: '<span class="sprite sprite--chest"></span>', iconSize: [30, 24], iconAnchor: [15, 12] });
+      L.marker([data.treasure.lat, data.treasure.lon], { icon: chest, title: data.treasure.name }).addTo(map);
+
+      const list = document.getElementById("racers");
+      const bounds = L.latLngBounds([[data.treasure.lat, data.treasure.lon]]);
+      for (const player of data.players) {
+        const colour = COLOURS[player.slot || 0];
+        const line = L.polyline([], { color: colour, weight: 2, opacity: 0.9 }).addTo(map);
+        const dot = L.circleMarker([0, 0], { radius: 8, color: "#14231f", weight: 2, fillColor: colour, fillOpacity: 1 });
+        dot.bindTooltip(player.name + (player.winner ? " 🏆" : ""), { permanent: true, direction: "right", offset: [10, 0], className: "racer-label" });
+        racers.push({ player, dot, line });
+        for (const p of player.points) bounds.extend([p[1], p[2]]);
+
+        const li = document.createElement("li");
+        const swatch = document.createElement("span");
+        swatch.className = `racers__dot s${player.slot || 0}`;
+        li.append(swatch, player.summary);
+        list.append(li);
+      }
+      map.fitBounds(bounds.pad(0.2));
+      scrub.max = String(data.duration_s);
+      scrub.disabled = play.disabled = data.players.length === 0;
+      draw();
+    }
+    load().catch(err => { headline.textContent = "Could not load the replay."; console.error(err); });
+  </script>
+</body>
+</html>

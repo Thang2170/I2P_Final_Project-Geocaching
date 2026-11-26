@@ -33,6 +33,8 @@ def record_point(user_id, lat, lon, when=None):
                                   .order_by(WalkPoint.at.desc(), WalkPoint.id.desc()).limit(1)).first()
     from territory_api import record_visit  # claim the campus: colour this hexagon for your team
     record_visit(user_id, lat, lon, when, (as_utc(previous[0]), previous[1], previous[2]) if previous else None)
+    from heatmap_api import record_heat  # B: the campus heat map (only spots with 5+ players show)
+    record_heat(user_id, lat, lon, when, (as_utc(previous[0]), previous[1], previous[2]) if previous else None)
     db.session.add(WalkPoint(user_id=user_id, lat=lat, lon=lon, at=when))
     too_old = (when - timedelta(seconds=TRAIL_WINDOW_S)).replace(tzinfo=None)
     db.session.execute(db.delete(WalkPoint).where(WalkPoint.user_id == user_id, WalkPoint.at < too_old))

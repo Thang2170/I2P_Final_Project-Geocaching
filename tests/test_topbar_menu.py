@@ -6,7 +6,7 @@ import unittest
 from app import create_app
 
 MENU_PAGES = ("/upload", "/riddles", "/territory", "/trails", "/health", "/report", "/collection", "/shop",
-              "/login", "/leaderboard")
+              "/login", "/leaderboard", "/heatmap")
 
 
 class TopbarMenuTest(unittest.TestCase):

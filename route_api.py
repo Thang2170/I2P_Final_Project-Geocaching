@@ -31,7 +31,9 @@ def api_route():
     kept = drop_reached_via(points)
     # B: weather-aware: shortest in the rain, greener in the heat (weather.py)
     weather, choice = weather_for(*kept[0])
-    route = get_route(kept, extra=choice["route_options"])
+    access, profile, extra = _route_settings(choice["route_options"])  # B: step-free routes
+    route = get_route(kept, extra=extra, profile=profile)
+    _add_access_note(route, access)
     if weather:
         route["weather"] = public_choice(choice)
     if len(kept) < len(points):
@@ -53,10 +55,27 @@ def api_random_route():
             raise ValueError("Need exactly 2 points: where you are, then the treasure")
         current = request.args.get("current")
         current_via = check_point(current.split(",")) if current else None
-        route = get_random_route(points[0], points[1], current_via=current_via)
+        access, profile, _ = _route_settings(None)  # B: a step-free user gets step-free side routes
+        route = get_random_route(points[0], points[1], current_via=current_via, profile=profile)
     except ValueError as err:
         return jsonify(error=str(err)), 400
+    _add_access_note(route, access)
     return jsonify(route)
+
+
+def _route_settings(weather_extra):
+    """B: (choice, ORS profile, extra settings) for the logged-in player (route_access.py)."""
+    from auth_api import current_user  # here, not at the top, to keep this file's imports A's
+    from route_access_api import route_settings
+    return route_settings(current_user(), weather_extra)
+
+
+def _add_access_note(route, access):
+    """B: say on the map that this is a step-free route (or that none could be found)."""
+    from route_access import route_note
+    note = route_note(access, route.get("source") == "openrouteservice")
+    if note:
+        route["access"] = {"choice": access, "note": note}
 
 
 # ------------------------------------------------------------ street crossings (Feature 7)

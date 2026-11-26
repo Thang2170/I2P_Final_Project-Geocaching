@@ -17,7 +17,9 @@ SHARE = "share"          # someone shared your post
 REPLY = "reply"          # someone replied to your comment
 HUNT_WON = "hunt_won"    # A: someone won a hunt race you were in
 STREAK_RISK = "streak_risk"  # B: your streak ends at midnight (habits.py writes the words)
-KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY, HUNT_WON, STREAK_RISK)
+TREASURE_MISSING = "treasure_missing"  # B: players couldn't find your treasure (dnf.py writes the words)
+KINDS = (LIKE, COMMENT, MOVED_UP, FRIEND_REQUEST, FRIEND_ACCEPTED, SHARE, REPLY, HUNT_WON, STREAK_RISK,
+         TREASURE_MISSING)
 
 SHOWN = 20  # how many notifications the bell lists
 
@@ -49,12 +51,12 @@ def message(kind, actor_name, subject):
         return f"{actor_name} accepted your friend request"
     if kind == HUNT_WON:
         return f'{actor_name} won the hunt "{subject}"'
-    if kind == STREAK_RISK:
-        return subject  # the whole sentence, from habits.streak_risk_text
+    if kind in (STREAK_RISK, TREASURE_MISSING):
+        return subject  # the whole sentence, from habits.streak_risk_text or dnf.owner_text
     raise ValueError(f"Unknown notification kind: {kind}")
 
 
-def link(kind, post_id=None, hunt_id=None, actor_name=None):
+def link(kind, post_id=None, hunt_id=None, actor_name=None, treasure_id=None):
     """Where tapping the notification takes you."""
     if kind in (LIKE, COMMENT, SHARE, REPLY):
         # B: straight to that post on its own page (the feed if the post isn't known)
@@ -64,9 +66,12 @@ def link(kind, post_id=None, hunt_id=None, actor_name=None):
     if kind in (FRIEND_REQUEST, FRIEND_ACCEPTED):
         return f"/players/{quote(actor_name or '')}"
     if kind == HUNT_WON:
-        return "/hunts"
+        # B: straight to the race replay (replay.py)
+        return f"/hunts/{hunt_id}/replay" if hunt_id is not None else "/hunts"
     if kind == STREAK_RISK:
         return "/welcome"  # the home page: your ring and streak
+    if kind == TREASURE_MISSING:
+        return f"/?treasure={treasure_id}" if treasure_id is not None else "/"  # opens its board
     raise ValueError(f"Unknown notification kind: {kind}")
 
 

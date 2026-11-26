@@ -53,7 +53,8 @@ class TestDemoData(unittest.TestCase):
         seed_demo_story()
         counts = [db.session.query(model).count() for model in (User, Treasure, Hunt, HuntMember)]
         again = seed_demo_story()
-        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": [], "social": []})
+        self.assertEqual(again, {"users": [], "treasures": [], "hunts": [], "journeys": [], "posts": [], "chat": [], "social": [],
+                                 "extras": []})
         self.assertEqual(counts, [db.session.query(m).count() for m in (User, Treasure, Hunt, HuntMember)])
         self.assertEqual(get_balance(self.user("demo_player").id), DEMO_USERS[0]["coins"])
 

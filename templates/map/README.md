@@ -16,6 +16,7 @@ script, exactly as before: every part shares the same variables, in this order.
 | `offline.js` | lost connection: the outbox | A |
 | `coins_rating.js` | coins for a find, rating a treasure | B |
 | `position.js` | GPS, drag mode, fake positions | A |
+| `not_found.js` | "I couldn't find it" reports, maybe-missing pins, rain and night treasures | B |
 
 Rules:
 - No Jinja tags (`{{`, `{%`, `{#`) in these files: Flask would run them. Values from Python go in

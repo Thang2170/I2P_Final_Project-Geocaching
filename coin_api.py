@@ -107,6 +107,12 @@ def claim_treasure(treasure_id):
         status, message = PROBLEMS[problem]
         return jsonify(error=message), status
 
+    # B: a rain or night treasure can only be found while it is out (conditions.py)
+    from condition_api import claim_refusal
+    hidden = claim_refusal(treasure, user.id)
+    if hidden:
+        return jsonify(error=hidden), 409
+
     # B: prove you walked (walk_proof.py). Does your GPS trail look like a real walk here?
     from walk_proof_api import check_find, flag_find  # here: walk_proof_api imports this file
     refusal, reasons = check_find(user, treasure, lat, lon)

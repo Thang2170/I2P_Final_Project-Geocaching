@@ -9,8 +9,9 @@ from flask import Blueprint, jsonify
 
 from auth_api import current_user
 from feed_rules import avatar, time_ago
-from models import Hunt, Notification, Post, StreakReminder, db
-from notify_rules import FRIEND_REQUEST, SHOWN, STREAK_RISK, link, message, short, should_notify
+from models import Hunt, MissingAlert, Notification, Post, StreakReminder, Treasure, db
+from notify_rules import (FRIEND_REQUEST, SHOWN, STREAK_RISK, TREASURE_MISSING, link, message, short,
+                          should_notify)
 
 notify_api = Blueprint("notify_api", __name__)
 
@@ -31,6 +32,7 @@ def notify(recipient_id, kind, actor_id=None, post_id=None, hunt_id=None):
 
 def _item(n, me_id=None):
     subject = ""
+    treasure_id = None
     if n.post_id is not None:
         post = db.session.get(Post, n.post_id)
         if post is None:
@@ -46,6 +48,12 @@ def _item(n, me_id=None):
         from habits import streak_risk_text
         r = db.session.execute(db.select(StreakReminder).where(StreakReminder.notification_id == n.id)).scalar()
         subject = streak_risk_text(r.streak, r.freezes) if r else "🔥 Your streak ends at midnight!"
+    elif n.kind == TREASURE_MISSING:  # B: "players couldn't find your treasure" (dnf.py)
+        from dnf import owner_text
+        alert = db.session.execute(db.select(MissingAlert).where(MissingAlert.notification_id == n.id)).scalar()
+        treasure = db.session.get(Treasure, alert.treasure_id) if alert else None
+        subject = owner_text(treasure.name, alert.count) if treasure else "Players couldn't find one of your treasures."
+        treasure_id = treasure.id if treasure else None
     actor = n.actor.username if n.actor else None
     friend_request = None
     if n.kind == FRIEND_REQUEST and actor:
@@ -57,7 +65,7 @@ def _item(n, me_id=None):
         "id": n.id,
         "kind": n.kind,
         "text": message(n.kind, actor, subject),
-        "link": link(n.kind, post_id=n.post_id, hunt_id=n.hunt_id, actor_name=actor),
+        "link": link(n.kind, post_id=n.post_id, hunt_id=n.hunt_id, actor_name=actor, treasure_id=treasure_id),
         "friend_request": friend_request,
         "avatar": avatar(actor) if actor else None,
         "ago": time_ago(n.created_at),

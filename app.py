@@ -41,6 +41,11 @@ from habit_api import habit_api
 from journey_live_api import journey_live_api
 from privacy_api import privacy_api
 from report_api import report_api
+from dnf_api import dnf_api
+from replay_api import replay_api
+from route_access_api import route_access_api
+from heatmap_api import heatmap_api
+from presenter_api import presenter_api
 from trail_api import trail_api
 from treasure_api import treasure_api
 from walk_api import walk_api
@@ -54,8 +59,11 @@ def get_current_treasure(user=None):
     B: for a logged-in player, the oldest treasure they haven't found yet (see coins.first_to_find);
     otherwise the first one in the database.
     """
-    ids = db.session.execute(db.select(Treasure.id).order_by(Treasure.id)).scalars().all()
     user_id = getattr(user, "id", None)  # some page tests log in with a stand-in object that has no id
+    treasures = db.session.execute(db.select(Treasure).order_by(Treasure.id)).scalars().all()
+    from condition_api import hidden_ids  # B: skip rain / night treasures that are not out now
+    hidden = hidden_ids(treasures, user_id)
+    ids = [t.id for t in treasures if t.id not in hidden]
     found = found_treasure_ids(user_id) if user_id is not None else []
     target = first_to_find(ids, found)
     return db.session.get(Treasure, target) if target is not None else None
@@ -124,6 +132,11 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(journey_live_api)  # B: one live update while you walk
     app.register_blueprint(privacy_api)  # B: download my data, delete my band data (privacy.py)
     app.register_blueprint(report_api)  # B: the weekly health report (weekly_report.py)
+    app.register_blueprint(dnf_api)  # B: "I couldn't find it" reports (dnf.py)
+    app.register_blueprint(replay_api)  # B: hunt race replays (replay.py)
+    app.register_blueprint(route_access_api)  # B: step-free routes (route_access.py)
+    app.register_blueprint(heatmap_api)  # B: the campus heat map (heatmap.py)
+    app.register_blueprint(presenter_api)  # B: presenter mode for the demo (presenter.py)
     # B: login cookies are signed with this key. It is never a fixed text in the code any more
     # (anyone could read that in the repo); see secret_key.py.
     app.config["SECRET_KEY"] = _secret_key(app, database_uri)
