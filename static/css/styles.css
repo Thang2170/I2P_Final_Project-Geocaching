@@ -1174,3 +1174,8 @@ h2 > .sprite, .btn > .sprite { margin-right: 6px; vertical-align: -2px; }
 /* B: comfortable tap sizes (44 px) for the last small links on the home page */
 .daily-card > a, .footer a { display: inline-flex; align-items: center; min-height: 44px; }
 .mini-card__bottom a { min-width: 44px; min-height: 44px; }
+
+/* B: app.css (loaded for the shared top bar) also has a .profile rule, for the player page.
+   Reset the parts this page doesn't set, so the little player chip keeps its shape. */
+.home-page .profile { width: auto; margin: 0; }
+.home-page .profile__avatar { flex: none; }

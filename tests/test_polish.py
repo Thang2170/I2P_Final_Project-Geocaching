@@ -143,3 +143,14 @@ class DemoTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ServiceWorkerTest(unittest.TestCase):
+    """B: after an update, the first page load must not use an old saved stylesheet (it looked broken)."""
+
+    def test_styles_and_scripts_come_fresh_when_online(self):
+        with open("static/js/sw.js", encoding="utf-8") as f:
+            sw = f.read()
+        self.assertIn("/\\.(css|js)$/", sw)                                  # styles and scripts...
+        self.assertIn("if (code) return fresh.catch(() => saved", sw)        # ...network first, saved copy offline
+        self.assertNotIn('VERSION = "stepquest-v1"', sw)                     # old saved copies are thrown away
