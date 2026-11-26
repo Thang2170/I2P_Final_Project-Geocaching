@@ -2,7 +2,7 @@
 the welcome lists without repeats, StepQuest error pages and consistent demo data."""
 
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app import create_app
 from demo_data import seed_demo_story
@@ -11,6 +11,11 @@ from models import Hunt, HuntMember, Treasure, TreasureCondition, User, db
 from player_profile import race_result
 from queue_logic import PLAYING, WAITING, status_text
 from ratings import HOME_TOP, HOME_TRENDING, home_lists
+
+
+def _utc_now():
+    """Naive UTC, like the database keeps (datetime.utcnow() is deprecated in Python 3.12+)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class RulesTest(unittest.TestCase):
@@ -77,8 +82,8 @@ class PagesTest(unittest.TestCase):
         for name in ("ann", "bob"):
             db.session.add(HuntMember(hunt_id=hunt.id, user_id=ids[name]))
         treasure = db.session.query(Treasure).first()
-        db.session.add(HuntGame(hunt_id=hunt.id, treasure_id=treasure.id, started_at=datetime.utcnow() - timedelta(minutes=5),
-                                winner_id=ids["bob"], finished_at=datetime.utcnow()))
+        db.session.add(HuntGame(hunt_id=hunt.id, treasure_id=treasure.id, started_at=_utc_now() - timedelta(minutes=5),
+                                winner_id=ids["bob"], finished_at=_utc_now()))
         db.session.commit()
         card = next(h for h in ann.get("/api/hunts").get_json() if h["id"] == hunt.id)
         self.assertEqual(card["me"]["text"], "You raced in this hunt")

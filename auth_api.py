@@ -7,7 +7,10 @@ the SECRET_KEY that Flask uses to sign the login cookie.
 from flask import Blueprint, jsonify, render_template, request, session
 from sqlalchemy.exc import IntegrityError
 
-from models import User, db
+from datetime import datetime, timedelta, timezone
+
+from login_guard import WINDOW_S, lock_text, locked_for, recent_fails, tries_left_text
+from models import LoginFailure, User, db
 from user_input import parse_login, parse_new_account
 
 auth_api = Blueprint("auth_api", __name__)
@@ -68,13 +71,45 @@ def login():
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
+    # B: slow down password guessing (login_guard.py)
+    key, place, now = username.lower(), _place(), _now()
+    db.session.execute(db.delete(LoginFailure).where(
+        LoginFailure.username == key, LoginFailure.at < now - timedelta(seconds=WINDOW_S)))
+    fails = db.session.execute(db.select(LoginFailure.at).where(
+        LoginFailure.username == key, LoginFailure.place == place)).scalars().all()
+    wait = locked_for(fails, now)
+    if wait:
+        db.session.commit()
+        response = jsonify(error=lock_text(wait), retry_after_s=wait)
+        response.headers["Retry-After"] = str(wait)
+        return response, 429
+
     user = _find_user(username)
     if user is None or not user.check_password(password):
-        return jsonify(error=WRONG_LOGIN), 401
+        db.session.add(LoginFailure(username=key, place=place, at=now))
+        db.session.commit()
+        wait = locked_for([*fails, now], now)
+        if wait:  # this was the last allowed try: say so now, not on the next one
+            response = jsonify(error=lock_text(wait), retry_after_s=wait)
+            response.headers["Retry-After"] = str(wait)
+            return response, 429
+        return jsonify(error=WRONG_LOGIN + "." + tries_left_text(len(recent_fails(fails, now)) + 1)), 401
 
+    db.session.execute(db.delete(LoginFailure).where(LoginFailure.username == key, LoginFailure.place == place))
+    db.session.commit()
     session.clear()
     session["user_id"] = user.id
     return jsonify(user.to_dict())
+
+
+def _now():
+    """B: naive UTC, like everything the database keeps."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _place():
+    """B: where a login try comes from (the address; a hosting proxy may make this the same for all)."""
+    return (request.remote_addr or "unknown")[:64]
 
 
 @auth_api.route("/api/logout", methods=["POST"])

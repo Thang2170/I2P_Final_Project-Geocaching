@@ -69,6 +69,7 @@
     <h2>Your bands</h2>
     <ul id="devices"></ul>
     <form id="pairForm" class="row">
+      <label for="deviceName" class="visually-hidden">Band name</label>{# B: read out by screen readers #}
       <input id="deviceName" name="name" placeholder="Band name" maxlength="40">
       <button type="submit" class="btn">Pair a new band</button>
     </form>
@@ -96,6 +97,18 @@
     // The page only shows what Python sends: the numbers, the chart line and the advice.
     const message = document.getElementById("message");
     function show(text, ok) { message.textContent = text; message.className = "message " + (ok ? "ok" : "bad"); }
+    // B: a form's answer goes right under that form, and every new try clears the old answers,
+    // so an old error from another form never looks like the answer to this one.
+    function clearMessages() {
+      show("", true);
+      document.querySelectorAll(".form-msg").forEach(m => m.remove());
+    }
+    function showAt(form, text, ok) {
+      clearMessages();
+      const m = el("p", text, "message form-msg " + (ok ? "ok" : "bad"));
+      m.setAttribute("role", "status");
+      form.after(m);
+    }
     function el(tag, text, className) {
       const node = document.createElement(tag);
       if (text !== undefined && text !== null) node.textContent = text;
@@ -154,11 +167,11 @@
       try {
         const data = await post("/api/me/band-data/delete", { confirm: word.value.trim() });
         word.value = "";
-        show(data.message, true);
+        showAt(event.target, data.message, true);
         loadSummary();
         loadDevices();
       } catch (err) {
-        show(err.message, false);
+        showAt(event.target, err.message, false);
       }
     });
 
@@ -182,6 +195,7 @@
       button.disabled = true;
       button.textContent = "Thinking…";
       try {
+        clearMessages();
         const data = await post("/api/health/analyse");
         document.getElementById("aiText").textContent = data.text;
         document.getElementById("aiSource").textContent = `Written by: ${data.source}` + (data.note ? ` (${data.note})` : "");
@@ -199,8 +213,9 @@
         const data = await post("/api/health/devices", { name: document.getElementById("deviceName").value });
         document.getElementById("token").textContent = data.token;
         document.getElementById("tokenBox").hidden = false;
+        showAt(event.target, `Paired "${data.name}". Copy its code below.`, true);
         loadDevices();
-      } catch (error) { show(error.message, false); }
+      } catch (error) { showAt(event.target, error.message, false); }
     });
 
     document.getElementById("ageForm").addEventListener("submit", async event => {
@@ -208,9 +223,9 @@
       try {
         await post("/api/health/profile", { age: document.getElementById("age").value,
                                             resting_hr: document.getElementById("restingHr").value });
-        show("Saved.", true);
+        showAt(event.target, "Saved.", true);
         loadSummary();
-      } catch (error) { show(error.message, false); }
+      } catch (error) { showAt(event.target, error.message, false); }
     });
 
     loadSummary().catch(error => show(error.message, false));

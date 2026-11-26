@@ -1,13 +1,19 @@
 """B: hunt race replays (replay.py, replay_api.py)."""
 
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app import create_app
 from hunt_game_api import HuntGame
 from models import Hunt, HuntMember, RacePoint, Treasure, User, db
 from replay import (MAX_POINTS, MAX_SPEED, MIN_GAP_S, REPLAY_LENGTH_S, build_replay, clock, headline,
                     replay_problem, should_keep, speed_for)
+
+
+def _utc_now():
+    """Naive UTC, like the database keeps (datetime.utcnow() is deprecated in Python 3.12+)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 T0 = datetime(2026, 11, 20, 8, 0, 0)
 TREASURE = {"name": "Pond", "lat": 24.7950, "lon": 120.9950}
@@ -82,7 +88,7 @@ class ReplayApiTest(unittest.TestCase):
             db.session.add(HuntMember(hunt_id=self.hunt.id, user_id=self.uid(name)))
         self.treasure = db.session.execute(db.select(Treasure)).scalars().first()
         self.game = HuntGame(hunt_id=self.hunt.id, treasure_id=self.treasure.id,
-                             started_at=datetime.utcnow() - timedelta(seconds=30))
+                             started_at=_utc_now() - timedelta(seconds=30))
         db.session.add(self.game)
         db.session.commit()
 
@@ -118,7 +124,7 @@ class ReplayApiTest(unittest.TestCase):
         self.game.started_at = None
         db.session.commit()
         self.ann.post("/api/me/position", json={"lat": 24.7951, "lon": 120.9951})
-        self.game.started_at = datetime.utcnow() - timedelta(seconds=30)
+        self.game.started_at = _utc_now() - timedelta(seconds=30)
         self.game.winner_id = self.uid("bob")
         db.session.commit()
         self.ann.post("/api/me/position", json={"lat": 24.7951, "lon": 120.9951})
@@ -128,7 +134,7 @@ class ReplayApiTest(unittest.TestCase):
         self.ann.post("/api/me/position", json={"lat": 24.7951, "lon": 120.9951})
         self.assertEqual(self.ann.get(f"/api/hunts/{self.hunt.id}/replay").status_code, 409)  # not finished
         self.game.winner_id = self.uid("bob")
-        self.game.finished_at = datetime.utcnow()
+        self.game.finished_at = _utc_now()
         db.session.commit()
         data = self.ann.get(f"/api/hunts/{self.hunt.id}/replay").get_json()
         self.assertEqual(data["winner"], "bob")

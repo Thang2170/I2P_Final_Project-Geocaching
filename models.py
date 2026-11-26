@@ -804,3 +804,16 @@ class HeatVisit(db.Model):
     q = db.Column(db.Integer, nullable=False)
     r = db.Column(db.Integer, nullable=False)
     day = db.Column(db.Date, nullable=False, index=True)  # Taiwan date
+
+
+class LoginFailure(db.Model):
+    """B: one wrong password, so guessing can be slowed down (login_guard.py).
+
+    Rows older than login_guard.WINDOW_S are deleted on the next try; a right password clears them.
+    """
+
+    __tablename__ = "login_failures"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), nullable=False, index=True)  # as typed, in lower case
+    place = db.Column(db.String(64), nullable=False)                   # the address the try came from
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)

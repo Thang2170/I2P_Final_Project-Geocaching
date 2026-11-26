@@ -4,7 +4,7 @@
 1. Stop the app.
 2. Delete `instance/geohunt.db`.
 3. Run `python seed_demo.py` (safe to run again; it only adds what is missing).
-4. Run `python app.py` and open http://127.0.0.1:5000
+4. Run `python app.py` and open https://127.0.0.1:5000 (the browser warns about the test certificate the first time: choose Advanced, then Proceed)
 
 ## Reset between rehearsals (no need to stop the app)
 ```powershell

@@ -17,7 +17,7 @@
 
   /* The rest of the palette (used inside sprites and scenes) */
   --px-gold-light: #ffe08a;
-  --px-gold-dark: #a85e0c;    /* gold as text on light paper (passes contrast) */
+  --px-gold-dark: #9e580b;    /* gold as text on light paper: 4.6:1 even on the page background (B: was #a85e0c) */
   --px-leaf: #2f7d5b;
   --px-grass: #4f9a4a;
   --px-grass-light: #8cc65a;
@@ -39,7 +39,7 @@
   --px-paper: #fffcf2;        /* dialogue boxes and cards */
   --px-muted: #59665f;
   --px-line: rgba(20, 35, 31, .14);
-  --px-good: #2f7d5b;
+  --px-good: #2d7756;  /* B: 4.6:1 on the page background (was #2f7d5b) */
   --px-bad: #b3412e;
 
   /* The signature "dialogue box" edge: a 4px outline with the four corners
