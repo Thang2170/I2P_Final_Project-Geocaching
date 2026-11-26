@@ -2241,3 +2241,13 @@ button.post__likes[hidden] { display: none; }
 /* Sprites inside a heading or a button line up with the words */
 h2 > .sprite, .btn > .sprite, .mode-pick > .sprite, .safety__eyebrow > .sprite { margin-right: 6px; vertical-align: -2px; }
 @media (prefers-reduced-motion: reduce) { .journey__fold .sprite--icon-chevron { transition: none; } }
+
+/* ---------- A: the login title screen ---------- */
+/* The pixel world fills the page behind the form; the form is a dialogue box on the sky */
+.title-screen { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--px-sky-bands); }
+.title-screen[hidden] { display: none; }
+.title-card { position: relative; margin-top: 8vh; }
+.title-card__logo { display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
+                    color: var(--px-gold-dark); font-family: var(--font-pixel); font-size: 14px; }
+.title-card__logo .sprite { animation: px-bob 1s steps(2) infinite; }
+@media (prefers-reduced-motion: reduce) { .title-card__logo .sprite { animation: none; } }

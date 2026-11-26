@@ -20,13 +20,43 @@
     #message .btn--chat { display: inline-block; width: auto; margin: 8px 0 0; padding: 12px;
                           font-size: 10px; text-decoration: none; }
     details { margin-top: 20px; }
+
+    /* A: hunts as lobby cards: a status chip, seats drawn as blocks, one clear main button */
+    .hunts-card { max-width: 720px; }
+    #hunts { display: grid; gap: 16px; margin-top: 16px; }
+    .hunt { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px;
+            border-top: 0; background: var(--px-paper); box-shadow: inset 0 0 0 4px var(--px-line); }
+    .hunt.is-racing { box-shadow: inset 0 0 0 4px var(--px-gold); }
+    .hunt__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    .hunt__name { display: flex; align-items: center; gap: 8px; }
+    .hunt__chip { padding: 2px 8px; background: var(--px-bg); box-shadow: inset 0 0 0 2px var(--px-line);
+                  color: var(--px-muted); font-size: 16px; }
+    .hunt__chip--racing { background: var(--px-gold); box-shadow: none; color: var(--px-ink);
+                          animation: px-blink 1s steps(1) infinite; }
+    .hunt__chip--finished { background: var(--px-green); box-shadow: none; color: var(--px-paper); }
+    /* Seats: one block per place. Gold = joined, green = joined and online now. */
+    .seats { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .seats i { width: 14px; height: 14px; box-shadow: inset 0 0 0 2px var(--px-line); }
+    .seats i.is-taken { background: var(--px-gold); box-shadow: inset 0 0 0 2px var(--px-gold-dark); }
+    .seats i.is-online { background: var(--px-grass-light); box-shadow: inset 0 0 0 2px var(--px-good); }
+    .seats small { margin-left: 8px; color: var(--px-muted); font-size: 18px; }
+    .hunt__text { margin: 0; }
+    .hunt__goes { display: flex; align-items: center; gap: 8px; }
+    .hunt__goes .px-icon { color: var(--px-green); }
+    .hunt__buttons { flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .hunt .btn { margin: 0; }
+    .hunt .btn--chat { background: var(--px-paper); box-shadow: var(--px-edge); }  /* secondary, not a second gold button */
+    .hunt .hunt__leave { margin-left: auto; padding: 8px; background: none; box-shadow: none; color: var(--px-muted);
+                         font-family: var(--font-body); font-size: 18px; text-decoration: underline; }
+    .hunt .hunt__chat-later { max-width: none; text-align: left; }
+    @media (prefers-reduced-motion: reduce) { .hunt__chip--racing { animation: none; } }
   </style>
 </head>
 <body>
   {% set active = "hunts" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card hunts-card">
     <h1>Hunts</h1>
     <p class="muted">Join a hunt to explore with others. When a hunt is full, you wait in line and move up as players leave.</p>
 
@@ -80,23 +110,33 @@
       box.replaceChildren();
       document.getElementById("noHunts").hidden = hunts.length > 0;
       for (const hunt of hunts) {
-        const row = el("div", undefined, "hunt");
+        const game = hunt.game || {};
+        const row = el("div", undefined, "hunt" + (game.state === "started" ? " is-racing" : ""));
         const info = el("div");
+        info.style.display = "contents";
         // A: "joined" = has a place (kept until Leave); "online now" = had the map open in the last 2 minutes
         const counts = `${hunt.playing}/${hunt.capacity} joined` + (hunt.waiting ? ` · ${hunt.waiting} waiting` : "")
           + ` · ${hunt.online} online now`;
         // A: a pixel flag before each hunt's name
         const name = el("p", undefined, "hunt__name");
         name.append(el("span", undefined, "sprite sprite--flag hunt__flag"), hunt.name);
-        info.append(name, el("p", counts, "muted hunt__text"));
+        // A: the status as a chip next to the name
+        const chip = game.state === "started" ? ["Racing", "hunt__chip hunt__chip--racing"]
+          : game.state === "finished" ? ["Finished", "hunt__chip hunt__chip--finished"] : ["Open", "hunt__chip"];
+        const head = el("div", undefined, "hunt__head");
+        head.append(name, el("span", chip[0], chip[1]));
+        info.append(head, seats(hunt, counts));
         if (hunt.description) info.append(el("p", hunt.description, "muted hunt__text"));
         // A: the race. Python decides the state, the winner and who may press Start.
-        const game = hunt.game || {};
-        if (game.treasure) info.append(el("p", `Goes to: ${game.treasure.name}`, "muted hunt__text"));
+        if (game.treasure) {
+          const goes = el("p", undefined, "muted hunt__text hunt__goes");
+          goes.append(el("span", undefined, "px-icon px-icon--map px-icon--sm"), `Goes to ${game.treasure.name}`);
+          info.append(goes);
+        }
         const race = el("p", undefined, "hunt__text");
         if (game.state === "finished") race.append(el("span", undefined, "sprite sprite--trophy hunt__trophy"));
         race.append(raceText(game));
-        info.append(race);
+        if (game.state === "started" || game.state === "finished") info.append(race);  // A: "Open" is in the chip
         if (hunt.me) info.append(el("p", myStatus(hunt.me), "hunt__text"));
 
         const buttons = el("div", undefined, "hunt__buttons");
@@ -119,7 +159,7 @@
         }
         // Once a race has started nobody new can join it (leaving is still fine)
         if (hunt.me || game.state === "open" || !game.state) {
-          const button = el("button", hunt.me ? "Leave" : "Join", hunt.me ? "btn btn--ghost" : "btn");
+          const button = el("button", hunt.me ? "Leave" : "Join", hunt.me ? "btn hunt__leave" : "btn");
           button.type = "button";
           button.addEventListener("click", () => act(hunt, button));
           buttons.append(button);
@@ -127,6 +167,20 @@
         row.append(info, buttons);
         box.append(row);
       }
+    }
+
+    // A: one block per place in the hunt (up to 12, then "+N"); gold = joined, green = online now
+    function seats(hunt, counts) {
+      const box = el("div", undefined, "seats");
+      box.setAttribute("role", "img");
+      box.setAttribute("aria-label", counts);
+      const shown = Math.min(hunt.capacity, 12);
+      for (let i = 0; i < shown; i++) {
+        box.append(el("i", undefined, i < hunt.online ? "is-taken is-online" : i < hunt.playing ? "is-taken" : ""));
+      }
+      if (hunt.capacity > shown) box.append(el("small", `+${hunt.capacity - shown}`));
+      box.append(el("small", counts));
+      return box;
     }
 
     // A: one line about the race

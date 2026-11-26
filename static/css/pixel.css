@@ -738,3 +738,132 @@
     transition: none !important;
   }
 }
+
+/* ---------- the pixel world (moved here from styles.css so more pages can show it) ----------
+   Used by the welcome banner (index.html) and the login title screen (login.html). */
+:root {
+  /* The sky in three hard bands, the way old games faked a gradient */
+  --px-sky-bands: linear-gradient(to bottom,
+    #7ccbe4 0 36%, #8fd3e8 36% 52%, #a6dcec 52% 64%, #bfe6ef 64% 100%);
+}
+
+.scene { position: absolute; inset: 0; }
+
+.scene > * { position: absolute; }
+
+/* A square pixel sun with its corners cut */
+.scene__sun {
+  top: 40px;
+  right: 120px;
+  width: 64px;
+  height: 64px;
+  background: var(--px-gold-light);
+  clip-path: polygon(16px 0, 48px 0, 48px 8px, 56px 8px, 56px 16px, 64px 16px, 64px 48px,
+                     56px 48px, 56px 56px, 48px 56px, 48px 64px, 16px 64px, 16px 56px,
+                     8px 56px, 8px 48px, 0 48px, 0 16px, 8px 16px, 8px 8px, 16px 8px);
+}
+
+/* Clouds drift across the open sky on the right, each at its own height
+   and speed. They stay in this strip so they never cross the headline. */
+.scene__sky {
+  top: 0;
+  left: 600px;
+  right: 0;
+  height: 160px;
+  overflow: hidden;
+}
+
+.scene__cloud { position: absolute; left: 0; animation: px-drift-sky linear infinite; animation-timing-function: steps(120); }
+
+@keyframes px-drift-sky {
+  from { transform: translateX(-80px); }
+  to { transform: translateX(900px); }
+}
+.scene__cloud--one { top: 32px; animation-duration: 48s; animation-delay: -30s; }
+.scene__cloud--two { top: 96px; animation-duration: 64s; animation-delay: -8s; transform-origin: 0 0; scale: 1.5; }
+.scene__cloud--three { top: 64px; animation-duration: 56s; animation-delay: -46s; }
+
+/* Hills: stepped shapes, so their edges look like stairs of pixels */
+.scene__hill { bottom: 96px; background: var(--px-grass); }
+
+.scene__hill--back {
+  right: -40px;
+  width: 640px;
+  height: 120px;
+  background: #6fae55;
+  clip-path: polygon(0 100%, 0 80%, 64px 80%, 64px 60%, 128px 60%, 128px 40%, 224px 40%,
+                     224px 20%, 352px 20%, 352px 40%, 448px 40%, 448px 60%, 544px 60%,
+                     544px 80%, 640px 80%, 640px 100%);
+}
+
+.scene__hill--front {
+  left: 38%;
+  width: 360px;
+  height: 72px;
+  clip-path: polygon(0 100%, 0 66%, 48px 66%, 48px 33%, 112px 33%, 112px 0, 248px 0,
+                     248px 33%, 312px 33%, 312px 66%, 360px 66%, 360px 100%);
+}
+
+.scene__tree--one { bottom: 128px; right: 460px; }
+.scene__tree--two { bottom: 132px; right: 412px; scale: 1.25; transform-origin: 50% 100%; }
+.scene__tree--three { bottom: 116px; left: 46%; }
+
+/* Grass on top, darker earth below */
+.scene__ground {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100px;
+  background:
+    linear-gradient(var(--px-grass-light) 0 8px, var(--px-grass) 8px 100%);
+  border-top: 4px solid var(--px-ink);
+}
+
+/* The path the explorer walks along. Its stones scroll left, so the
+   explorer (who walks in place) looks like they are moving right. */
+.scene__path {
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  height: 32px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 28px, #c49a5c 28px 36px) 0 12px / 100% 8px no-repeat,
+    var(--px-dirt);
+  box-shadow: 0 -4px 0 0 #b98f53, 0 4px 0 0 #b98f53;
+  animation: px-path 1s steps(9) infinite;
+}
+
+@keyframes px-path {
+  from { background-position: 0 12px, 0 0; }
+  to { background-position: -36px 12px, 0 0; }
+}
+
+/* The explorer, twice the normal size, walking toward the chest */
+.scene__hero {
+  bottom: 48px;
+  right: 248px;
+  transform: scale(2);
+  transform-origin: 50% 100%;
+}
+
+.scene__hero .sprite { animation: px-bob .5s steps(1) infinite; }
+
+/* The treasure chest, three times the size, waiting on the path */
+.scene__chest {
+  bottom: 52px;
+  right: 104px;
+  width: 30px;
+  height: 24px;
+  transform: scale(3);
+  transform-origin: 50% 100%;
+}
+
+.scene__sparkle--one { bottom: 136px; right: 112px; }
+.scene__sparkle--two { bottom: 116px; right: 168px; }
+.scene__sparkle--three { bottom: 152px; right: 152px; }
+.scene__sparkle--two::before { animation-delay: .4s; }
+.scene__sparkle--three::before { animation-delay: .8s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene__cloud, .scene__path, .scene__hero .sprite { animation: none; }
+}

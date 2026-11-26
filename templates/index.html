@@ -224,19 +224,19 @@
 
         <article class="stat-card">
           <small>Treasures you found</small>
-          <strong id="statFound">–</strong>
+          <strong><span class="sprite sprite--chest" aria-hidden="true"></span><span id="statFound">–</span></strong>
           <span class="stat-note" id="statFoundNote">5 to 30 coins each</span>
         </article>
 
         <article class="stat-card">
           <small>Treasures on the map</small>
-          <strong id="statTreasures">–</strong>
+          <strong><span class="px-icon px-icon--map" aria-hidden="true"></span><span id="statTreasures">–</span></strong>
           <span class="stat-note">Hidden by players</span>
         </article>
 
         <article class="stat-card">
           <small>Players on StepQuest</small>
-          <strong id="statPlayers">–</strong>
+          <strong><span class="px-icon px-icon--users" aria-hidden="true"></span><span id="statPlayers">–</span></strong>
           <span class="stat-note" id="statLeader">–</span>
         </article>
 
@@ -597,11 +597,21 @@
           const b = document.createElement("button");
           b.type = "button";
           b.className = "goal-pick" + (c.id === state.goal ? " is-current" : "");
+          // A: one pixel icon per goal (just the look; Python decides what each goal means)
+          const art = document.createElement("span");
+          art.className = "goal-pick__art";
+          const glyph = document.createElement("span");
+          glyph.className = { steps: "px-icon px-icon--run", active: "sprite sprite--icon-flame",
+                              rehab: "sprite sprite--icon-leaf" }[c.id] || "px-icon px-icon--flag";
+          art.append(glyph);
           const t = document.createElement("strong");
           t.textContent = c.title;
           const d = document.createElement("span");
           d.textContent = c.text;
-          b.append(t, d);
+          const go = document.createElement("span");
+          go.className = "goal-pick__go";
+          go.textContent = c.id === state.goal ? "Your goal" : "Choose";
+          b.append(art, t, d, go);
           b.addEventListener("click", () => pickGoal(c.id));
           return b;
         }));

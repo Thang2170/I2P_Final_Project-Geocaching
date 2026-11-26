@@ -8,8 +8,32 @@
   {% set active = "account" %}
   {% include "_topbar.html" %}
 
+  <!-- A: logged out, the page is a title screen: the same pixel world as the welcome page,
+       with the form as a dialogue box over the sky -->
+  <div class="title-screen" id="titleScreen" aria-hidden="true">
+    <div class="scene">
+      <span class="scene__sun"></span>
+      <span class="scene__sky">
+        <span class="sprite sprite--cloud scene__cloud scene__cloud--one"></span>
+        <span class="sprite sprite--cloud scene__cloud scene__cloud--two"></span>
+        <span class="sprite sprite--cloud scene__cloud scene__cloud--three"></span>
+      </span>
+      <span class="scene__hill scene__hill--back"></span>
+      <span class="scene__hill scene__hill--front"></span>
+      <span class="sprite sprite--tree scene__tree scene__tree--one"></span>
+      <span class="sprite sprite--tree scene__tree scene__tree--two"></span>
+      <span class="scene__ground"></span>
+      <span class="scene__path"></span>
+      <span class="scene__hero"><span class="sprite sprite--explorer"></span></span>
+      <span class="scene__chest"><span class="sprite sprite--chest"></span></span>
+      <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--one"></span>
+      <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--two"></span>
+    </div>
+  </div>
+
   <!-- Logged out: log in or create an account -->
-  <main id="welcomeCard" class="card">
+  <main id="welcomeCard" class="card title-card">
+    <p class="title-card__logo"><span class="sprite sprite--coin" aria-hidden="true"></span>StepQuest</p>
     <h1>Welcome, explorer</h1>
     <p id="who" class="muted">Checking who you are…</p>
 
@@ -104,6 +128,7 @@
         : "Log in to start hunting for treasure.";
       forms.hidden = Boolean(user);
       document.getElementById("welcomeCard").hidden = Boolean(user);
+      document.getElementById("titleScreen").hidden = Boolean(user);  // A: the pixel world only on the login screen
       loggedIn.hidden = !user;
       if (user) {
         document.title = `${user.username} · Account · StepQuest`;

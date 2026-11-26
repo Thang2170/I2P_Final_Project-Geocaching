@@ -4,12 +4,35 @@
   {% include "_head.html" %}
   <title>Shop · StepQuest</title>
   <style>
-    .item { display: flex; align-items: center; justify-content: space-between; gap: 16px;
-            padding: 16px 0; border-top: 2px dashed var(--line); }
-    .item__name { font-size: 24px; margin: 0; }
-    .item__text { margin: 4px 0 0; }
-    .item .btn { width: auto; margin: 0 4px 0 0; padding: 12px; font-size: 10px; white-space: nowrap; }
+    /* A: the shop is a game store: a wallet bar, then the items as tiles on display stands */
+    .shop-card { max-width: 760px; }
+    .wallet { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; padding: 12px 16px;
+              background: var(--px-green); color: var(--px-paper); box-shadow: inset 0 -4px 0 0 rgba(0, 0, 0, .25); }
+    .wallet strong { font-family: var(--font-pixel); font-size: 20px; font-weight: 400; color: var(--px-gold);
+                     font-variant-numeric: tabular-nums; }
+    .wallet span { color: #a9bdb4; }
+    .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: 16px; }
+    .item { position: relative; min-width: 0; display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 8px; padding: 0 0 16px;
+            background: var(--px-paper); box-shadow: inset 0 0 0 4px var(--px-line); }
+    .item .item__art { width: auto; height: 120px; background: var(--px-sky-bands);  /* app.css made it 56px wide */
+                 box-shadow: inset 0 -12px 0 0 var(--px-grass), inset 0 -16px 0 0 var(--px-ink); }
+    .item__art .sprite { transform: scale(2); animation: px-bob 1.4s steps(2) infinite; }
+    .item:nth-child(2) .item__art .sprite { animation-delay: .35s; }
+    .item:nth-child(3) .item__art .sprite { animation-delay: .7s; }
+    .item:nth-child(4) .item__art .sprite { animation-delay: 1.05s; }
+    .item__name { margin: 0; padding: 0 16px; font-size: 24px; }
+    .item__text { margin: 0; padding: 0 16px; font-size: 18px; line-height: 1.15; }
+    .item__price { margin: 0; padding: 0 16px; color: var(--px-gold-dark); font-size: 20px; }
+    .item .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: auto;
+                 margin: 0 16px; padding: 12px 8px; font-size: 10px; line-height: 1.4; white-space: normal; }
+    .item .btn .sprite { transform: scale(.8); }
     .item .btn[disabled] { opacity: .5; }
+    /* Not enough coins yet: the button stays (Python still decides) but says how many are missing */
+    .item.is-short .btn { background: var(--px-paper); box-shadow: var(--px-edge); color: var(--px-muted); }
+    .item.is-owned { box-shadow: inset 0 0 0 4px var(--px-green); }
+    .item__owned { position: absolute; top: 8px; right: 8px; padding: 2px 8px; background: var(--px-green);
+                   color: var(--px-paper); font-size: 16px; }
+    @media (prefers-reduced-motion: reduce) { .item__art .sprite { animation: none; } }
     #purchases { list-style: none; padding: 0; margin: 0; }
     #purchases li { padding: 8px 0; border-top: 2px dashed var(--line); }
     .code { color: var(--px-gold-dark); font-size: 22px; letter-spacing: 1px; }
@@ -18,19 +41,21 @@
     .toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -160%); z-index: 1000;
              width: max-content; max-width: min(calc(100vw - 40px), 420px); padding: 12px 16px;
              font-size: 22px; color: #fff; background: var(--px-bad);
-             box-shadow: var(--px-edge), var(--px-drop); transition: transform .2s steps(4); }
-    .toast.is-visible { transform: translate(-50%, 0); animation: px-shake .3s steps(2) .2s 2; }
+             box-shadow: var(--px-edge), var(--px-drop); transition: transform .2s steps(4), visibility 0s .2s;
+             visibility: hidden; }  /* A: its frame used to peek in at the top of the page */
+    .toast.is-visible { transform: translate(-50%, 0); visibility: visible; transition: transform .2s steps(4); animation: px-shake .3s steps(2) .2s 2; }
   </style>
 </head>
 <body>
   {% set active = "shop" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card shop-card">
     <h1>Shop</h1>
-    <p id="balance" class="muted coin-line">Loading your coins…</p>
+    <p class="wallet"><span class="sprite sprite--coin-spin" aria-hidden="true"></span>
+      <strong id="balance">…</strong><span>coins to spend</span></p>
 
-    <div id="items"></div>
+    <div id="items" class="items"></div>
 
     <p id="message" class="message" role="status"></p>
     <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
@@ -85,19 +110,25 @@
       const box = document.getElementById("items");
       box.replaceChildren();
       for (const item of items) {
-        const row = el("div", undefined, "item");
+        const short = !item.owned && item.price > balance;
+        const row = el("div", undefined, "item" + (item.owned ? " is-owned" : short ? " is-short" : ""));
         // A: each item's own picture (sprites from pixel_art.py)
         const art = el("div", undefined, "item__art");
         art.append(el("span", undefined, `sprite sprite--${ITEM_ART[item.id] || "coin-spin"}`));
         art.setAttribute("aria-hidden", "true");
         const info = el("div");
-        info.style.flex = "1";
+        info.style.display = "contents";
         info.append(el("p", item.name, "item__name"), el("p", item.description, "muted item__text"));
-        const button = el("button", item.owned ? "Owned" : `${item.price} coins`, "btn");
+        const price = el("p", `${item.price} coins`, "item__price");
+        info.append(price);
+        const button = el("button", item.owned ? "Owned" : short ? `Need ${item.price - balance} more`
+                                                        : `Buy · ${item.price}`, "btn");
+        if (!item.owned) button.prepend(el("span", undefined, "sprite sprite--icon-coin"));
         button.type = "button";
         button.disabled = item.owned;
         button.addEventListener("click", () => buy(item, button));
         row.append(art, info, button);
+        if (item.owned) row.append(el("span", "Owned", "item__owned"));
         box.append(row);
       }
     }
@@ -118,7 +149,7 @@
         getJson("/api/coins"), getJson("/api/shop/items"), getJson("/api/shop/purchases")
       ]);
       balance = coins.balance;
-      document.getElementById("balance").textContent = `You have ${coins.balance} coins`;
+      document.getElementById("balance").textContent = coins.balance;
       renderItems(items);
       renderPurchases(purchases);
     }

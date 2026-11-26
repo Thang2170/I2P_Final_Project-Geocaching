@@ -18,13 +18,14 @@
     .pick .btn[aria-pressed="true"] { background: var(--px-ink); color: var(--px-gold); }
     #leader { font-size: 22px; color: var(--px-gold-dark); }
     @media (max-width: 800px) { .terr { grid-template-columns: 1fr; } #terrMap { height: 380px; } }
+    .terr-card { max-width: 1040px; }  /* A: the 480px card squeezed the map into a strip */
   </style>
 </head>
 <body>
   {% set active = "territory" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card terr-card">
     <h1>Claim the campus</h1>
     <p class="muted">Pick a team, then walk with the map open. Every hexagon you walk through gets a visit
       for your team (once a day). The team with the most visits in a hexagon this week owns it.</p>

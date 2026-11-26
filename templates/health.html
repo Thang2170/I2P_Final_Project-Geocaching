@@ -21,13 +21,14 @@
     .token { padding: 10px; background: var(--px-ink); color: var(--px-gold-light); word-break: break-all;
              font-family: var(--font-body); font-size: 20px; }
     .disclaimer { font-size: 16px; }
+      .health-card { max-width: 760px; }  /* A: room for the heart-rate chart */
   </style>
 </head>
 <body>
   {% set active = "health" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card health-card">
     <h1><span class="sprite sprite--explorer" aria-hidden="true"></span> Health</h1>
     <p class="muted">Wear the StepQuest band (an ESP32 with a heart-rate and motion sensor) on your walks.
       After a walk you see your heart rate, steps and blood oxygen, and a coach-style summary.</p>
