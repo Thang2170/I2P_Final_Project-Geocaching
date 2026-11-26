@@ -68,7 +68,8 @@
           const link = el("a", q.text);
           link.href = q.link;  // fixed paths from onboarding.py
           link.addEventListener("click", () => close("finished"));
-          row.append(el("span", q.done ? "✓" : "□", "tour__tick"), link);
+          // A: a ticked or empty pixel box instead of tick and box characters
+          row.append(el("span", "", q.done ? "tour__tick is-done" : "tour__tick"), link);
           return row;
         }));
       }
@@ -125,7 +126,7 @@
     if (mapWrap) mapWrap.append(questBtn); else questBtn.classList.add("quest-btn--page");
 
     function showProgress(q) {
-      $("questBtnCount").textContent = q.all_done ? "✓" : `${q.done}/${q.total}`;
+      $("questBtnCount").textContent = q.all_done ? "Done" : `${q.done}/${q.total}`;
       questBtn.setAttribute("aria-label", `Quests: ${q.done} of ${q.total} done`);
       questBtn.hidden = false;
     }

@@ -47,7 +47,7 @@ def _item(n, me_id=None):
     elif n.kind == STREAK_RISK:  # B: the words come from the streak and freezes of that evening
         from habits import streak_risk_text
         r = db.session.execute(db.select(StreakReminder).where(StreakReminder.notification_id == n.id)).scalar()
-        subject = streak_risk_text(r.streak, r.freezes) if r else "🔥 Your streak ends at midnight!"
+        subject = streak_risk_text(r.streak, r.freezes) if r else "Your streak ends at midnight!"
     elif n.kind == TREASURE_MISSING:  # B: "players couldn't find your treasure" (dnf.py)
         from dnf import owner_text
         alert = db.session.execute(db.select(MissingAlert).where(MissingAlert.notification_id == n.id)).scalar()

@@ -21,32 +21,39 @@
     <div id="crossingAlert" class="crossing-alert" role="alert" hidden></div>
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
-      <div id="routeInfo" class="sheet__route" hidden></div>
+      <!-- A: a little trek from you to the chest: the explorer moves right as you get closer -->
+      <div id="trek" class="trek" aria-hidden="true" hidden>
+        <span class="trek__path"></span>
+        <span class="trek__walker"><span class="sprite sprite--explorer"></span></span>
+        <span class="trek__goal"><span class="sprite sprite--chest"></span></span>
+      </div>
+      <div id="routeInfo" class="sheet__route route-facts" hidden></div>
       <!-- B: weather-aware routes: shortest in the rain, greener in the heat (weather.py) -->
       <div id="weatherInfo" class="sheet__route weather-line" data-kind="" hidden>
+        <span id="weatherIcon" class="weather-line__icon" aria-hidden="true"></span>
         <strong id="weatherHead"></strong> <span id="weatherTip"></span>
       </div>
       <!-- B: one compact row of actions, so the card stays small and the map stays visible -->
       <div class="sheet__actions">
         <!-- A: Feature 6, a different walking route to the same treasure -->
-        <button type="button" id="newRouteBtn" class="sheet__btn" hidden>↻ New route</button>
+        <button type="button" id="newRouteBtn" class="sheet__btn sheet__btn--main" hidden><span class="sprite sprite--icon-refresh" aria-hidden="true"></span>New route</button>
         <!-- B: Treasure Trail, a loop through unfound treasures for a step or time goal (trail_planner.py) -->
-        <button type="button" id="trailBtn" class="sheet__btn" aria-expanded="false" aria-controls="trailBox">🧭 Plan a trail</button>
+        <button type="button" id="trailBtn" class="sheet__btn" aria-expanded="false" aria-controls="trailBox"><span class="sprite sprite--icon-compass" aria-hidden="true"></span>Plan a trail</button>
         <!-- B: walk the trail with the live panel (time, pace, splits), saved at the finish -->
-        <button type="button" id="trailStartBtn" class="sheet__btn sheet__btn--go" hidden>▶ Start trail</button>
-        <button type="button" id="trailEnd" class="sheet__btn" hidden>✕ End trail</button>
+        <button type="button" id="trailStartBtn" class="sheet__btn sheet__btn--go" hidden>Start trail</button>
+        <button type="button" id="trailEnd" class="sheet__btn" hidden>End trail</button>
         <!-- B: everything else (coins, mode, team, crossings) folds away under "More" -->
-        <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore">▴ More</button>
+        <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore"><span class="sprite sprite--icon-chevron" aria-hidden="true"></span><span id="sheetMoreLabel">More</span></button>
       </div>
       <div id="trailBox" class="trail-box" hidden>
         <p class="trail-box__ask">How long do you want to walk? <span id="trailShapeText">The loop starts and ends here.</span></p>
         <!-- B: the trail's shape, and skipping treasures other players rated badly (trail_planner.py) -->
         <div class="trail-shape" role="group" aria-label="Trail shape">
-          <button type="button" class="trail-shape__btn is-on" data-shape="loop" aria-pressed="true">↺ Loop back here</button>
-          <button type="button" class="trail-shape__btn" data-shape="oneway" aria-pressed="false">→ One way</button>
+          <button type="button" class="trail-shape__btn is-on" data-shape="loop" aria-pressed="true">Loop back here</button>
+          <button type="button" class="trail-shape__btn" data-shape="oneway" aria-pressed="false">One way</button>
         </div>
         <label class="trail-box__skip"><input type="checkbox" id="trailSkipLow"> Skip low-rated treasures (2★ or less)</label>
-        <p class="trail-box__history"><a href="/trails">📜 My trails and personal bests</a></p>
+        <p class="trail-box__history"><a href="/trails">My trails and personal bests <span class="px-arrow-right" aria-hidden="true"></span></a></p>
         <div class="trail-box__choices">
           <button type="button" class="trail-pick" data-steps="1500">1,500 steps</button>
           <button type="button" class="trail-pick" data-steps="3000">3,000 steps</button>
@@ -66,8 +73,8 @@
       <!-- B: walking mode: normal, try-hard (fast, big bonus) or calm walk (modes.py). Logged in only. -->
       <div id="modePicker" class="mode-picker" role="group" aria-label="Walking mode" hidden>
         <button type="button" class="mode-pick" data-mode="normal">Normal</button>
-        <button type="button" class="mode-pick" data-mode="tryhard">🔥 Try-hard</button>
-        <button type="button" class="mode-pick" data-mode="calm">🌿 Calm walk</button>
+        <button type="button" class="mode-pick" data-mode="tryhard"><span class="sprite sprite--icon-flame" aria-hidden="true"></span> Try-hard</button>
+        <button type="button" class="mode-pick" data-mode="calm"><span class="sprite sprite--icon-leaf" aria-hidden="true"></span> Calm walk</button>
       </div>
       <p id="modeText" class="sheet__route mode-text" hidden></p>
       <div id="teamInfo" class="sheet__route" hidden></div>
@@ -93,7 +100,7 @@
       <div class="journey__top">
         <p id="jTitle" class="journey__title"></p>
         <!-- Fold the panel down to the essentials, so more of the route shows -->
-        <button type="button" id="jFold" class="journey__fold" aria-expanded="true" aria-controls="journey">▾ Less</button>
+        <button type="button" id="jFold" class="journey__fold" aria-expanded="true" aria-controls="journey"><span class="sprite sprite--icon-chevron" aria-hidden="true"></span><span id="jFoldLabel">Less</span></button>
       </div>
       <div class="journey__main">
         <div class="journey__stat"><strong id="jTime">00:00</strong><span>Time</span></div>
@@ -133,12 +140,12 @@
     <div id="safetyAlert" class="safety" role="alertdialog" aria-modal="true"
          aria-labelledby="safetyTitle" aria-describedby="safetyText" hidden>
       <div class="safety__box">
-        <p class="safety__eyebrow">⚠ Safety stop</p>
+        <p class="safety__eyebrow"><span class="sprite sprite--warning" aria-hidden="true"></span> Safety stop</p>
         <h2 id="safetyTitle" class="safety__title"></h2>
         <p id="safetyText" class="safety__text"></p>
         <ul id="safetyAdvice" class="safety__advice"></ul>
         <div class="safety__buttons">
-          <a class="btn safety__call" href="tel:119">📞 Call 119</a>
+          <a class="btn safety__call" href="tel:119"><span class="px-icon px-icon--phone px-icon--sm" aria-hidden="true"></span> Call 119</a>
           <button type="button" id="safetyOk" class="btn btn--ghost">I'm OK, close</button>
         </div>
       </div>

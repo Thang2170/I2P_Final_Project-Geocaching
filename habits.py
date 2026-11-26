@@ -114,13 +114,13 @@ def share_text(current, best, ring_closed):
     if current <= 0:
         raise ValueError("Start a streak first: find a treasure, finish a hunt or close your ring today.")
     days = f"{current}-day streak" if current != 1 else "1-day streak"
-    text = f"🔥 I'm on a {days} on StepQuest!"
+    text = f"I'm on a {days} on StepQuest!"
     if best > current:
         text += f" My best is {best} days, so I'm coming for it."
     elif current >= 3:
         text += " That's my best ever."
     if ring_closed:
-        text += " Today's ring is closed too. ⭕"
+        text += " Today's ring is closed too."
     return text + " Who's walking with me?"
 
 
@@ -137,7 +137,7 @@ def streak_at_risk(current, today_done, local_hour):
 def streak_risk_text(current, freezes):
     """What the evening reminder says."""
     days = "1-day streak" if current == 1 else f"{current}-day streak"
-    text = (f"🔥 Your {days} ends at midnight! Find a treasure, finish a hunt or close your ring "
+    text = (f"Your {days} ends at midnight! Find a treasure, finish a hunt or close your ring "
             "today to keep it.")
     if freezes:
         text += f" (You have {freezes} freeze{'s' if freezes != 1 else ''} ready, so a missed day won't break it.)"

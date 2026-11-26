@@ -62,7 +62,7 @@ def board_text(count):
     if count <= 0:
         return ""
     if is_missing(count):
-        return (f"⚠ Maybe missing: {count} players couldn't find it since it was last found. "
+        return (f"Maybe missing: {count} players couldn't find it since it was last found. "
                 "You can still look, and finding it clears this.")
     people = "1 player" if count == 1 else f"{count} players"
     return f"{people} couldn't find it lately. Look carefully."

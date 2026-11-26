@@ -18,13 +18,14 @@
     .pick .btn[aria-pressed="true"] { background: var(--px-ink); color: var(--px-gold); }
     #leader { font-size: 22px; color: var(--px-gold-dark); }
     @media (max-width: 800px) { .terr { grid-template-columns: 1fr; } #terrMap { height: 380px; } }
+    .terr-card { max-width: 1040px; }  /* A: the 480px card squeezed the map into a strip */
   </style>
 </head>
 <body>
   {% set active = "territory" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card terr-card">
     <h1>Claim the campus</h1>
     <p class="muted">Pick a team, then walk with the map open. Every hexagon you walk through gets a visit
       for your team (once a day). The team with the most visits in a hexagon this week owns it.</p>
@@ -90,12 +91,12 @@
         name.textContent = `${t.name} · ${t.players} player${t.players === 1 ? "" : "s"}`;
         const hexes = document.createElement("span");
         hexes.className = "team__hexes";
-        hexes.textContent = `${t.hexes} ⬢`;
+        hexes.textContent = `${t.hexes} hex${t.hexes === 1 ? "" : "es"}`;
         li.append(swatch, name, hexes);
         list.append(li);
       }
       const lead = data.teams.find(t => t.id === data.leader);
-      say("leader", lead ? `👑 ${lead.name} is in front` : data.hexes.length ? "It's a tie!" : "No hexagons claimed yet this week.");
+      say("leader", lead ? `${lead.name} is in front` : data.hexes.length ? "It's a tie!" : "No hexagons claimed yet this week.");
       const mine = data.teams.find(t => t.id === data.my_team);
       say("myTeam", mine ? `You walk for ${mine.name}. You coloured ${data.my_visits} hexagon visit${data.my_visits === 1 ? "" : "s"} this week.`
                          : "No team yet: pick one to start claiming.");

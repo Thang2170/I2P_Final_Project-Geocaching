@@ -61,7 +61,7 @@
         firstFix = false;
         drawRoute(currentPos, routeTarget, true);
         if (trail && !trailLayer) drawTrailLeg(true);  // B: a trail carried on before the GPS answered
-        else if (againId && !trail) walkAgain();      // B: ↻ Walk it again, from My trails
+        else if (againId && !trail) walkAgain();      // B: Walk it again, from My trails
         sendPosition();  // show up on the admin map straight away, not after 10 seconds
       } else if (!dragMode && routeFrom && map.distance(routeFrom, currentPos) > REROUTE_DISTANCE_M) {
         // Real GPS: the user walked away from where the route started, so make a new one.
@@ -77,6 +77,29 @@
       checkTrail(lat, lon);  // B: reached the next trail checkpoint?
     }
 
+    // A: the distance is the big number on the card and the treasure's name sits after it.
+    // statusBox.textContent still reads "173 m to Pond bench" (the journey panel copies it).
+    const trek = document.getElementById("trek");
+    let trekStart = { id: null, meters: 0 };  // how far it was when you picked this treasure
+
+    function showDistance(meters, name, found) {
+      const big = document.createElement("span");
+      big.className = "sheet__meters";
+      big.textContent = meters;
+      const unit = document.createElement("small");
+      unit.textContent = " m";
+      big.append(unit);
+      const to = document.createElement("span");
+      to.className = "sheet__to";
+      to.textContent = ` to ${name}`;
+      statusBox.replaceChildren(big, to);
+      // The explorer walks along the little path: 0 = where you started, 1 = at the chest
+      if (trekStart.id !== huntId || meters > trekStart.meters) trekStart = { id: huntId, meters: Math.max(meters, 1) };
+      const done = found ? 1 : Math.max(0, Math.min(1, 1 - meters / trekStart.meters));
+      trek.style.setProperty("--done", done.toFixed(3));
+      trek.hidden = false;
+    }
+
     // Ask Python how far you are from the treasure you are hunting
     async function updateDistance(lat, lon) {
       const askedFor = huntId;
@@ -85,9 +108,12 @@
         const data = await res.json();
         if (askedFor !== huntId) return;  // you picked another treasure meanwhile
         if (!res.ok) throw new Error(data.error || "Distance request failed");
-        statusBox.textContent = data.found
-          ? foundText(data.treasure, askedFor)
-          : `${Math.round(data.meters)} m to ${data.treasure}`;
+        if (data.found) {
+          statusBox.textContent = foundText(data.treasure, askedFor);
+          trek.style.setProperty("--done", "1");
+        } else {
+          showDistance(Math.round(data.meters), data.treasure, false);
+        }
         sheet.classList.toggle("is-found", data.found);
         checkCrossing(lat, lon);  // A: about to cross a street?
         if (data.found) claimCoins(askedFor, data.treasure, lat, lon);

@@ -1,0 +1,37 @@
+{# A random pixel landscape (owner: A). scenery.py picks it fresh on every page view:
+   {% include "_scene.html" %} draws a new one. Used by the login title screen and the welcome banner.
+   Python decides what goes where; this file only draws it, and the CSS in pixel.css moves it. #}
+{# A Flask app built without app.py (some tests) has no random_scene: then there is no landscape #}
+{% if random_scene is defined %}
+{% set scene = random_scene() %}
+<div class="scene scene--{{ scene.name }}" style="--scene-sky: {{ scene.sky }}" aria-hidden="true">
+  {% if scene.sun %}<span class="scene__sun"></span>{% endif %}
+  <span class="scene__sky">
+    <span class="sprite sprite--cloud scene__cloud scene__cloud--one"></span>
+    <span class="sprite sprite--cloud scene__cloud scene__cloud--two"></span>
+    <span class="sprite sprite--cloud scene__cloud scene__cloud--three"></span>
+  </span>
+  <span class="scene__hill scene__hill--back"></span>
+  <span class="scene__hill scene__hill--front"></span>
+
+  {% for item in scene["items"] if item.kind == "prop" %}
+  <span class="scene-item" style="left: {{ item.left }}%; bottom: {{ item.bottom }}px; --s: {{ item.scale }}; --d: -{{ item.delay }}s"><span class="sprite sprite--{{ item.sprite }}"></span></span>
+  {% endfor %}
+
+  <span class="scene__ground"></span>
+  <span class="scene__path"></span>
+
+  {% for item in scene["items"] if item.kind in ("walker", "flyer") %}
+  <span class="scene-item scene-item--{{ item.kind }}" style="left: {{ item.left }}%; bottom: {{ item.bottom }}px; --s: {{ item.scale }}; --d: -{{ item.delay }}s"><span class="sprite sprite--{{ item.sprite }}"></span>{% if item.sprite == "cat" %}<span class="scene-zz">z</span>{% endif %}</span>
+  {% endfor %}
+
+  <span class="scene__hero"><span class="sprite sprite--explorer"></span></span>
+  <span class="scene__chest"><span class="sprite sprite--chest"></span></span>
+  <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--one"></span>
+  <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--two"></span>
+
+  {% for item in scene["items"] if item.kind == "fall" %}
+  <span class="scene-item scene-item--fall" style="left: {{ item.left }}%; --s: {{ item.scale }}; --d: -{{ item.delay }}s"><span class="sprite sprite--{{ item.sprite }}"></span></span>
+  {% endfor %}
+</div>
+{% endif %}

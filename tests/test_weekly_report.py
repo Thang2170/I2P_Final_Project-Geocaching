@@ -57,8 +57,8 @@ class RulesTest(unittest.TestCase):
 
     def test_share_text_has_no_heart_data(self):
         text = share_text(self.report())
-        self.assertEqual(text, "📊 My StepQuest week: 6,500 steps (+30% vs the same days last week), 2 walks "
-                               "(2.0 km), and a 3-day streak 🔥.")
+        self.assertEqual(text, "My StepQuest week: 6,500 steps (+30% vs the same days last week), 2 walks "
+                               "(2.0 km), and a 3-day streak.")
         self.assertNotIn("zone", text.lower())
 
     def test_a_finished_week_compares_all_seven_days(self):

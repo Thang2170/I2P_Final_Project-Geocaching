@@ -31,6 +31,8 @@
   --px-cloud-shade: #cfe3ea;
   --px-dirt: #d9b47a;
   --px-water: #4b9fc4;
+  --px-pink: #f4a6c0;         /* A: sakura blossom */
+  --px-pink-dark: #d9739a;
 
   /* The interface around the pictures stays calm */
   --px-bg: #f1ede0;           /* page background, like old paper */
@@ -585,6 +587,7 @@
 /* A small pixel arrow (the pixel fonts have no arrow characters).
    Down: the "more text" marker in a dialogue box. Right: a menu cursor. */
 .px-arrow-down,
+.px-arrow-left,
 .px-arrow-right {
   display: inline-block;
   flex: none;
@@ -598,6 +601,10 @@
                      4px 6px, 4px 4px, 2px 4px, 2px 2px, 0 2px);
 }
 
+/* A: "back" links: the right arrow, mirrored */
+.px-arrow-left { transform: scaleX(-1); }
+
+.px-arrow-left,
 .px-arrow-right {
   width: 6px;
   height: 12px;
@@ -638,6 +645,21 @@
 .px-icon--clock { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/clock.svg"); }
 .px-icon--gps { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/gps.svg"); }
 .px-icon--next { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/chevron-right.svg"); }
+/* A: these replace emoji and arrow characters (the pixel fonts have none) */
+.px-icon--heart { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/heart.svg"); }
+.px-icon--lock { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/lock.svg"); }
+.px-icon--play { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/play.svg"); }
+.px-icon--pause { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/pause.svg"); }
+.px-icon--download { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/download.svg"); }
+.px-icon--close { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/close.svg"); }
+.px-icon--reload { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/reload.svg"); }
+.px-icon--check { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/check.svg"); }
+.px-icon--share { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/external-link.svg"); }
+.px-icon--phone { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/device-phone.svg"); }
+.px-icon--alert { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/warning-box.svg"); }
+.px-icon--trending { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/trending-up.svg"); }
+/* A: a smaller icon that sits inside a line of text or a button */
+.px-icon--sm { width: 16px; height: 16px; -webkit-mask-size: 16px 16px; mask-size: 16px 16px; vertical-align: -2px; }
 .px-icon--down { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/chevron-down.svg"); }
 .px-icon--buildings { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/buildings.svg"); }
 
@@ -655,7 +677,9 @@
 }
 
 /* Boxes "draw in" from the top, like an old screen loading line by line.
-   The -16px leaves room for the pixel edge and shadow outside the box. */
+   The -16px leaves room for the pixel edge and shadow outside the box.
+   A: use it with "backwards", never "both": a clip-path left on after the animation made
+   iPhone Safari cut off cards whose content grew after loading (the welcome page). */
 @keyframes px-boot {
   from { clip-path: inset(-16px -16px 100% -16px); }
   to { clip-path: inset(-16px); }
@@ -718,3 +742,168 @@
     transition: none !important;
   }
 }
+
+/* ---------- the pixel world (moved here from styles.css so more pages can show it) ----------
+   Used by the welcome banner (index.html) and the login title screen (login.html). */
+:root {
+  /* The sky in three hard bands, the way old games faked a gradient */
+  --px-sky-bands: linear-gradient(to bottom,
+    #7ccbe4 0 36%, #8fd3e8 36% 52%, #a6dcec 52% 64%, #bfe6ef 64% 100%);
+}
+
+.scene { position: absolute; inset: 0; }
+
+.scene > * { position: absolute; }
+
+/* A square pixel sun with its corners cut */
+.scene__sun {
+  top: 40px;
+  right: 120px;
+  width: 64px;
+  height: 64px;
+  background: var(--px-gold-light);
+  clip-path: polygon(16px 0, 48px 0, 48px 8px, 56px 8px, 56px 16px, 64px 16px, 64px 48px,
+                     56px 48px, 56px 56px, 48px 56px, 48px 64px, 16px 64px, 16px 56px,
+                     8px 56px, 8px 48px, 0 48px, 0 16px, 8px 16px, 8px 8px, 16px 8px);
+}
+
+/* Clouds drift across the open sky on the right, each at its own height
+   and speed. They stay in this strip so they never cross the headline. */
+.scene__sky {
+  top: 0;
+  left: 600px;
+  right: 0;
+  height: 160px;
+  overflow: hidden;
+}
+
+.scene__cloud { position: absolute; left: 0; animation: px-drift-sky linear infinite; animation-timing-function: steps(120); }
+
+@keyframes px-drift-sky {
+  from { transform: translateX(-80px); }
+  to { transform: translateX(900px); }
+}
+.scene__cloud--one { top: 32px; animation-duration: 48s; animation-delay: -30s; }
+.scene__cloud--two { top: 96px; animation-duration: 64s; animation-delay: -8s; transform-origin: 0 0; scale: 1.5; }
+.scene__cloud--three { top: 64px; animation-duration: 56s; animation-delay: -46s; }
+
+/* Hills: stepped shapes, so their edges look like stairs of pixels */
+.scene__hill { bottom: 96px; background: var(--px-grass); }
+
+.scene__hill--back {
+  right: -40px;
+  width: 640px;
+  height: 120px;
+  background: #6fae55;
+  clip-path: polygon(0 100%, 0 80%, 64px 80%, 64px 60%, 128px 60%, 128px 40%, 224px 40%,
+                     224px 20%, 352px 20%, 352px 40%, 448px 40%, 448px 60%, 544px 60%,
+                     544px 80%, 640px 80%, 640px 100%);
+}
+
+.scene__hill--front {
+  left: 38%;
+  width: 360px;
+  height: 72px;
+  clip-path: polygon(0 100%, 0 66%, 48px 66%, 48px 33%, 112px 33%, 112px 0, 248px 0,
+                     248px 33%, 312px 33%, 312px 66%, 360px 66%, 360px 100%);
+}
+
+.scene__tree--one { bottom: 128px; right: 460px; }
+.scene__tree--two { bottom: 132px; right: 412px; scale: 1.25; transform-origin: 50% 100%; }
+.scene__tree--three { bottom: 116px; left: 46%; }
+
+/* Grass on top, darker earth below */
+.scene__ground {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100px;
+  background:
+    linear-gradient(var(--px-grass-light) 0 8px, var(--px-grass) 8px 100%);
+  border-top: 4px solid var(--px-ink);
+}
+
+/* The path the explorer walks along. Its stones scroll left, so the
+   explorer (who walks in place) looks like they are moving right. */
+.scene__path {
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  height: 32px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 28px, #c49a5c 28px 36px) 0 12px / 100% 8px no-repeat,
+    var(--px-dirt);
+  box-shadow: 0 -4px 0 0 #b98f53, 0 4px 0 0 #b98f53;
+  animation: px-path 1s steps(9) infinite;
+}
+
+@keyframes px-path {
+  from { background-position: 0 12px, 0 0; }
+  to { background-position: -36px 12px, 0 0; }
+}
+
+/* The explorer, twice the normal size, walking toward the chest */
+.scene__hero {
+  bottom: 48px;
+  right: 248px;
+  transform: scale(2);
+  transform-origin: 50% 100%;
+}
+
+.scene__hero .sprite { animation: px-bob .5s steps(1) infinite; }
+
+/* The treasure chest, three times the size, waiting on the path */
+.scene__chest {
+  bottom: 52px;
+  right: 104px;
+  width: 30px;
+  height: 24px;
+  transform: scale(3);
+  transform-origin: 50% 100%;
+}
+
+.scene__sparkle--one { bottom: 136px; right: 112px; }
+.scene__sparkle--two { bottom: 116px; right: 168px; }
+.scene__sparkle--three { bottom: 152px; right: 152px; }
+.scene__sparkle--two::before { animation-delay: .4s; }
+.scene__sparkle--three::before { animation-delay: .8s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene__cloud, .scene__path, .scene__hero .sprite { animation: none; }
+}
+
+/* ---------- A: random landscapes (scenery.py picks them, templates/_scene.html draws them) ---------- */
+.scene { overflow: hidden; background: var(--scene-sky, var(--px-sky-bands)); }
+.scene-item > .sprite { transform: scale(var(--s, 1)); transform-origin: bottom left; }
+/* Each piece of scenery starts its own frames at a different moment, so they don't sway in step */
+.scene-item .sprite::before { animation-delay: var(--d, 0s); }
+/* Birds and butterflies drift in a loop across their patch of sky */
+.scene-item--flyer { animation: scene-fly 16s steps(64) infinite; animation-delay: var(--d, 0s); }
+@keyframes scene-fly {
+  25% { translate: 64px -16px; }
+  50% { translate: 128px 0; }
+  75% { translate: 64px 12px; }
+}
+/* Petals and leaves drift down from the top and sway on the way */
+.scene-item--fall { top: -16px; animation: scene-fall 11s steps(55) infinite; animation-delay: var(--d, 0s); }
+@keyframes scene-fall {
+  0% { translate: 0 0; opacity: 0; }
+  5% { opacity: 1; }
+  50% { translate: 32px 260px; }
+  90% { opacity: 1; }
+  100% { translate: -8px 520px; opacity: 0; }
+}
+/* The sleeping cat's "z" floats up */
+.scene-zz { position: absolute; left: 8px; top: -16px; color: var(--px-ink); font-family: var(--font-pixel);
+            font-size: 10px; animation: scene-zz 2.4s steps(4) infinite; }
+@keyframes scene-zz {
+  0% { opacity: 0; translate: 0 4px; }
+  30% { opacity: 1; }
+  100% { opacity: 0; translate: 8px -16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-item--flyer, .scene-item--fall, .scene-zz { animation: none; }
+  .scene-item--fall { display: none; }
+}
+/* On a phone the sun would sit behind the headline: tuck it into the corner */
+@media (max-width: 520px) { .scene__sun { top: 12px; right: 12px; transform: scale(.6); transform-origin: top right; } }

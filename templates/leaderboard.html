@@ -3,15 +3,41 @@
 <head>
   {% include "_head.html" %}
   <title>Leaderboard · StepQuest</title>
+  <style>
+    /* A: the top three stand on a podium; everyone else is in the table under it */
+    .board-card { max-width: 640px; }
+    .podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px;
+              margin: 24px 0 16px; padding: 24px 12px 0; background: var(--px-sky-bands);
+              box-shadow: inset 0 -12px 0 0 var(--px-grass), inset 0 -16px 0 0 var(--px-ink); }
+    .podium[hidden] { display: none; }
+    .step { display: grid; justify-items: center; gap: 6px; text-align: center; animation: px-rise .4s steps(4) both; }
+    .step__who { display: grid; justify-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+    .step__who a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                   color: var(--px-ink); font-size: 20px; }
+    .step__coins { color: var(--px-gold-dark); font-size: 18px; font-variant-numeric: tabular-nums; }
+    .step__block { display: grid; place-items: start center; width: 100%; padding-top: 8px;
+                   background: var(--px-wood); box-shadow: inset 0 4px 0 0 var(--px-wood-light), inset 0 -4px 0 0 var(--px-wood-dark);
+                   color: var(--px-paper); font-family: var(--font-pixel); font-size: 18px; }
+    .step--1 .step__block { height: 112px; background: var(--px-gold); color: var(--px-ink);
+                            box-shadow: inset 0 4px 0 0 var(--px-gold-light), inset 0 -4px 0 0 var(--px-gold-dark); }
+    .step--2 .step__block { height: 80px; }
+    .step--3 .step__block { height: 56px; }
+    .step--1 { order: 2; animation-delay: .2s; }   /* first place stands in the middle, and arrives last */
+    .step--2 { order: 1; animation-delay: .1s; }
+    .step--3 { order: 3; }
+    .step--1 .sprite--trophy { animation: px-bob 1s steps(2) infinite; }
+    @media (prefers-reduced-motion: reduce) { .step, .step--1 .sprite--trophy { animation: none; } }
+  </style>
 </head>
 <body>
   {% set active = "leaderboard" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card board-card">
     <h1>Leaderboard</h1>
     <p class="muted">Every treasure you find pays 10 coins. The players with the most coins come first.</p>
 
+    <div class="podium" id="podium" hidden></div>
     <table class="table" id="board">
       <thead>
         <tr><th>#</th><th>Player</th><th class="num">Coins</th><th class="num">Found</th><th class="num">Hidden</th></tr>
@@ -39,8 +65,11 @@
       const rows = document.getElementById("rows");
       rows.replaceChildren();
       document.getElementById("empty").hidden = players.length > 0;
-      document.getElementById("board").hidden = players.length === 0;
-      for (const p of players) {
+      // A: the top three go on the podium, the table lists everyone after them
+      drawPodium(players.slice(0, 3));
+      const rest = players.slice(3);
+      document.getElementById("board").hidden = rest.length === 0;
+      for (const p of rest) {
         const tr = document.createElement("tr");
         // B: the name opens the player's profile (/players/<name>)
         const name = cell("");
@@ -52,6 +81,37 @@
         tr.append(cell(p.rank), name, cell(p.coins, "num"), cell(p.found, "num"), cell(p.hidden, "num"));
         rows.append(tr);
       }
+    }
+
+    function playerLink(p) {
+      const link = document.createElement("a");
+      link.className = "player-link player-link__name";
+      link.href = `/players/${encodeURIComponent(p.username)}`;
+      link.textContent = p.username;
+      return link;
+    }
+
+    function drawPodium(top) {
+      const podium = document.getElementById("podium");
+      podium.hidden = top.length === 0;
+      podium.replaceChildren(...top.map((p, i) => {
+        const step = document.createElement("div");
+        step.className = `step step--${i + 1}`;
+        const who = document.createElement("div");
+        who.className = "step__who";
+        const art = document.createElement("span");
+        art.className = i === 0 ? "sprite sprite--trophy" : "sprite sprite--explorer";
+        art.setAttribute("aria-hidden", "true");
+        const coins = document.createElement("span");
+        coins.className = "step__coins";
+        coins.textContent = `${p.coins} coins · ${p.found} found`;
+        who.append(art, playerLink(p), coins);
+        const block = document.createElement("div");
+        block.className = "step__block";
+        block.textContent = p.rank;
+        step.append(who, block);
+        return step;
+      }));
     }
 
     load().catch(error => {

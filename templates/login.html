@@ -4,12 +4,19 @@
   {% include "_head.html" %}
   <title>Log in · StepQuest</title>
 </head>
-<body>
+<body class="has-title-screen">
   {% set active = "account" %}
   {% include "_topbar.html" %}
 
+  <!-- A: logged out, the page is a title screen: the same pixel world as the welcome page,
+       with the form as a dialogue box over the sky -->
+  <div class="title-screen" id="titleScreen" aria-hidden="true">
+    {% include "_scene.html" %}{# A: a new random landscape on every visit (scenery.py) #}
+  </div>
+
   <!-- Logged out: log in or create an account -->
-  <main id="welcomeCard" class="card">
+  <main id="welcomeCard" class="card title-card">
+    <p class="title-card__logo"><span class="sprite sprite--coin" aria-hidden="true"></span>StepQuest</p>
     <h1>Welcome, explorer</h1>
     <p id="who" class="muted">Checking who you are…</p>
 
@@ -76,7 +83,7 @@
         <a class="btn btn--ghost" href="/?tour">Replay the tour</a>
         <button type="button" id="logout" class="btn btn--ghost">Log out</button>
         {# B: appears only when the browser can install StepQuest (static/js/install.js) #}
-        <button type="button" class="btn btn--ghost" data-install hidden>📲 Install the app</button>
+        <button type="button" class="btn btn--ghost" data-install hidden><span class="px-icon px-icon--phone px-icon--sm" aria-hidden="true"></span> Install the app</button>
       </div>
       <p id="accountMsg" class="message" role="status"></p>
     </section>
@@ -104,6 +111,7 @@
         : "Log in to start hunting for treasure.";
       forms.hidden = Boolean(user);
       document.getElementById("welcomeCard").hidden = Boolean(user);
+      document.getElementById("titleScreen").hidden = Boolean(user);  // A: the pixel world only on the login screen
       loggedIn.hidden = !user;
       if (user) {
         document.title = `${user.username} · Account · StepQuest`;

@@ -203,7 +203,7 @@ h1, h2 {
 }
 
 /* Every section "boots" onto the screen, one after another */
-.main > * { animation: px-boot .45s steps(6) both; }
+.main > * { animation: px-boot .45s steps(6) backwards; }
 .main > :nth-child(2) { animation-delay: .08s; }
 .main > :nth-child(3) { animation-delay: .16s; }
 .main > :nth-child(4) { animation-delay: .24s; }
@@ -287,128 +287,10 @@ h1, h2 {
   position: relative;
   min-height: 440px;
   overflow: hidden;
-  /* The sky in three hard bands, the way old games faked a gradient */
-  background:
-    linear-gradient(to bottom,
-      #7ccbe4 0 36%, #8fd3e8 36% 52%, #a6dcec 52% 64%, #bfe6ef 64% 100%);
+  background: var(--px-sky-bands);  /* pixel.css */
 }
 
-.scene { position: absolute; inset: 0; }
-
-.scene > * { position: absolute; }
-
-/* A square pixel sun with its corners cut */
-.scene__sun {
-  top: 40px;
-  right: 120px;
-  width: 64px;
-  height: 64px;
-  background: var(--px-gold-light);
-  clip-path: polygon(16px 0, 48px 0, 48px 8px, 56px 8px, 56px 16px, 64px 16px, 64px 48px,
-                     56px 48px, 56px 56px, 48px 56px, 48px 64px, 16px 64px, 16px 56px,
-                     8px 56px, 8px 48px, 0 48px, 0 16px, 8px 16px, 8px 8px, 16px 8px);
-}
-
-/* Clouds drift across the open sky on the right, each at its own height
-   and speed. They stay in this strip so they never cross the headline. */
-.scene__sky {
-  top: 0;
-  left: 600px;
-  right: 0;
-  height: 160px;
-  overflow: hidden;
-}
-
-.scene__cloud { position: absolute; left: 0; animation: px-drift-sky linear infinite; animation-timing-function: steps(120); }
-
-@keyframes px-drift-sky {
-  from { transform: translateX(-80px); }
-  to { transform: translateX(900px); }
-}
-.scene__cloud--one { top: 32px; animation-duration: 48s; animation-delay: -30s; }
-.scene__cloud--two { top: 96px; animation-duration: 64s; animation-delay: -8s; transform-origin: 0 0; scale: 1.5; }
-.scene__cloud--three { top: 64px; animation-duration: 56s; animation-delay: -46s; }
-
-/* Hills: stepped shapes, so their edges look like stairs of pixels */
-.scene__hill { bottom: 96px; background: var(--px-grass); }
-
-.scene__hill--back {
-  right: -40px;
-  width: 640px;
-  height: 120px;
-  background: #6fae55;
-  clip-path: polygon(0 100%, 0 80%, 64px 80%, 64px 60%, 128px 60%, 128px 40%, 224px 40%,
-                     224px 20%, 352px 20%, 352px 40%, 448px 40%, 448px 60%, 544px 60%,
-                     544px 80%, 640px 80%, 640px 100%);
-}
-
-.scene__hill--front {
-  left: 38%;
-  width: 360px;
-  height: 72px;
-  clip-path: polygon(0 100%, 0 66%, 48px 66%, 48px 33%, 112px 33%, 112px 0, 248px 0,
-                     248px 33%, 312px 33%, 312px 66%, 360px 66%, 360px 100%);
-}
-
-.scene__tree--one { bottom: 128px; right: 460px; }
-.scene__tree--two { bottom: 132px; right: 412px; scale: 1.25; transform-origin: 50% 100%; }
-.scene__tree--three { bottom: 116px; left: 46%; }
-
-/* Grass on top, darker earth below */
-.scene__ground {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 100px;
-  background:
-    linear-gradient(var(--px-grass-light) 0 8px, var(--px-grass) 8px 100%);
-  border-top: 4px solid var(--px-ink);
-}
-
-/* The path the explorer walks along. Its stones scroll left, so the
-   explorer (who walks in place) looks like they are moving right. */
-.scene__path {
-  left: 0;
-  right: 0;
-  bottom: 28px;
-  height: 32px;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 28px, #c49a5c 28px 36px) 0 12px / 100% 8px no-repeat,
-    var(--px-dirt);
-  box-shadow: 0 -4px 0 0 #b98f53, 0 4px 0 0 #b98f53;
-  animation: px-path 1s steps(9) infinite;
-}
-
-@keyframes px-path {
-  from { background-position: 0 12px, 0 0; }
-  to { background-position: -36px 12px, 0 0; }
-}
-
-/* The explorer, twice the normal size, walking toward the chest */
-.scene__hero {
-  bottom: 48px;
-  right: 248px;
-  transform: scale(2);
-  transform-origin: 50% 100%;
-}
-
-.scene__hero .sprite { animation: px-bob .5s steps(1) infinite; }
-
-/* The treasure chest, three times the size, waiting on the path */
-.scene__chest {
-  bottom: 52px;
-  right: 104px;
-  width: 30px;
-  height: 24px;
-  transform: scale(3);
-  transform-origin: 50% 100%;
-}
-
-.scene__sparkle--one { bottom: 136px; right: 112px; }
-.scene__sparkle--two { bottom: 116px; right: 168px; }
-.scene__sparkle--three { bottom: 152px; right: 152px; }
-.scene__sparkle--two::before { animation-delay: .4s; }
-.scene__sparkle--three::before { animation-delay: .8s; }
+/* The scene itself (.scene and its parts) lives in pixel.css, so the login page can use it too */
 
 /* The words sit on the calm sky at the top left */
 .welcome-banner__content {
@@ -1126,3 +1008,142 @@ h1, h2 {
 .habit-info__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .habit-info__buttons .btn { width: auto; margin-top: 0; }
 @media (max-width: 520px) { .habit-row { grid-template-columns: 1fr; justify-items: center; text-align: center; } .habit-info__buttons { justify-content: center; } }
+
+/* ---------- A: "This week" as a game's quest log ----------
+   A dark screen (like a handheld's display) so it stands apart from the paper cards.
+   Progress always fills in whole blocks, one after another, never smoothly. */
+.quest-log {
+  --q-bg: #102620;           /* a shade darker than --px-green: the screen */
+  --q-tile: #17332d;         /* tiles on the screen */
+  --q-text: var(--px-paper);
+  --q-muted: #a9bdb4;        /* 7:1 on the screen colour */
+  --q-dim: #2c4c43;          /* unlit blocks */
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--q-bg);
+  color: var(--q-text);
+  box-shadow: var(--px-edge), var(--px-drop);
+}
+.quest-log[hidden] { display: none; }
+.quest-log__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.quest-log__head h2 { margin: 0; color: var(--px-gold-light); }
+.quest-log__link { display: inline-flex; align-items: center; gap: 8px; color: var(--q-muted); font-size: 20px; }
+.quest-log__link:hover { color: var(--q-text); }
+.quest-log__link .sprite { filter: brightness(1.6); }  /* the dark outline would vanish on the screen */
+
+/* The status bar: three tiles of the same size */
+.quest-log__hud { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.quest-log__hud .habit-row { display: contents; }
+.quest-log__hud .habit-row[hidden] { display: none; }
+.hud-tile { display: grid; justify-items: center; align-content: start; gap: 8px; padding: 16px 8px;
+            background: var(--q-tile); box-shadow: inset 0 0 0 3px var(--q-dim); text-align: center;
+            animation: px-rise .4s steps(4) both; }
+.hud-tile:nth-child(2), .habit-row .hud-tile:first-child { animation-delay: .08s; }
+.habit-row .hud-tile:last-child { animation-delay: .16s; }
+.hud-tile__icon { display: grid; place-items: end center; height: 48px; }
+.hud-tile__icon .sprite { transform: scale(2); transform-origin: bottom center; }
+.hud-tile__big { font-family: var(--font-pixel); font-size: 24px; font-weight: 400; color: var(--q-text);
+                 font-variant-numeric: tabular-nums; }
+.hud-tile__label { color: var(--q-muted); font-size: 18px; line-height: 1.1; }
+/* A live streak: the tile's frame turns gold and the flame flickers (the sprite does that) */
+.hud-tile.is-lit { box-shadow: inset 0 0 0 3px var(--px-gold-dark); }
+.hud-tile.is-lit .hud-tile__big { color: var(--px-gold); }
+
+/* Today's ring: 20 blocks round a circle, lighting up one after another */
+.pixel-ring { position: relative; width: 88px; height: 88px; }
+.pixel-ring__blocks { width: 100%; height: 100%; }
+.pixel-ring__blocks rect { fill: var(--q-dim); transition: fill .01s steps(1) calc(var(--i) * 40ms); }
+.pixel-ring__blocks rect.is-on { fill: var(--px-gold); }
+.pixel-ring.is-closed rect { fill: var(--px-grass-light); }
+.pixel-ring.is-closed { animation: px-bob .6s steps(2) 3; }
+.pixel-ring__value { position: absolute; inset: 0; display: grid; place-items: center;
+                     font-family: var(--font-pixel); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.quest-log__note { margin: 16px 0 0; color: var(--q-muted); font-size: 20px; }
+.quest-log__buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.quest-log__buttons[hidden] { display: none; }
+.quest-log__msg { margin: 8px 0 0; color: var(--px-gold-light); font-size: 18px; }
+.quest-log__msg:empty { display: none; }
+.quest-log__sub { margin: 24px 0 8px; color: var(--q-text); font-size: 12px; }
+
+/* Small game buttons for the dark screen */
+.qbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0;
+        background: var(--px-gold); color: var(--px-ink); cursor: pointer;
+        box-shadow: inset -3px -3px 0 0 var(--px-gold-dark), inset 3px 3px 0 0 var(--px-gold-light);
+        font-family: var(--font-body); font-size: 20px; line-height: 1; }
+.qbtn:hover { background: #ffb84d; }
+.qbtn:active { transform: translateY(2px); box-shadow: inset 3px 3px 0 0 var(--px-gold-dark); }
+.qbtn:focus-visible { outline: 3px solid var(--px-gold-light); outline-offset: 3px; }
+.qbtn[disabled] { opacity: .45; cursor: default; transform: none; }
+.qbtn--ghost { background: transparent; color: var(--q-text); box-shadow: inset 0 0 0 3px var(--q-dim); }
+.qbtn--ghost:hover { background: var(--q-tile); }
+
+/* The weekly quests: reward, name, block bar, count */
+.quests { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.quest { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto 88px; align-items: center; gap: 12px;
+         min-height: 44px; padding: 4px 8px; animation: px-rise .4s steps(4) both;
+         animation-delay: calc(.2s + var(--n) * 70ms); }
+.quest:nth-child(odd) { background: rgba(255, 252, 242, .04); }
+.quest__reward { display: inline-flex; align-items: center; gap: 4px; color: var(--px-gold); font-size: 18px;
+                 font-variant-numeric: tabular-nums; }
+.quest__title { font-size: 20px; }
+.quest__state { justify-self: end; color: var(--q-muted); font-size: 18px; font-variant-numeric: tabular-nums; }
+.quest .qbtn--claim { justify-self: end; animation: px-bob .8s steps(2) infinite; }  /* a reward is waiting */
+.quest.is-claimed .quest__title { color: var(--q-muted); }
+.quest.is-claimed .quest__reward { opacity: .5; }
+
+/* The block bar: 10 blocks, lit ones in gold (green once the quest is done) */
+.blocks { display: inline-flex; gap: 3px; }
+.blocks i { width: 10px; height: 14px; background: var(--q-dim); }
+.blocks i.is-on { background: var(--px-gold); animation: block-on .01s steps(1) both;
+                  animation-delay: calc(.3s + var(--i) * 45ms); }
+.quest.is-done .blocks i, .quest.is-claimed .blocks i { background: var(--px-grass-light); }
+@keyframes block-on { from { background: var(--q-dim); } }
+
+@media (max-width: 640px) {
+  .quest-log { padding: 16px; }
+  .quest-log__hud { gap: 8px; }
+  .hud-tile { padding: 12px 4px; }
+  .hud-tile__big { font-size: 18px; }
+  .quest { grid-template-columns: 52px minmax(0, 1fr) auto; row-gap: 4px; }
+  .quest .blocks { grid-column: 2 / 3; grid-row: 2; }
+  .quest__state, .quest .qbtn--claim { grid-row: 1 / 3; grid-column: 3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-tile, .quest, .blocks i.is-on, .pixel-ring.is-closed, .quest .qbtn--claim { animation: none; }
+  .pixel-ring__blocks rect { transition: none; }
+}
+
+/* A: sprites inside headings and buttons line up with the words (they replace emoji) */
+h2 > .sprite, .btn > .sprite { margin-right: 6px; vertical-align: -2px; }
+.tour__tick { display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 8px;
+              box-shadow: inset 0 0 0 2px var(--px-ink); vertical-align: -2px; }
+.tour__tick.is-done { background: var(--px-good); box-shadow: inset 0 0 0 2px var(--px-ink), inset 0 0 0 4px var(--px-paper); }
+
+/* ---------- A: livelier stat cards and goal picks ---------- */
+/* Stat cards: an icon next to a bigger number; the four cards come in one after another */
+.stats-row .stat-card { animation: px-rise .4s steps(4) both; }
+.stats-row .stat-card:nth-child(2) { animation-delay: .06s; }
+.stats-row .stat-card:nth-child(3) { animation-delay: .12s; }
+.stats-row .stat-card:nth-child(4) { animation-delay: .18s; }
+.stats-row .stat-card strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.stats-row .stat-card strong .px-icon { color: var(--px-green); }
+
+/* Goal picks: cards you choose, like a path in a game (the card's stat-card rule made the titles huge) */
+.goal-pick { position: relative; gap: 8px; padding: 16px; border: 0; box-shadow: inset 0 0 0 4px var(--px-line);
+             transition: transform .12s steps(2), box-shadow .12s steps(2); }
+.goal-pick__art { display: grid; place-items: center; width: 48px; height: 48px; background: var(--px-bg);
+                  box-shadow: inset 0 0 0 3px var(--px-line); color: var(--px-green); }
+.goal-pick__art .sprite { transform: scale(2); }
+.stat-card .goal-pick strong { display: block; font-family: var(--font-body); font-size: 24px; font-weight: 400;
+                               line-height: 1.1; color: var(--px-ink); }
+.goal-pick__go { justify-self: start; margin-top: 4px; padding: 4px 10px; background: var(--px-gold); color: var(--px-ink);
+                 box-shadow: inset -3px -3px 0 0 var(--px-gold-dark); font-size: 18px; }
+.goal-pick:hover, .goal-pick:focus-visible { transform: translateY(-4px); box-shadow: inset 0 0 0 4px var(--px-gold), 0 4px 0 0 var(--px-gold-dark); }
+.goal-pick.is-current { box-shadow: inset 0 0 0 4px var(--px-green); }
+.goal-pick.is-current .goal-pick__go { background: var(--px-green); color: var(--px-paper); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .stats-row .stat-card { animation: none; }
+  .goal-pick { transition: none; }
+  .goal-pick:hover, .goal-pick:focus-visible { transform: none; }
+}

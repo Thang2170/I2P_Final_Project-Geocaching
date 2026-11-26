@@ -10,7 +10,7 @@
       sheetMore.hidden = !open;
       sheet.classList.toggle("is-more", open);
       sheetMoreBtn.setAttribute("aria-expanded", String(open));
-      sheetMoreBtn.textContent = open ? "▾ Less" : "▴ More";
+      document.getElementById("sheetMoreLabel").textContent = open ? "Less" : "More";  // A: the chevron flips in CSS
       try { localStorage.setItem("sheetMore", open ? "1" : "0"); } catch (err) { /* private mode */ }
     }
     sheetMoreBtn.addEventListener("click", () => setSheetMore(sheetMore.hidden));
@@ -75,7 +75,7 @@
       if (!trail || !trailShowAll.checked) return;
       trailOthers = L.layerGroup(trail.checkpoints
         .map((cp, i) => i === trail.index ? null : L.marker([cp.lat, cp.lon], {
-          icon: stopIcon(i < trail.index ? "✓" : cp.label, i < trail.index ? "trail-stop--done" : "trail-stop--later"),
+          icon: stopIcon(i < trail.index ? "" : cp.label, i < trail.index ? "trail-stop--done" : "trail-stop--later"),
           interactive: false, zIndexOffset: 400
         }))
         .filter(Boolean)).addTo(map);
@@ -185,7 +185,7 @@
       });
     }
 
-    // Put a planned trail on the map (from 🧭 Plan a trail, or ↻ Walk it again on My trails).
+    // Put a planned trail on the map (from Plan a trail, or Walk it again on My trails).
     function showPlannedTrail(data) {
           trailActive = true;
           if (routeLine) { routeLine.remove(); routeLine = null; }
@@ -197,7 +197,7 @@
             checkpoints: [
               ...data.stops.map(stop => ({ id: stop.id, lat: stop.lat, lon: stop.lon, name: stop.name, label: stop.order })),
               // a loop ends back here; a one-way trail ends at its last treasure
-              ...(data.shape === "oneway" ? [] : [{ lat: data.start[0], lon: data.start[1], name: "back to the start", label: "🏁" }])
+              ...(data.shape === "oneway" ? [] : [{ lat: data.start[0], lon: data.start[1], name: "back to the start", label: "S" }])
             ]
           };
           trail.shape = data.shape || "loop";
@@ -212,7 +212,7 @@
           drawTrailLeg(true);
     }
 
-    // B: /?trail=<walk id>, from "↻ Walk it again" on My trails: the same treasures in the same
+    // B: /?trail=<walk id>, from "Walk it again" on My trails: the same treasures in the same
     // order, from where you are now, so you can beat your time. Asked once the GPS answers.
     let againId = Number(params.get("trail")) || null;
     async function walkAgain() {
@@ -240,7 +240,7 @@
     function trailSplit(cp) {
       if (journey.kind !== "trail" || !journeyActive()) return;
       journey.splits.push(Math.round(journey.elapsedMs / 1000));
-      journeyNote(`✓ ${cp.label} ${cp.name} at ${fmtTime(journey.elapsedMs)}`);
+      journeyNote(`Checkpoint ${cp.label}: ${cp.name} at ${fmtTime(journey.elapsedMs)}`);
     }
 
     trailStartBtn.addEventListener("click", () => {
@@ -304,8 +304,8 @@
     async function finishTrailWalk(lat, lon) {
       const walked = trail;
       const timed = journey.kind === "trail" && journeyActive();
-      endTrail(walked.shape === "oneway" ? "🏁 Trail complete: you reached the last treasure!"
-                                         : "🏁 Trail complete: you walked the whole loop!");
+      endTrail(walked.shape === "oneway" ? "Trail complete: you reached the last treasure"
+                                         : "Trail complete: you walked the whole loop");
       if (!timed) return;  // the trail was walked without the panel: nothing to save
       const body = {
         distance_m: Math.round(journey.meters), duration_s: Math.max(1, Math.round(journey.elapsedMs / 1000)),
@@ -324,7 +324,7 @@
         text = ok ? "Trail saved and posted." : (data.error || text);
         // B: personal best on this same trail (Python compares the times)
         if (ok && data.best && data.best.personal_best && !data.best.first_time) {
-          text = `🏅 New personal best: ${fmtTime(data.best.faster_by_s * 1000)} faster! ` + text;
+          text = `New personal best: ${fmtTime(data.best.faster_by_s * 1000)} faster! ` + text;
         }
         if (ok) startCooldown();  // B: the cool-down quest after a trail too
       } catch (err) {

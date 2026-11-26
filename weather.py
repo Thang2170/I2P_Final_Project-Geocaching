@@ -77,6 +77,17 @@ def parse_weather(data):
     }
 
 
+# A: which pixel icon the map shows for each kind of weather (pixel_art.py draws them:
+# "rain" -> the sprite icon-rain). The headline itself stays plain text, no emoji.
+WEATHER_ICONS = {"storm": "storm", "rain": "rain", "heat": "sun", "cold": "snow",
+                 "wind": "wind", "nice": "sun-cloud"}
+
+
+def weather_icon(kind):
+    """The icon name for a kind of weather, or "" when the weather is unknown."""
+    return WEATHER_ICONS.get(kind, "")
+
+
 def route_choice(w):
     """How to walk in this weather.
 
@@ -86,27 +97,27 @@ def route_choice(w):
     if w is None:
         return {"kind": "unknown", "headline": "", "tip": "", "route_options": {}}
     if w["code"] in THUNDER_CODES:
-        return {"kind": "storm", "headline": f"⛈ Thunderstorm ({w['temp_c']:.0f}°C): shortest route",
+        return {"kind": "storm", "headline": f"Thunderstorm ({w['temp_c']:.0f}°C): shortest route",
                 "tip": "Lightning is dangerous outside. Wait indoors until it passes, then take the short way.",
                 "route_options": SHORTEST}
     if w["rain_mm"] >= RAIN_MM or w["code"] in RAIN_CODES or w["rain_chance"] >= RAIN_CHANCE:
         raining = w["rain_mm"] >= RAIN_MM or w["code"] in RAIN_CODES
         what = "Rain" if raining else "Rain likely ({}%)".format(w["rain_chance"])
         return {"kind": "rain",
-                "headline": f"🌧 {what}: shortest route",
+                "headline": f"{what}: shortest route",
                 "tip": "Take an umbrella and watch for slippery steps and tiles.",
                 "route_options": SHORTEST}
     if w["feels_c"] >= HOT_FEELS_C or (w["is_day"] and w["uv"] >= STRONG_UV):
-        return {"kind": "heat", "headline": f"☀ Hot (feels {w['feels_c']:.0f}°C, UV {w['uv']:.0f}): shadier, greener route",
+        return {"kind": "heat", "headline": f"Hot (feels {w['feels_c']:.0f}°C, UV {w['uv']:.0f}): shadier, greener route",
                 "tip": "Bring water and rest in the shade if you feel dizzy.",
                 "route_options": GREEN}
     if w["feels_c"] <= COLD_FEELS_C:
-        return {"kind": "cold", "headline": f"🧣 Cold (feels {w['feels_c']:.0f}°C)",
+        return {"kind": "cold", "headline": f"Cold (feels {w['feels_c']:.0f}°C)",
                 "tip": "Wear a warm layer. Walking warms you up after a few minutes.", "route_options": {}}
     if w["wind_kmh"] >= WINDY_KMH:
-        return {"kind": "wind", "headline": f"💨 Windy ({w['wind_kmh']} km/h)",
+        return {"kind": "wind", "headline": f"Windy ({w['wind_kmh']} km/h)",
                 "tip": "Hsinchu wind is strong: hold on to your phone and hat.", "route_options": {}}
-    return {"kind": "nice", "headline": f"🌤 {w['words'].capitalize()}, {w['temp_c']:.0f}°C: a greener route",
+    return {"kind": "nice", "headline": f"{w['words'].capitalize()}, {w['temp_c']:.0f}°C: a greener route",
             "tip": "Nice weather for a walk.", "route_options": A_BIT_GREEN}
 
 

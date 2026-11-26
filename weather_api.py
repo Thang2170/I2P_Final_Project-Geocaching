@@ -13,7 +13,7 @@ import time
 from flask import Blueprint, current_app, jsonify, request
 
 from routing import check_point
-from weather import WeatherError, area_key, fetch_weather, route_choice
+from weather import WeatherError, area_key, fetch_weather, route_choice, weather_icon
 
 weather_api = Blueprint("weather_api", __name__)
 
@@ -53,7 +53,9 @@ def weather_for(lat, lon):
 
 def public_choice(choice):
     """What the map shows (not the route-service settings)."""
-    return {k: choice[k] for k in ("kind", "headline", "tip")}
+    shown = {k: choice[k] for k in ("kind", "headline", "tip")}
+    shown["icon"] = weather_icon(choice["kind"])  # A: a pixel icon instead of an emoji in the text
+    return shown
 
 
 @weather_api.route("/api/weather")

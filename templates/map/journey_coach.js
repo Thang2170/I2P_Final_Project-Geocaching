@@ -94,7 +94,7 @@
       const spot = calmById.get(treasureId);
       line.hidden = walkMode !== "calm";
       line.textContent = !spot ? "Not a calm spot. Green pins are parks, water and quiet places."
-        : `🌿 Mindful moment, ${spot.where}: ${spot.prompt}`;
+        : `Mindful moment, ${spot.where}: ${spot.prompt}`;
     }
 
     // During a journey: try-hard shows your pace against the target (Python decides), calm a reminder.
@@ -122,7 +122,7 @@
         document.getElementById("jZoneText").textContent =
           `${z.hr} bpm (${z.percent}% of max) · ${mins} min in the 60–80% zone` +
           (z.bonus_coins ? ` · +${z.bonus_coins} bonus coins` : "") +
-          (z.in_bonus_zone ? " ✓" : "");
+          (z.in_bonus_zone ? " · in the zone" : "");
       }
     }
 
@@ -215,11 +215,11 @@
       if (shown) map.fitBounds(shown.getBounds(), routePadding());
     }
 
-    // ▾ Less / ▴ More: hide the extra numbers and messages, or show them again.
+    // Less / More: hide the extra numbers and messages, or show them again.
     const jFold = document.getElementById("jFold");
     jFold.addEventListener("click", () => {
       const folded = journeyBox.classList.toggle("is-folded");
-      jFold.textContent = folded ? "▴ More" : "▾ Less";
+      document.getElementById("jFoldLabel").textContent = folded ? "More" : "Less";  // A: the chevron flips in CSS
       jFold.setAttribute("aria-expanded", folded ? "false" : "true");
     });
 

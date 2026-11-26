@@ -40,7 +40,7 @@
       <h1 class="visually-hidden">Community</h1>
 
       <!-- B: on /posts/<id> this page shows just that one post -->
-      <a id="backToFeed" class="back-link" href="/community" hidden>◂ Back to the Community feed</a>
+      <a id="backToFeed" class="back-link" href="/community" hidden><span class="px-arrow-left" aria-hidden="true"></span> Back to the Community feed</a>
 
       <form id="composer" class="panel composer">
         <div class="composer__row">
@@ -78,6 +78,13 @@
   </div>
 
   <script>
+    // A: a pixel icon element (pixelarticons mask or a pixel_art.py sprite), in place of emoji
+    function pxIcon(cls) {
+      const node = document.createElement("span");
+      node.className = cls;
+      node.setAttribute("aria-hidden", "true");
+      return node;
+    }
     // The browser only shows what Python sends and sends what the player typed.
     // textContent (never innerHTML) is used everywhere, so nothing from the server
     // (a username, a post, a comment) can inject HTML.
@@ -325,11 +332,13 @@
 
       // Like / Comment buttons
       const actions = el("div", undefined, "post__actions");
-      const likeBtn = el("button", "♥ Like", "post__action");
+      const likeBtn = el("button", "Like", "post__action");
+      likeBtn.prepend(pxIcon("px-icon px-icon--heart px-icon--sm"));
       likeBtn.type = "button";
       const commentBtn = el("button", "Comment", "post__action");
       commentBtn.type = "button";
-      const shareBtn = el("button", "↗ Share", "post__action");
+      const shareBtn = el("button", "Share", "post__action");
+      shareBtn.prepend(pxIcon("px-icon px-icon--share px-icon--sm"));
       shareBtn.type = "button";
       // Sharing a share shares the original (Python decides); a deleted original can't be shared.
       shareBtn.hidden = p.is_share && !p.shared;
@@ -369,7 +378,7 @@
       let shareCount = p.share_count;
 
       function draw() {
-        likeLine.textContent = likes.likes ? "♥ " + likes.like_summary : "";
+        likeLine.replaceChildren(...(likes.likes ? [pxIcon("px-icon px-icon--heart px-icon--sm"), " " + likes.like_summary] : []));
         likeLine.hidden = !likes.likes;
         likeLine.title = "See who liked this";
         if (!likes.likes) likersBox.hidden = true;
@@ -452,7 +461,8 @@
             return row;
           }));
           // B: a Close button, so a long list never hides the rest of the feed
-          const closeBtn = el("button", "✕ Close", "likers__close");
+          const closeBtn = el("button", "Close", "likers__close");
+          closeBtn.prepend(pxIcon("px-icon px-icon--close px-icon--sm"));
           closeBtn.type = "button";
           closeBtn.setAttribute("aria-label", "Close the list of likes");
           closeBtn.addEventListener("click", () => {

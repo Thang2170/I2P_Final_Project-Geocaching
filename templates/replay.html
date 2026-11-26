@@ -30,14 +30,14 @@
   {% include "_topbar.html" %}
 
   <main class="card map-card">
-    <p class="board__eyebrow"><a href="/hunts">← Hunts</a></p>
+    <p class="board__eyebrow"><a href="/hunts"><span class="px-arrow-left" aria-hidden="true"></span> Hunts</a></p>
     <h1>Replay: {{ hunt_name }}</h1>
     <p id="headline" class="muted" role="status">Loading the race…</p>
 
     <div id="replayMap" class="replay-map" aria-label="Map of the race"></div>
 
     <div class="replay-bar">
-      <button type="button" id="play" class="btn" disabled>▶ Play</button>
+      <button type="button" id="play" class="btn" disabled>Play</button>
       <input type="range" id="scrub" min="0" max="1" step="0.1" value="0" aria-label="Race time" disabled>
       <span id="clock" class="replay-clock">0:00</span>
       <span id="speed" class="replay-speed"></span>
@@ -108,7 +108,12 @@
 
     function setPlaying(on) {
       playing = on;
-      play.textContent = on ? "❚❚ Pause" : (t >= race.duration_s ? "↺ Again" : "▶ Play");
+      // A: pixel icons instead of the pause and play characters
+      const label = on ? "Pause" : (t >= race.duration_s ? "Again" : "Play");
+      const glyph = document.createElement("span");
+      glyph.className = `px-icon px-icon--${on ? "pause" : label === "Again" ? "reload" : "play"} px-icon--sm`;
+      glyph.setAttribute("aria-hidden", "true");
+      play.replaceChildren(glyph, ` ${label}`);
       lastFrame = null;
       if (on) requestAnimationFrame(frame);
     }
@@ -136,7 +141,7 @@
         const colour = COLOURS[player.slot || 0];
         const line = L.polyline([], { color: colour, weight: 2, opacity: 0.9 }).addTo(map);
         const dot = L.circleMarker([0, 0], { radius: 8, color: "#14231f", weight: 2, fillColor: colour, fillOpacity: 1 });
-        dot.bindTooltip(player.name + (player.winner ? " 🏆" : ""), { permanent: true, direction: "right", offset: [10, 0], className: "racer-label" });
+        dot.bindTooltip(player.name + (player.winner ? " (winner)" : ""), { permanent: true, direction: "right", offset: [10, 0], className: "racer-label" });
         racers.push({ player, dot, line });
         for (const p of player.points) bounds.extend([p[1], p[2]]);
 

@@ -9,11 +9,18 @@
     .week-nav h2 { margin: 0; font-size: 20px; text-align: center; }
     .week-nav .btn { width: auto; margin: 0; padding: 8px 12px; }
     .week-nav .btn[disabled] { visibility: hidden; }
-    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
-    .tile { padding: 10px 12px; box-shadow: 0 0 0 3px var(--px-ink); background: var(--px-paper); }
-    .tile span { display: block; color: var(--px-muted); font-size: 16px; }
-    .tile strong { display: block; font-size: 28px; line-height: 1.1; color: var(--px-ink); }
-    .tile small { display: block; color: var(--px-muted); font-size: 15px; min-height: 1em; }
+    /* A: the week's numbers as a game status bar (same dark screen as the Quest log); one row on a laptop */
+    .report-card { max-width: 820px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 20px;
+             padding: 12px; background: #102620; }
+    .tile { padding: 12px; background: #17332d; box-shadow: inset 0 0 0 3px #2c4c43; animation: px-rise .4s steps(4) both; }
+    .tile:nth-child(2) { animation-delay: .05s; } .tile:nth-child(3) { animation-delay: .1s; }
+    .tile:nth-child(4) { animation-delay: .15s; } .tile:nth-child(5) { animation-delay: .2s; }
+    .tile span { display: block; color: #a9bdb4; font-size: 16px; }
+    .tile strong { display: block; margin: 4px 0; font-family: var(--font-pixel); font-size: 20px; font-weight: 400;
+                   line-height: 1.2; color: var(--px-gold); font-variant-numeric: tabular-nums; }
+    .tile small { display: block; color: #a9bdb4; font-size: 15px; min-height: 1em; }
+    @media (prefers-reduced-motion: reduce) { .tile { animation: none; } }
     .chart-box { position: relative; margin: 6px 0 20px; }
     .chart { width: 100%; height: auto; display: block; }
     .chart .grid { stroke: rgba(20, 35, 31, .12); stroke-width: 1; }
@@ -47,14 +54,14 @@
   {% set active = "report" %}
   {% include "_topbar.html" %}
 
-  <main class="card">
+  <main class="card report-card">
     <h1>Weekly report</h1>
     <p class="muted">Your week at a glance: steps, active minutes, heart-rate zones, hunts and trails.</p>
 
     <nav class="week-nav" aria-label="Choose a week">
-      <button type="button" class="btn btn--ghost" id="prevWeek" aria-label="Earlier week">←</button>
+      <button type="button" class="btn btn--ghost" id="prevWeek" aria-label="Earlier week"><span class="px-arrow-left" aria-hidden="true"></span></button>
       <h2 id="weekTitle">This week</h2>
-      <button type="button" class="btn btn--ghost" id="nextWeek" aria-label="Later week">→</button>
+      <button type="button" class="btn btn--ghost" id="nextWeek" aria-label="Later week"><span class="px-arrow-right" aria-hidden="true"></span></button>
     </nav>
 
     <section class="tiles" id="tiles" aria-label="Totals"></section>
@@ -83,10 +90,10 @@
     </details>
 
     <div class="share-row" style="margin-top: 20px">
-      <button type="button" class="btn" id="shareBtn" hidden>📊 Share my week</button>
+      <button type="button" class="btn" id="shareBtn" hidden>Share my week</button>
       <p class="muted" id="msg" role="status"></p>
     </div>
-    <p><a href="/health">← Health page</a></p>
+    <p><a href="/health"><span class="px-arrow-left" aria-hidden="true"></span> Health page</a></p>
   </main>
 
   <script>
@@ -210,7 +217,7 @@
         tile("Hunts and trails", `${t.hunts + t.trails}`, `${(t.distance_m / 1000).toFixed(1)} km`),
         tile("Calories", `${t.calories}`, "kcal on hunts and trails"),
       ];
-      if (t.streak !== null) tiles.push(tile("Streak", `🔥 ${t.streak}`, t.streak === 1 ? "day" : "days"));
+      if (t.streak !== null) tiles.push(tile("Streak", `${t.streak}`, t.streak === 1 ? "day" : "days"));
       $("tiles").replaceChildren(...tiles);
       drawSteps(r);
       drawZones(r.zones);
@@ -223,7 +230,7 @@
       }));
       $("shareBtn").hidden = !r.is_current;
       $("shareBtn").disabled = r.shared;
-      $("shareBtn").textContent = r.shared ? "✓ Shared this week" : "📊 Share my week";
+      $("shareBtn").textContent = r.shared ? "Shared this week" : "Share my week";
     }
 
     async function load(week) {
@@ -244,7 +251,7 @@
       const res = await fetch("/api/report/share", { method: "POST" });
       const data = await res.json();
       $("msg").textContent = res.ok ? "Shared to the Community!" : (data.error || "Could not share");
-      if (res.ok) { $("shareBtn").textContent = "✓ Shared this week"; } else { $("shareBtn").disabled = false; }
+      if (res.ok) { $("shareBtn").textContent = "Shared this week"; } else { $("shareBtn").disabled = false; }
     });
     load(params.get("week"));
   </script>

@@ -111,7 +111,7 @@ class TestPage(unittest.TestCase):
             db.session.remove()
             db.drop_all()
             db.engine.dispose()
-        self.assertIn("↗ Share", html)
+        self.assertIn("Share", html)
         self.assertIn("/share`", html)
         self.assertIn("This post was deleted.", html)
         self.assertIn("shared ${p.shared.author}'s post", html)

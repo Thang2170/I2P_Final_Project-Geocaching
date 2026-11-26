@@ -225,7 +225,7 @@ body {
   padding: 28px 24px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
-  animation: px-boot .4s steps(6) both;
+  animation: px-boot .4s steps(6) backwards;
 }
 
 /* 16px side gutter on phones (plus 4px for the pixel edge) */
@@ -386,7 +386,7 @@ summary {
   padding: 12px 16px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
-  animation: px-boot .4s steps(5) both;
+  animation: px-boot .4s steps(5) backwards;
 }
 
 .sheet__status {
@@ -450,7 +450,7 @@ body.is-journey .sheet { display: none; }
   padding: 8px 12px 10px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
-  animation: px-boot .4s steps(5) both;
+  animation: px-boot .4s steps(5) backwards;
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) 150px;
   grid-template-areas:
@@ -812,7 +812,7 @@ input[type="file"]:focus-visible::file-selector-button { outline: 4px solid var(
   max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
-  animation: px-boot .4s steps(6) both;
+  animation: px-boot .4s steps(6) backwards;
 }
 
 .admin__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
@@ -1230,7 +1230,7 @@ body.has-tour { overflow: hidden; }
   text-align: center;
 }
 
-.tour__box.is-turning { animation: px-boot .3s steps(4) both; }
+.tour__box.is-turning { animation: px-boot .3s steps(4) backwards; }
 
 .tour__skip {
   position: absolute;
@@ -1895,7 +1895,7 @@ button.post__likes[hidden] { display: none; }
 .fancy-select.is-open .fancy-select__arrow { transform: rotate(180deg); }
 .fancy-select__panel { position: absolute; top: calc(100% + 10px); left: 0; right: 0; z-index: 7000;
                        padding: 6px; background: var(--px-paper); box-shadow: var(--px-edge), var(--px-drop);
-                       animation: px-boot .2s steps(3) both; }
+                       animation: px-boot .2s steps(3) backwards; }
 .fancy-select__panel[hidden] { display: none; }
 .fancy-select.opens-up .fancy-select__panel { top: auto; bottom: calc(100% + 10px); }
 .fancy-select__search { width: 100%; margin: 0 0 6px; }
@@ -2168,3 +2168,89 @@ button.post__likes[hidden] { display: none; }
 .presenter__elsewhere { margin: 6px 0; font-size: 16px; color: var(--px-bad); }
 .is-presenting { outline: 4px dashed var(--px-gold); outline-offset: 4px; }
 @media print { .presenter { display: none; } }
+
+/* ---------- A: the map card, livelier and easier to read at a glance ---------- */
+
+/* The distance is the headline: a big pixel number, the treasure's name after it */
+.sheet__status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+.sheet__meters { font-family: var(--font-pixel); font-size: 22px; line-height: 1.3; color: var(--px-green);
+                 font-variant-numeric: tabular-nums; }
+.sheet__meters small { font-size: 12px; }
+.sheet__to { font-family: var(--font-body); font-size: 22px; line-height: 1.1; color: var(--px-ink); }
+
+/* The trek: a dotted path, the explorer on it and the chest at the end.
+   --done goes from 0 (just picked) to 1 (arrived); the explorer moves in steps, like a sprite. */
+.trek { position: relative; height: 40px; margin: 4px 0; --done: 0; }
+.trek[hidden] { display: none; }
+.trek__path { position: absolute; left: 12px; right: 24px; bottom: 6px; height: 3px;
+              background: repeating-linear-gradient(90deg, var(--px-dirt) 0 6px, transparent 6px 12px); }
+.trek__walker { position: absolute; bottom: 6px; left: calc((100% - 56px) * var(--done)); width: 24px; height: 36px;
+                transition: left .6s steps(6); }
+.trek__goal { position: absolute; right: 0; bottom: 6px; width: 24px; height: 20px; }
+/* The sprites are bigger than these boxes: pin them to the bottom, then shrink them */
+.trek__walker .sprite, .trek__goal .sprite { position: absolute; bottom: 0; }
+.trek__walker .sprite { left: 0; transform: scale(.5); transform-origin: bottom left; }
+.trek__goal .sprite { right: 0; transform: scale(.8); transform-origin: bottom right; animation: px-bob 1.2s steps(2) infinite; }
+.sheet.is-found .trek__goal .sprite { animation: px-flash .24s steps(1) 4; }
+
+/* The route as small facts: number first, unit after */
+.route-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.route-fact { padding: 2px 8px; background: var(--px-bg); box-shadow: inset 0 0 0 2px var(--px-line);
+              color: var(--px-muted); font-size: 18px; animation: px-rise .3s steps(3) both; }
+.route-fact strong { color: var(--px-ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+.route-fact:nth-child(2) { animation-delay: .05s; }
+.route-fact:nth-child(3) { animation-delay: .1s; }
+.route-fact:nth-child(4) { animation-delay: .15s; }
+.route-fact--note { background: transparent; box-shadow: none; }
+
+/* Weather: a pixel icon from weather.py's "icon", then the words */
+.weather-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.weather-line__icon { flex: none; }
+.weather-line__icon:not(.sprite) { display: none; }
+
+/* Buttons: New route is the main one (gold), the others are quieter */
+.sheet__btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+              transition: background-color .12s steps(2), transform .08s steps(1); }
+.sheet__btn:active { transform: translateY(2px); }
+.sheet__btn--main { background: var(--px-gold); border-color: var(--px-ink);
+                    box-shadow: inset -3px -3px 0 0 var(--px-gold-dark), inset 3px 3px 0 0 var(--px-gold-light); }
+.sheet__btn--main:hover { background: #ffb84d; }
+.sheet__btn--main:hover .sprite--icon-refresh { animation: icon-turn .4s steps(4) 1; }
+@keyframes icon-turn { to { transform: rotate(360deg); } }
+.sheet__btn--more .sprite--icon-chevron { transition: transform .15s steps(2); }
+.sheet__btn--more[aria-expanded="true"] .sprite--icon-chevron { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .trek__walker, .sheet__btn, .sheet__btn--more .sprite--icon-chevron { transition: none; }
+  .trek__goal .sprite, .route-fact, .sheet__btn--main:hover .sprite--icon-refresh { animation: none; }
+}
+
+/* ---------- A: icons that replace emoji around the site ---------- */
+/* A passed trail checkpoint shows a pixel tick (it used to be the ✓ character) */
+.trail-stop--done .trail-stop__n { display: block; width: 12px; height: 12px; background: var(--px-good);
+  -webkit-mask: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/check.svg") center / 12px 12px no-repeat;
+  mask: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/check.svg") center / 12px 12px no-repeat; }
+/* The onboarding checklist: an empty pixel box, ticked when done */
+.tour__tick { display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 8px;
+              box-shadow: inset 0 0 0 2px var(--px-ink); vertical-align: -2px; }
+.tour__tick.is-done { background: var(--px-good); box-shadow: inset 0 0 0 2px var(--px-ink), inset 0 0 0 4px var(--px-paper); }
+/* The journey panel's Less / More: same chevron as the map card */
+.journey__fold { display: inline-flex; align-items: center; gap: 6px; }
+.journey__fold .sprite--icon-chevron { transform: rotate(180deg); transition: transform .15s steps(2); }
+.journey__fold[aria-expanded="false"] .sprite--icon-chevron { transform: none; }
+/* Sprites inside a heading or a button line up with the words */
+h2 > .sprite, .btn > .sprite, .mode-pick > .sprite, .safety__eyebrow > .sprite { margin-right: 6px; vertical-align: -2px; }
+@media (prefers-reduced-motion: reduce) { .journey__fold .sprite--icon-chevron { transition: none; } }
+
+/* ---------- A: the login title screen ---------- */
+/* The pixel world fills the page behind the form; the form is a dialogue box on the sky */
+/* Not position: fixed with a negative z-index: iPhone Safari drew that badly. It is a normal layer
+   that covers the page, and the form sits above it. */
+body.has-title-screen { position: relative; min-height: 100vh; min-height: 100dvh; }
+.title-screen { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--scene-sky, var(--px-sky-bands)); }
+.title-screen[hidden] { display: none; }
+.title-card { position: relative; z-index: 1; margin-top: 8vh; }
+.title-card__logo { display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
+                    color: var(--px-gold-dark); font-family: var(--font-pixel); font-size: 14px; }
+.title-card__logo .sprite { animation: px-bob 1s steps(2) infinite; }
+@media (prefers-reduced-motion: reduce) { .title-card__logo .sprite { animation: none; } }
