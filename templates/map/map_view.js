@@ -265,15 +265,36 @@
     let routeRequestId = 0;         // so an old, slow answer can't replace a newer route
     const REROUTE_DISTANCE_M = 25;  // real GPS: ask for a new route after moving this far
 
-    // Write the route summary in the status card and, if open, the info board
-    let routeSummary = "";  // the status-card text without the steps and calories
+    // Write the route summary in the status card and, if open, the info board.
+    // A: as a row of small facts (0.31 km · 4 min · 419 steps · 10 kcal) instead of one long sentence.
+    let routeFacts = {};
+    function fact(value, unit) {
+      const box = document.createElement("span");
+      box.className = "route-fact";
+      const number = document.createElement("strong");
+      number.textContent = value;
+      box.append(number, ` ${unit}`);
+      return box;
+    }
+    function drawRouteFacts() {
+      const f = routeFacts;
+      const parts = [fact(f.km, "km"), fact(f.min, "min")];
+      if (f.steps !== undefined) parts.push(fact(f.steps.toLocaleString(), "steps"), fact(f.kcal, "kcal"));
+      const notes = [f.random && "new route", f.straight && "straight line", f.access && "step-free"].filter(Boolean);
+      if (notes.length) {
+        const note = document.createElement("span");
+        note.className = "route-fact route-fact--note";
+        note.textContent = notes.join(" · ");
+        parts.push(note);
+      }
+      routeInfo.replaceChildren(...parts);
+    }
+
     function showRoute(data) {
       const km = (data.distance_m / 1000).toFixed(2);
       const min = Math.max(1, Math.round(data.duration_s / 60));
-      const straight = data.warning ? " (straight line)" : "";
-      const random = routeVia ? "New route: " : "";
-      routeSummary = `${random}${km} km walk, about ${min} min${straight}`;
-      routeInfo.textContent = routeSummary;
+      routeFacts = { km, min, straight: Boolean(data.warning), random: Boolean(routeVia), access: Boolean(data.access) };
+      drawRouteFacts();
       routeInfo.hidden = false;
       boardKm.textContent = `${km} km`;
       boardMin.textContent = `${min} min`;
@@ -281,7 +302,6 @@
       // B: step-free routes (Account page): Python writes the note (route_access.py)
       if (data.access) {
         boardNote.textContent = data.access.note;
-        routeInfo.textContent = `${routeSummary} · ♿`;
       }
       showWalkStats(data.distance_m);
       showWeather(data.weather);
@@ -293,6 +313,9 @@
       weatherInfo.hidden = !w;
       if (!w) return;
       weatherInfo.dataset.kind = w.kind;
+      // A: Python names the pixel icon (weather.py WEATHER_ICONS); no emoji in the text
+      document.getElementById("weatherIcon").className =
+        w.icon ? `weather-line__icon sprite sprite--icon-${w.icon}` : "weather-line__icon";
       document.getElementById("weatherHead").textContent = w.headline;
       document.getElementById("weatherTip").textContent = w.tip;
     }
@@ -309,7 +332,8 @@
         if (!res.ok) throw new Error(data.error || "Stats request failed");
         boardSteps.textContent = data.steps.toLocaleString();
         boardCal.textContent = data.calories;
-        routeInfo.textContent = `${routeSummary} · ${data.steps.toLocaleString()} steps · ${data.calories} kcal`;
+        Object.assign(routeFacts, { steps: data.steps, kcal: data.calories });
+        drawRouteFacts();
         document.getElementById("boardWeight").textContent = data.weight_kg;
         document.getElementById("boardWeightNote").hidden = data.weight_source !== "default";
       } catch (err) {

@@ -21,22 +21,29 @@
     <div id="crossingAlert" class="crossing-alert" role="alert" hidden></div>
     <section id="sheet" class="sheet" aria-live="polite">
       <div id="status" class="sheet__status">Finding you…</div>
-      <div id="routeInfo" class="sheet__route" hidden></div>
+      <!-- A: a little trek from you to the chest: the explorer moves right as you get closer -->
+      <div id="trek" class="trek" aria-hidden="true" hidden>
+        <span class="trek__path"></span>
+        <span class="trek__walker"><span class="sprite sprite--explorer"></span></span>
+        <span class="trek__goal"><span class="sprite sprite--chest"></span></span>
+      </div>
+      <div id="routeInfo" class="sheet__route route-facts" hidden></div>
       <!-- B: weather-aware routes: shortest in the rain, greener in the heat (weather.py) -->
       <div id="weatherInfo" class="sheet__route weather-line" data-kind="" hidden>
+        <span id="weatherIcon" class="weather-line__icon" aria-hidden="true"></span>
         <strong id="weatherHead"></strong> <span id="weatherTip"></span>
       </div>
       <!-- B: one compact row of actions, so the card stays small and the map stays visible -->
       <div class="sheet__actions">
         <!-- A: Feature 6, a different walking route to the same treasure -->
-        <button type="button" id="newRouteBtn" class="sheet__btn" hidden>↻ New route</button>
+        <button type="button" id="newRouteBtn" class="sheet__btn sheet__btn--main" hidden><span class="sprite sprite--icon-refresh" aria-hidden="true"></span>New route</button>
         <!-- B: Treasure Trail, a loop through unfound treasures for a step or time goal (trail_planner.py) -->
-        <button type="button" id="trailBtn" class="sheet__btn" aria-expanded="false" aria-controls="trailBox">🧭 Plan a trail</button>
+        <button type="button" id="trailBtn" class="sheet__btn" aria-expanded="false" aria-controls="trailBox"><span class="sprite sprite--icon-compass" aria-hidden="true"></span>Plan a trail</button>
         <!-- B: walk the trail with the live panel (time, pace, splits), saved at the finish -->
-        <button type="button" id="trailStartBtn" class="sheet__btn sheet__btn--go" hidden>▶ Start trail</button>
-        <button type="button" id="trailEnd" class="sheet__btn" hidden>✕ End trail</button>
+        <button type="button" id="trailStartBtn" class="sheet__btn sheet__btn--go" hidden>Start trail</button>
+        <button type="button" id="trailEnd" class="sheet__btn" hidden>End trail</button>
         <!-- B: everything else (coins, mode, team, crossings) folds away under "More" -->
-        <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore">▴ More</button>
+        <button type="button" id="sheetMoreBtn" class="sheet__btn sheet__btn--more" aria-expanded="false" aria-controls="sheetMore"><span class="sprite sprite--icon-chevron" aria-hidden="true"></span><span id="sheetMoreLabel">More</span></button>
       </div>
       <div id="trailBox" class="trail-box" hidden>
         <p class="trail-box__ask">How long do you want to walk? <span id="trailShapeText">The loop starts and ends here.</span></p>

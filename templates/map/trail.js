@@ -10,7 +10,7 @@
       sheetMore.hidden = !open;
       sheet.classList.toggle("is-more", open);
       sheetMoreBtn.setAttribute("aria-expanded", String(open));
-      sheetMoreBtn.textContent = open ? "▾ Less" : "▴ More";
+      document.getElementById("sheetMoreLabel").textContent = open ? "Less" : "More";  // A: the chevron flips in CSS
       try { localStorage.setItem("sheetMore", open ? "1" : "0"); } catch (err) { /* private mode */ }
     }
     sheetMoreBtn.addEventListener("click", () => setSheetMore(sheetMore.hidden));

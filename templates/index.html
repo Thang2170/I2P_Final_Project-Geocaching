@@ -242,35 +242,48 @@
 
       </section>
 
-      <!-- B: THIS WEEK: your daily streak and the weekly challenges (streaks.py). Logged in only. -->
-      <section class="stat-card week-card" id="weekCard" hidden aria-labelledby="weekTitle">
-        <div class="week-card__head">
+      <!-- B: THIS WEEK: your daily streak and the weekly challenges (streaks.py). Logged in only.
+           A: drawn as a game's quest log: a dark screen, a status bar of three tiles (streak, today's
+           ring, freezes) and the weekly quests as block bars. Python still counts everything. -->
+      <section class="week-card quest-log" id="weekCard" hidden aria-labelledby="weekTitle">
+        <div class="quest-log__head">
           <h2 id="weekTitle">This week</h2>
-          <span class="week-card__streak" id="streak"></span>
+          <a class="quest-log__link" href="/report"><span class="sprite sprite--icon-chart" aria-hidden="true"></span>Weekly report</a>
         </div>
-        <p class="stat-note" id="streakNote"></p>
-        <!-- B: today's goal ring, streak freezes and sharing your streak (habits.py) -->
-        <div class="habit-row" id="habitRow" hidden>
-          <svg class="ring" id="ring" viewBox="0 0 120 120" role="img" aria-labelledby="ringLabel">
-            <circle class="ring__track" cx="60" cy="60" r="48"></circle>
-            <circle class="ring__fill" id="ringFill" cx="60" cy="60" r="48" pathLength="100"
-                    stroke-dasharray="100" stroke-dashoffset="100"></circle>
-            <text class="ring__value" id="ringValue" x="60" y="62"></text>
-            <text class="ring__unit" id="ringUnit" x="60" y="82"></text>
-          </svg>
-          <div class="habit-info">
-            <p class="habit-info__ring" id="ringLabel"></p>
-            <p class="habit-info__freezes" id="freezeText"></p>
-            <div class="habit-info__buttons">
-              <button type="button" class="btn btn--small btn--ghost" id="buyFreeze">❄ Buy a freeze</button>
-              <button type="button" class="btn btn--small" id="shareStreak">Share my streak</button>
+
+        <div class="quest-log__hud">
+          <div class="hud-tile" id="streakTile">
+            <span class="hud-tile__icon"><span class="sprite sprite--icon-campfire" id="streakIcon" aria-hidden="true"></span></span>
+            <strong class="hud-tile__big" id="streakDays">0</strong>
+            <span class="hud-tile__label" id="streak">No streak yet</span>
+          </div>
+          <!-- B: today's goal ring, streak freezes and sharing your streak (habits.py) -->
+          <div class="habit-row" id="habitRow" hidden>
+            <div class="hud-tile hud-tile--ring">
+              <div class="pixel-ring" id="ring" role="img" aria-labelledby="ringLabel">
+                <svg class="pixel-ring__blocks" id="ringBlocks" viewBox="0 0 120 120" aria-hidden="true"></svg>
+                <span class="pixel-ring__value" id="ringValue"></span>
+              </div>
+              <span class="hud-tile__label" id="ringLabel"></span>
             </div>
-            <p class="stat-note" id="habitMsg" role="status"></p>
+            <div class="hud-tile">
+              <span class="hud-tile__icon"><span class="sprite sprite--icon-snow" aria-hidden="true"></span></span>
+              <strong class="hud-tile__big" id="freezeCount">0</strong>
+              <span class="hud-tile__label" id="freezeText"></span>
+            </div>
           </div>
         </div>
-        <ul class="challenges" id="challenges"></ul>
-        <p class="stat-note" id="weekMsg" role="status"></p>
-        <p class="stat-note"><a href="/report">📊 See your weekly report</a></p><!-- B: weekly_report.py -->
+
+        <p class="quest-log__note" id="streakNote"></p>
+        <div class="quest-log__buttons habit-row" id="habitButtons" hidden>
+          <button type="button" class="qbtn" id="buyFreeze"></button>
+          <button type="button" class="qbtn qbtn--ghost" id="shareStreak">Share my streak</button>
+        </div>
+        <p class="quest-log__msg" id="habitMsg" role="status"></p>
+
+        <h3 class="quest-log__sub">Weekly quests</h3>
+        <ul class="quests" id="challenges"></ul>
+        <p class="quest-log__msg" id="weekMsg" role="status"></p>
       </section>
 
       <!-- B: YOUR GOAL: pick a health goal and collect milestones on the way (goals.py). Logged in only. -->
@@ -502,37 +515,64 @@
     }
 
     // B: streak and weekly challenges. Python counts everything; the page shows it and sends claims.
+    // A: the streak is a flame while it is alive and cold logs when there is none.
+    function showStreak(current) {
+      setText("streakDays", current);
+      setText("streak", current ? `day streak` : "No streak yet");
+      document.getElementById("streakIcon").className = `sprite sprite--icon-${current ? "flame" : "campfire"}`;
+      document.getElementById("streakTile").classList.toggle("is-lit", current > 0);
+    }
+
+    // A: a bar made of blocks that light up one after another (our "signature" progress look)
+    function blockBar(value, goal, blocks = 10) {
+      const bar = document.createElement("span");
+      bar.className = "blocks";
+      const lit = goal > 0 ? Math.min(blocks, Math.floor(value / goal * blocks)) : 0;
+      for (let i = 0; i < blocks; i++) {
+        const block = document.createElement("i");
+        if (i < lit) block.className = "is-on";
+        block.style.setProperty("--i", i);
+        bar.append(block);
+      }
+      return bar;
+    }
+
     function showWeek(week) {
       if (!week) return;  // logged out: the card stays hidden
       document.getElementById("weekCard").hidden = false;
       const s = week.streak;
-      setText("streak", s.current ? `🔥 ${s.current}-day streak` : "No streak yet");
+      showStreak(s.current);
       setText("streakNote", s.today_done
-        ? `You walked today. Best streak: ${s.best} day${s.best === 1 ? "" : "s"}.`
-        : s.current ? "Find a treasure, finish a hunt or close your ring today to keep it going!"
-                    : "Find a treasure, finish a hunt or close your ring today to start a streak.");
+        ? `You walked today. Best streak: ${s.best} day${s.best === 1 ? "" : "s"}`
+        : s.current ? "Walk today to keep your streak: find a treasure, finish a hunt or close your ring"
+                    : "Find a treasure, finish a hunt or close your ring today to start a streak");
       const list = document.getElementById("challenges");
       list.replaceChildren();
-      for (const c of week.challenges) {
+      week.challenges.forEach((c, n) => {
         const li = document.createElement("li");
-        li.className = "challenge" + (c.claimed ? " challenge--claimed" : c.done ? " challenge--done" : "");
+        li.className = "quest" + (c.claimed ? " is-claimed" : c.done ? " is-done" : "");
+        li.style.setProperty("--n", n);
+        const reward = document.createElement("span");
+        reward.className = "quest__reward";
+        const coin = document.createElement("span");
+        coin.className = "sprite sprite--icon-coin";
+        reward.append(coin, `+${c.reward}`);
         const title = document.createElement("span");
-        title.className = "challenge__title";
+        title.className = "quest__title";
         title.textContent = c.title;
-        const bar = document.createElement("progress");
-        bar.max = c.goal;
-        bar.value = c.progress;
+        const bar = blockBar(c.progress, c.goal);
+        bar.setAttribute("role", "img");
         bar.setAttribute("aria-label", `${c.title}: ${c.progress} of ${c.goal}`);
         const end = document.createElement(c.done && !c.claimed ? "button" : "span");
-        end.className = c.done && !c.claimed ? "btn btn--small" : "challenge__state";
-        end.textContent = c.claimed ? "✓ Claimed" : c.done ? `Claim +${c.reward}` : c.text;
+        end.className = c.done && !c.claimed ? "qbtn qbtn--claim" : "quest__state";
+        end.textContent = c.claimed ? "Claimed" : c.done ? "Claim" : c.text;
         if (end.tagName === "BUTTON") {
           end.type = "button";
           end.addEventListener("click", () => claimChallenge(c.id, end));
         }
-        li.append(title, bar, end);
+        li.append(reward, title, bar, end);
         list.append(li);
-      }
+      });
     }
 
     // B: your health goal. Python counts steps and minutes and decides what is done.
@@ -652,28 +692,49 @@
     }
 
     // B: the daily goal ring, streak freezes and sharing (Python counts and decides)
+    // A: the ring is 20 pixel blocks round a circle; each block is 5% of today's goal.
+    const RING_BLOCKS = 20;
+    function drawRing(percent, closed) {
+      const svg = document.getElementById("ringBlocks");
+      if (!svg.childElementCount) {
+        for (let i = 0; i < RING_BLOCKS; i++) {
+          const angle = (i / RING_BLOCKS) * 2 * Math.PI - Math.PI / 2;  // start at the top, go clockwise
+          const block = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          block.setAttribute("x", Math.round(60 + 48 * Math.cos(angle) - 6));
+          block.setAttribute("y", Math.round(60 + 48 * Math.sin(angle) - 6));
+          block.setAttribute("width", 12);
+          block.setAttribute("height", 12);
+          block.style.setProperty("--i", i);
+          svg.append(block);
+        }
+      }
+      const lit = Math.floor(percent / (100 / RING_BLOCKS));
+      [...svg.children].forEach((block, i) => block.classList.toggle("is-on", i < lit));
+      document.getElementById("ring").classList.toggle("is-closed", closed);
+    }
+
     function showHabits(h) {
       if (!h) return;  // logged out
       document.getElementById("habitRow").hidden = false;
+      document.getElementById("habitButtons").hidden = false;
       const r = h.ring;
-      document.getElementById("ringFill").setAttribute("stroke-dashoffset", String(100 - r.percent));
-      document.getElementById("ring").classList.toggle("is-closed", r.closed);
-      setText("ringValue", r.closed ? "✓" : `${r.percent}%`);
-      setText("ringUnit", `${r.value.toLocaleString()} / ${r.target.toLocaleString()}`);
-      setText("ringLabel", `Today's ring: ${r.target.toLocaleString()} ${r.unit}. ${r.text}`);
+      drawRing(r.percent, r.closed);
+      setText("ringValue", r.closed ? "Done" : `${r.percent}%`);
+      setText("ringLabel", `${r.value.toLocaleString()} / ${r.target.toLocaleString()} ${r.unit} today`);
       const f = h.freezes;
-      let freezeLine = f.owned ? `❄ ${f.owned} of ${f.max} streak freezes ready: a missed day won't break your streak.`
-        : "❄ No streak freezes. One covers a missed day so your streak lives on.";
-      if (h.used_freeze_now.length) freezeLine = `❄ A freeze saved your streak (${h.used_freeze_now.join(", ")})! ` + freezeLine;
-      setText("freezeText", freezeLine);
+      setText("freezeCount", `${f.owned}/${f.max}`);
+      setText("freezeText", h.used_freeze_now.length ? `A freeze saved ${h.used_freeze_now.join(", ")}`
+                                                     : "Streak freezes");
       const buy = document.getElementById("buyFreeze");
-      buy.textContent = `❄ Buy a freeze (${f.price} coins)`;
+      const coin = document.createElement("span");
+      coin.className = "sprite sprite--icon-coin";
+      buy.replaceChildren("Buy a freeze ", coin, ` ${f.price}`);
+      buy.title = "One freeze covers a missed day, so your streak lives on";
       buy.disabled = f.owned >= f.max;
       const share = document.getElementById("shareStreak");
       share.disabled = h.shared_today || h.current === 0;
-      share.textContent = h.shared_today ? "✓ Shared today" : "Share my streak";
-      // the streak line on the card counts rings and freezes too
-      setText("streak", h.current ? `🔥 ${h.current}-day streak` : "No streak yet");
+      share.textContent = h.shared_today ? "Shared today" : "Share my streak";
+      showStreak(h.current);  // the streak counts rings and freezes too
     }
 
     async function habitPost(url, okText) {
@@ -691,7 +752,7 @@
     document.getElementById("buyFreeze").addEventListener("click", () =>
       habitPost("/api/habits/freeze", d => `Freeze bought. You have ${d.balance} coins left.`));
     document.getElementById("shareStreak").addEventListener("click", () =>
-      habitPost("/api/habits/share", () => "Shared to the Community!"));
+      habitPost("/api/habits/share", () => "Shared to the Community"));
 
     async function claimChallenge(id, button) {
       button.disabled = true;
@@ -699,7 +760,7 @@
         const res = await fetch(`/api/challenges/${encodeURIComponent(id)}/claim`, { method: "POST" });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Could not claim it");
-        setText("weekMsg", `+${data.coins_earned} coins! You have ${data.balance} now.`);
+        setText("weekMsg", `+${data.coins_earned} coins. You have ${data.balance} now`);
         setText("statCoins", data.balance);
         showWeek(data);
       } catch (err) {
