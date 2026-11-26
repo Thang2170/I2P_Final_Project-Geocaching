@@ -88,6 +88,36 @@ def _secret_key(app, database_uri):
     return key
 
 
+def _add_error_pages(app):
+    """B: a StepQuest page instead of Flask's plain one. Addresses under /api/ get JSON,
+    because programs (the pages' own scripts) read those, not people."""
+    from flask import jsonify, render_template, request
+
+    def wants_json():
+        return request.path.startswith("/api/")
+
+    @app.errorhandler(404)
+    def not_found(_error):
+        if wants_json():
+            return jsonify(error="Not found"), 404
+        return render_template("error.html", code=404, title="Nothing here",
+                               text="This page doesn't exist. Maybe the link is old, or a letter is off."), 404
+
+    @app.errorhandler(405)
+    def wrong_method(_error):
+        if wants_json():
+            return jsonify(error="That method is not allowed here"), 405
+        return render_template("error.html", code=405, title="Not like that",
+                               text="This page can't be opened that way."), 405
+
+    @app.errorhandler(500)
+    def broken(_error):
+        if wants_json():
+            return jsonify(error="Something went wrong on the server. Try again in a moment."), 500
+        return render_template("error.html", code=500, title="Something went wrong",
+                               text="That's on us, not you. Try again in a moment."), 500
+
+
 def create_app(database_uri="sqlite:///geohunt.db"):
     """Build the Flask app.
 
@@ -205,6 +235,7 @@ def create_app(database_uri="sqlite:///geohunt.db"):
         meters = haversine_m(lat, lon, treasure.lat, treasure.lon)
         return jsonify(treasure=treasure.name, meters=round(meters, 1), found=meters <= FOUND_RADIUS_M)
 
+    _add_error_pages(app)  # B: StepQuest pages for "not found" and "something went wrong"
     return app
 
 

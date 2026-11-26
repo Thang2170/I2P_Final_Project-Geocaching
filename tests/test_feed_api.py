@@ -135,10 +135,10 @@ class TestFeedApi(unittest.TestCase):
         ann, bob = self.player("ann"), self.player("bob")
         pid = self.post(ann).get_json()["id"]
         r = bob.post(f"/api/posts/{pid}/like")
-        self.assertEqual(r.get_json(), {"likes": 1, "liked_by_me": True, "like_summary": "You"})
+        self.assertEqual(r.get_json(), {"likes": 1, "liked_by_me": True, "like_summary": "Liked by you"})
         seen_by_ann = self.feed(ann)["posts"][0]
         self.assertEqual((seen_by_ann["likes"], seen_by_ann["liked_by_me"], seen_by_ann["like_summary"]),
-                         (1, False, "bob"))
+                         (1, False, "Liked by bob"))
         r = bob.post(f"/api/posts/{pid}/like")  # again: takes it back
         self.assertEqual(r.get_json(), {"likes": 0, "liked_by_me": False, "like_summary": ""})
         self.assertEqual(db.session.query(PostLike).count(), 0)
@@ -147,7 +147,7 @@ class TestFeedApi(unittest.TestCase):
         ann, bob, cyd = self.player("ann"), self.player("bob"), self.player("cyd")
         pid = self.post(ann).get_json()["id"]
         bob.post(f"/api/posts/{pid}/like")
-        self.assertEqual(cyd.post(f"/api/posts/{pid}/like").get_json()["like_summary"], "You and bob")
+        self.assertEqual(cyd.post(f"/api/posts/{pid}/like").get_json()["like_summary"], "Liked by you and bob")
 
     def test_liking_an_unknown_post_is_404(self):
         self.assertEqual(self.player("ann").post("/api/posts/999/like").status_code, 404)

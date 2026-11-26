@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>{{ title }} · StepQuest</title>
+  <style>
+    /* B: "not found" and "something went wrong" (app._add_error_pages) */
+    .error-page { max-width: 520px; margin: 10vh auto; text-align: center; }
+    .error-page__code { margin: 0 0 12px; color: var(--px-muted); font-family: var(--font-pixel); font-size: 12px; }
+    .error-page .sprite { display: inline-block; margin: 8px auto 16px; }
+    .error-page .btn { width: auto; display: inline-block; }
+  </style>
+</head>
+<body>
+  {% include "_topbar.html" %}
+  <main class="card error-page">
+    <p class="error-page__code">Error {{ code }}</p>
+    <span class="sprite sprite--chest" aria-hidden="true"></span>
+    <h1>{{ title }}</h1>
+    <p>{{ text }}</p>
+    <a class="btn" href="/">Back to the map</a>
+  </main>
+</body>
+</html>

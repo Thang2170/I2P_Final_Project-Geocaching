@@ -52,7 +52,8 @@ def build_replay(started_at, finished_at, paths, winner, treasure):
     path ends on the treasure at the finish, because that is where the race ended.
     Players are listed winner first, then by name, and each keeps that place (and colour).
     """
-    duration_s = max(1, round((finished_at - started_at).total_seconds()))
+    # Rounded up, so a point saved in the race's last fraction of a second is never cut off.
+    duration_s = max(1, math.ceil((finished_at - started_at).total_seconds()))
     if winner is not None and winner not in paths:  # no saved path (map closed): still at the finish
         paths = {**paths, winner: []}
     players = []

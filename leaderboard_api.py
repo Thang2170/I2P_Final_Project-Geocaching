@@ -48,4 +48,5 @@ def leaderboard_page():
 @leaderboard_api.route("/api/leaderboard")
 def leaderboard():
     """The top players, best first: rank, username, coins, found, hidden."""
-    return jsonify(rank_players(player_rows()))
+    from leaderboard import on_the_board  # B: no rows of zeros
+    return jsonify(rank_players(on_the_board(player_rows())))

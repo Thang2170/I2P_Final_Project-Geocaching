@@ -210,7 +210,7 @@ h1, h2 {
 .main > :nth-child(5) { animation-delay: .32s; }
 .main > :nth-child(6) { animation-delay: .4s; }
 
-.topbar {
+.home-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -221,7 +221,7 @@ h1, h2 {
 .breadcrumb b { margin: 0 8px; font-weight: 400; }
 .breadcrumb span { color: var(--px-muted); }
 
-.topbar__right {
+.home-head__right {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -901,7 +901,7 @@ h1, h2 {
   .side-nav__link .px-icon { display: none; }
   .side-nav__link { padding-right: 4px; font-size: 20px; }
 
-  .topbar { flex-wrap: wrap; }
+  .home-head { flex-wrap: wrap; }
   .streak strong,
   .profile__name { display: none; }
 
@@ -1064,7 +1064,7 @@ h1, h2 {
 .quest-log__buttons[hidden] { display: none; }
 .quest-log__msg { margin: 8px 0 0; color: var(--px-gold-light); font-size: 18px; }
 .quest-log__msg:empty { display: none; }
-.quest-log__sub { margin: 24px 0 8px; color: var(--q-text); font-size: 12px; }
+.quest-log__sub { margin: 24px 0 8px; color: var(--q-text); font-family: var(--font-pixel); font-size: 10px; }
 
 /* Small game buttons for the dark screen */
 .qbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0;
@@ -1147,3 +1147,30 @@ h2 > .sprite, .btn > .sprite { margin-right: 6px; vertical-align: -2px; }
   .goal-pick { transition: none; }
   .goal-pick:hover, .goal-pick:focus-visible { transform: none; }
 }
+
+/* ---------- B: the shared top bar on the home page ----------
+   _topbar.html sits above the dashboard, so the sidebar starts below it.
+   On tablets and phones the sidebar is hidden: the top bar's Menu has every page. */
+.home-page .sidebar { top: 60px; height: calc(100vh - 60px); }
+@media (max-width: 900px) {
+  .home-page .sidebar { display: none; }
+  .home-page .home-head { display: none; }  /* the top bar already says where you are */
+}
+
+/* ---------- B: a shorter home page on phones ----------
+   "What you can do" becomes a compact 2-column grid of shortcuts (each card links to its page),
+   and the top treasure's picture is shorter. */
+@media (max-width: 620px) {
+  .home-page .feature-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; margin-top: 16px; }
+  .home-page .feature-list__item { align-items: center; gap: 10px; padding: 10px 0; }
+  .home-page .feature-list__icon { width: 40px; height: 40px; }
+  .home-page .feature-list h3 { font-size: 20px; line-height: 1.1; }
+  .home-page .feature-list p { display: none; }
+  .home-page .quest-art { min-height: 150px; }
+  .home-page .mini-art { display: none; }
+  .home-page .mini-card { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* B: comfortable tap sizes (44 px) for the last small links on the home page */
+.daily-card > a, .footer a { display: inline-flex; align-items: center; min-height: 44px; }
+.mini-card__bottom a { min-width: 44px; min-height: 44px; }

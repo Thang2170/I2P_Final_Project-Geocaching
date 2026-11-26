@@ -89,3 +89,19 @@ def newest_unrated(treasure_ids, rated_ids, limit=LIST_SIZE):
     after the top rated ones, so a fresh treasure still gets seen."""
     rated = set(rated_ids)
     return sorted((t for t in treasure_ids if t not in rated), reverse=True)[:limit]
+
+
+# B: the welcome page shows fewer, and never the same treasure twice
+HOME_TOP = 4        # the big card plus 3 small ones: top rated, then new ones nobody rated
+HOME_TRENDING = 3   # trending treasures that are not already in the top part
+
+
+def home_lists(top_rated_ids, new_ids, trending_ids):
+    """(top part, trending part) for the welcome page, as lists of treasure ids, no repeats."""
+    top = []
+    for tid in [*top_rated_ids, *new_ids]:
+        if tid not in top:
+            top.append(tid)
+    top = top[:HOME_TOP]
+    hot = [tid for tid in trending_ids if tid not in top][:HOME_TRENDING]
+    return top, hot

@@ -10,6 +10,11 @@ MAX_DESCRIPTION_LENGTH = 300
 # Two treasures closer than this would be found at the same time, so we don't allow it.
 MIN_TREASURE_GAP_M = 10
 
+# B: where treasures may be hidden (outside_play_area)
+PLAY_CENTRE = (24.7955, 120.9965)   # NTHU, the same centre as the territory map
+PLAY_RADIUS_KM = 15                 # all of Hsinchu
+PLAY_AREA_NAME = "NTHU"
+
 
 def parse_number(value, field, low, high):
     """Turn value into a float between low and high, or raise ValueError."""
@@ -47,12 +52,25 @@ def parse_treasure(data):
     if len(description) > MAX_DESCRIPTION_LENGTH:
         raise ValueError(f"description must be at most {MAX_DESCRIPTION_LENGTH} characters")
 
-    return {
-        "name": name,
-        "description": description,
-        "lat": parse_number(data.get("lat"), "lat", -90, 90),
-        "lon": parse_number(data.get("lon"), "lon", -180, 180),
-    }
+    lat = parse_number(data.get("lat"), "lat", -90, 90)
+    lon = parse_number(data.get("lon"), "lon", -180, 180)
+    problem = outside_play_area(lat, lon)
+    if problem:
+        raise ValueError(problem)
+    return {"name": name, "description": description, "lat": lat, "lon": lon}
+
+
+def outside_play_area(lat, lon):
+    """B: a message if this spot is outside the game's area (e.g. 0, 0 in the ocean), else None.
+
+    StepQuest is a campus game: treasures go within PLAY_RADIUS_KM of PLAY_CENTRE (NTHU).
+    To run it somewhere else, change these two numbers.
+    """
+    distance_m = haversine_m(lat, lon, *PLAY_CENTRE)
+    if distance_m <= PLAY_RADIUS_KM * 1000:
+        return None
+    return (f"Treasures must be hidden within {PLAY_RADIUS_KM} km of {PLAY_AREA_NAME}. "
+            f"This spot is {distance_m / 1000:,.0f} km away.")
 
 
 def find_too_close(lat, lon, existing, min_distance_m=MIN_TREASURE_GAP_M):

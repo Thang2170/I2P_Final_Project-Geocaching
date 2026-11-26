@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from conditions import NIGHT, RAIN
 from demo_content import BUILT_IN_TREASURE_NAME, DEMO_PASSWORD, TREASURE_CREATOR
 from location import haversine_m
-from models import HeatVisit, Hunt, HuntMember, RacePoint, Treasure, TreasureCondition, User, db
+from models import CoinTransaction, HeatVisit, Hunt, HuntMember, RacePoint, Treasure, TreasureCondition, User, db
 from streaks import local_day
 from territory import hex_of
 
@@ -121,6 +121,8 @@ def _seed_race(now):
     winner = _user(DEMO_RACE["winner"])
     db.session.add(HuntGame(hunt_id=hunt.id, treasure_id=treasure.id, started_at=started,
                             winner_id=winner.id, finished_at=finished))
+    from hunt_game import WIN_BONUS, WIN_REASON  # the winner got the race bonus, like a real win
+    db.session.add(CoinTransaction(user_id=winner.id, amount=WIN_BONUS, reason=WIN_REASON, created_at=finished))
     steps = DEMO_RACE["duration_s"] // RACE_POINT_EVERY_S
     for user, (lat, lon), reach in players:
         for i in range(steps):  # the winner's last point (on the treasure) is added by the replay

@@ -40,19 +40,23 @@ BUILT_IN_TREASURE_NAME = "National Tsing Hua University"
 
 # Finished hunts, so the Community page is not empty. Nobody hunts their own treasure:
 # alice hid the three extra ones, so ben reaches those, and alice reaches the built-in one.
+# B: hours_ago: when it happened, so the feed doesn't say "Just now" everywhere. Each walk also
+# records its find (+10 coins), like a real one. Every find is under 24 hours old on purpose:
+# a treasure nobody found for a day pays more, and the pitch (and the tests) expect +10.
 DEMO_JOURNEYS = (
-    {"username": "ben", "treasure": "Pond bench", "distance_m": 180, "duration_s": 250},
-    {"username": "ben", "treasure": "Library steps", "distance_m": 260, "duration_s": 340},
-    {"username": "alice", "treasure": BUILT_IN_TREASURE_NAME, "distance_m": 420, "duration_s": 560},
+    {"username": "ben", "treasure": "Pond bench", "distance_m": 180, "duration_s": 250, "hours_ago": 20},
+    {"username": "ben", "treasure": "Library steps", "distance_m": 260, "duration_s": 340, "hours_ago": 22},
+    {"username": "alice", "treasure": BUILT_IN_TREASURE_NAME, "distance_m": 420, "duration_s": 560, "hours_ago": 3},
 )
+DEMO_FIND_COINS = 10
 
 # Posts on the Community feed. likes: who liked it; comments: (who, what), oldest first.
 DEMO_POSTS = (
-    {"username": "alice",
+    {"username": "alice", "hours_ago": 52,
      "text": "Just hid three new treasures around campus: by the pond, on the library steps and at the cafe corner. Good luck!",
      "likes": ("ben", "demo_player"),
      "comments": (("ben", "Found two of them already!"), ("alice", "Nice! The cafe one is the tricky one."))},
-    {"username": "ben",
+    {"username": "ben", "hours_ago": 2,
      "text": "Anyone up for an evening walk? The Full house hunt has a waiting line, but join anyway.",
      "likes": ("alice",),
      "comments": ()},
@@ -98,7 +102,7 @@ DEMO_FRIEND_REQUESTS = (("ben", "demo_player"),)
 
 # ben shares alice's "Just hid three new treasures" post (found by its first words).
 DEMO_SHARES = (
-    {"username": "ben", "post_by": "alice", "post_starts": "Just hid three new treasures",
+    {"username": "ben", "post_by": "alice", "post_starts": "Just hid three new treasures", "hours_ago": 26,
      "text": "Go find these, they're fun!"},
 )
 

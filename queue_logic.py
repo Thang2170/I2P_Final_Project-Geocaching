@@ -32,3 +32,15 @@ def queue_status(user_id, member_ids, capacity):
     if index < capacity:
         return {"state": PLAYING, "position": index + 1}
     return {"state": WAITING, "position": index - capacity + 1}
+
+
+def status_text(status, finished=False):
+    """B: the "you" line on a hunt card. status: queue_status()'s dict (not None).
+
+    finished: the hunt's race is over, so nobody is "playing" or "waiting" any more.
+    """
+    if finished:
+        return "You raced in this hunt" if status["state"] == PLAYING else "You were in line for this race"
+    if status["state"] == PLAYING:
+        return f"You are playing (#{status['position']})"
+    return f"You are waiting: #{status['position']} in line"

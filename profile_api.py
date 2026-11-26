@@ -45,7 +45,8 @@ def profile(username):
 
     rows = player_rows()  # the same numbers as /leaderboard
     mine = next(r for r in rows if r["username"] == player.username)
-    rank, players = rank_of(player.username, rows)
+    from leaderboard import on_the_board  # B: the same players as the Leaderboard page
+    rank, players = rank_of(player.username, on_the_board(rows))
 
     journeys = db.session.execute(
         db.select(Journey).where(Journey.user_id == uid).order_by(Journey.id.desc())).scalars().all()
@@ -57,6 +58,7 @@ def profile(username):
         .order_by(Post.id.desc()).limit(RECENT_POSTS)).scalars().all()
     in_hunts = db.session.execute(
         db.select(db.func.count()).select_from(HuntMember).where(HuntMember.user_id == uid)).scalar_one()
+    races = _finished_races(uid, player.username, me.id)
 
     return jsonify(
         username=player.username,
@@ -76,7 +78,31 @@ def profile(username):
         recent_hunts=[{"treasure": j.treasure.name, "distance_km": round(j.distance_m / 1000, 2),
                        "time": format_duration(j.duration_s), "ago": time_ago(j.created_at)}
                       for j in journeys[:RECENT_HUNTS]],
+        races=races,  # B: group hunt races this player was in, newest first
         hidden_treasures=hidden,
         # A share with no words of its own still shows up (B: shares, see shares.py).
         recent_posts=[{"id": p.id, "text": p.text or "Shared a post", "ago": time_ago(p.created_at)} for p in posts],
     )
+
+
+def _finished_races(uid, username, viewer_id):
+    """B: the finished hunt races this player was in, newest first (replay links for those who raced)."""
+    from hunt_game_api import HuntGame  # here, not at the top: hunt_game_api imports much of the app
+    from player_profile import race_result
+    from models import Hunt
+    rows = db.session.execute(
+        db.select(Hunt, HuntGame, User.username)
+        .join(HuntGame, HuntGame.hunt_id == Hunt.id)
+        .join(HuntMember, HuntMember.hunt_id == Hunt.id)
+        .outerjoin(User, User.id == HuntGame.winner_id)
+        .where(HuntMember.user_id == uid, HuntGame.winner_id.is_not(None))
+        .order_by(HuntGame.finished_at.desc(), Hunt.id.desc())
+        .limit(RECENT_HUNTS)).all()
+    races = []
+    for hunt, game, winner in rows:
+        viewer_raced = db.session.execute(db.select(HuntMember.id).where(
+            HuntMember.hunt_id == hunt.id, HuntMember.user_id == viewer_id)).first() is not None
+        races.append({"name": hunt.name, "result": race_result(winner, username, uid == viewer_id),
+                      "ago": time_ago(game.finished_at or game.started_at),
+                      "replay": f"/hunts/{hunt.id}/replay" if viewer_raced else None})
+    return races

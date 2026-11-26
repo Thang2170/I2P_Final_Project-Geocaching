@@ -5,7 +5,7 @@ Rules live in queue_logic.py. Like route_api.py, this lives in its own Blueprint
 
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request
 from sqlalchemy.exc import IntegrityError
 
 from admin_api import online_user_ids  # A: "online now" reuses the live positions of the admin map
@@ -17,7 +17,7 @@ from hunt_input import parse_hunt
 from models import Hunt, HuntMember, db
 from notify_api import notify
 from notify_rules import MOVED_UP, moved_up
-from queue_logic import count_players, queue_status
+from queue_logic import count_players, queue_status, status_text
 
 hunt_api = Blueprint("hunt_api", __name__)
 
@@ -31,6 +31,7 @@ def _member_ids(hunt_id):
 def _hunt_dict(hunt, user):
     member_ids = _member_ids(hunt.id)
     playing, waiting = count_players(len(member_ids), hunt.capacity)
+    game = game_dict(hunt, user)
     return {
         "id": hunt.id,
         "name": hunt.name,
@@ -41,12 +42,20 @@ def _hunt_dict(hunt, user):
         # A: members who had the map open in the last 2 minutes. Joining is still kept until
         # "Leave" (so nobody loses their place by logging out); this only says who is around now.
         "online": len(online_user_ids(member_ids, datetime.now(timezone.utc))),
-        "me": queue_status(user.id, member_ids, hunt.capacity) if user else None,
+        "me": _me(user, member_ids, hunt, game),
         # B: unread group-chat messages, only for players who can open the chat (playing, not in line)
         "unread": _unread(user, hunt, member_ids),
         # A: the race: its treasure, open/started/finished, the winner, and whether you may press Start
-        "game": game_dict(hunt, user),
+        "game": game,
     }
+
+
+def _me(user, member_ids, hunt, game):
+    """B: where you are in this hunt, with the line Python writes for it (queue_logic.status_text)."""
+    status = queue_status(user.id, member_ids, hunt.capacity) if user else None
+    if status is None:
+        return None
+    return {**status, "text": status_text(status, finished=bool(game) and game.get("state") == "finished")}
 
 
 def _unread(user, hunt, member_ids):
@@ -59,6 +68,8 @@ def _unread(user, hunt, member_ids):
 
 @hunt_api.route("/hunts")
 def hunts_page():
+    if current_user() is None:  # B: like every other page: log in first, then come back here
+        return redirect("/login?next=/hunts")
     return render_template("hunts.html")
 
 

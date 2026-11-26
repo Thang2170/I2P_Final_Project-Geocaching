@@ -40,7 +40,11 @@ class TestHuntApi(unittest.TestCase):
         return client.post("/api/hunts", json=body)
 
     def test_hunts_page_loads(self):
-        r = self.app.test_client().get("/hunts")
+        # B: like every other page, /hunts asks you to log in first
+        self.assertEqual(self.app.test_client().get("/hunts").headers["Location"], "/login?next=/hunts")
+        c = self.app.test_client()
+        c.post("/api/register", json={"username": "pagecheck", "password": "secret1"})
+        r = c.get("/hunts")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"Hunts", r.data)
 
@@ -54,7 +58,7 @@ class TestHuntApi(unittest.TestCase):
         self.assertEqual(r.status_code, 201)
         data = r.get_json()
         self.assertEqual((data["name"], data["capacity"], data["playing"], data["waiting"]), ("Night walk", 2, 1, 0))
-        self.assertEqual(data["me"], {"state": "playing", "position": 1})
+        self.assertEqual({k: data["me"][k] for k in ("state", "position")}, {"state": "playing", "position": 1})
 
     def test_creating_needs_a_login(self):
         r = self.create(self.app.test_client())
@@ -75,7 +79,7 @@ class TestHuntApi(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         data = r.get_json()
         self.assertEqual((data["playing"], data["waiting"]), (2, 0))
-        self.assertEqual(data["me"], {"state": "playing", "position": 2})
+        self.assertEqual({k: data["me"][k] for k in ("state", "position")}, {"state": "playing", "position": 2})
 
     def test_a_full_hunt_puts_new_players_in_line(self):
         hunt_id = self.create(self.player("bao"), capacity=2).get_json()["id"]
@@ -83,7 +87,7 @@ class TestHuntApi(unittest.TestCase):
         third = self.player("minh")
         data = third.post(f"/api/hunts/{hunt_id}/join").get_json()
         self.assertEqual((data["playing"], data["waiting"]), (2, 1))
-        self.assertEqual(data["me"], {"state": "waiting", "position": 1})
+        self.assertEqual({k: data["me"][k] for k in ("state", "position")}, {"state": "waiting", "position": 1})
 
     def test_leaving_moves_the_next_player_up(self):
         bao = self.player("bao")
@@ -95,7 +99,7 @@ class TestHuntApi(unittest.TestCase):
         r = bao.post(f"/api/hunts/{hunt_id}/leave")
         self.assertEqual(r.status_code, 200)
         self.assertIsNone(r.get_json()["me"])
-        self.assertEqual(lan.get("/api/hunts").get_json()[0]["me"], {"state": "playing", "position": 1})
+        self.assertEqual({k: lan.get("/api/hunts").get_json()[0]["me"][k] for k in ("state", "position")}, {"state": "playing", "position": 1})
 
     def test_rejoining_goes_to_the_back_of_the_line(self):
         bao = self.player("bao")
@@ -104,7 +108,7 @@ class TestHuntApi(unittest.TestCase):
         lan.post(f"/api/hunts/{hunt_id}/join")
         bao.post(f"/api/hunts/{hunt_id}/leave")
         data = bao.post(f"/api/hunts/{hunt_id}/join").get_json()
-        self.assertEqual(data["me"], {"state": "waiting", "position": 1})
+        self.assertEqual({k: data["me"][k] for k in ("state", "position")}, {"state": "waiting", "position": 1})
 
     def test_joining_twice_is_refused(self):
         bao = self.player("bao")

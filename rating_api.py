@@ -70,6 +70,11 @@ def rankings():
     """The welcome page's rows: Top rated, Trending this week, and New (not rated yet).
     Anyone can see these."""
     treasures = {t.id: t for t in db.session.execute(db.select(Treasure)).scalars().all()}
+    # B: rain and night treasures that are not out right now stay hidden here too (conditions.py)
+    from condition_api import hidden_ids  # here, not at the top (weather_api imports routing)
+    user = current_user()
+    hidden = hidden_ids(treasures.values(), user.id if user else None)
+    treasures = {tid: t for tid, t in treasures.items() if tid not in hidden}
     ratings = rating_summaries()
 
     best = top_rated([{"id": tid, "stars_sum": r["stars_sum"], "count": r["count"]}
@@ -101,5 +106,8 @@ def rankings():
                 "value": values[tid]}  # what a find pays right now (treasure_value.py)
 
     fresh = newest_unrated(treasures, ratings)
+    from ratings import home_lists  # B: what the welcome page shows, without repeats
+    home_top, home_hot = home_lists(best, fresh, hot)
     return jsonify(top_rated=[item(t) for t in best], trending=[item(t) for t in hot],
-                   new=[item(t) for t in fresh])
+                   new=[item(t) for t in fresh],
+                   home={"top": [item(t) for t in home_top], "trending": [item(t) for t in home_hot]})

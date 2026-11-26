@@ -48,7 +48,8 @@ class TestFeedPage(unittest.TestCase):
 
     def test_the_welcome_sidebar_links_to_the_community(self):
         html = self.client.get("/welcome").get_data(as_text=True)
-        self.assertIn('class="side-nav__link" href="/community"', html)
+        # B: the welcome page now has the shared top bar, with Community in it
+        self.assertIn('<a href="/community" class="">Community</a>', html)
         css = self.client.get("/static/css/pixel.css").get_data(as_text=True)
         self.assertIn(".px-icon--comment", css)
 

@@ -17,3 +17,11 @@ def rank_players(players, limit=TOP_PLAYERS):
     for position, player in enumerate(ordered[:limit], start=1):
         ranked.append({**player, "rank": position})
     return ranked
+
+
+def on_the_board(players):
+    """B: only players who have done something: any coins, finds or hidden treasures.
+
+    A brand-new account with nothing yet is left off, so the board never fills up with zeros.
+    """
+    return [p for p in players if p["coins"] or p["found"] or p["hidden"]]

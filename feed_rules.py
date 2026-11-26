@@ -95,20 +95,21 @@ def time_ago(then, now=None):
 
 
 def like_summary(names, liked_by_me):
-    """A short line under a post, e.g. 'You and 2 others', 'ben', 'alice and ben'.
+    """A short line under a post, e.g. 'Liked by you and 2 others', 'Liked by ben'.
 
     names: usernames of the other players who liked it (not you), newest first.
+    B: it starts with "Liked by", so a lone name under a post never looks like a stray word.
     """
     if liked_by_me:
         if not names:
-            return "You"
+            return "Liked by you"
         if len(names) == 1:
-            return f"You and {names[0]}"
-        return f"You and {len(names)} others"
+            return f"Liked by you and {names[0]}"
+        return f"Liked by you and {len(names)} others"
     if not names:
         return ""
     if len(names) == 1:
-        return names[0]
+        return f"Liked by {names[0]}"
     if len(names) == 2:
-        return f"{names[0]} and {names[1]}"
-    return f"{names[0]} and {len(names) - 1} others"
+        return f"Liked by {names[0]} and {names[1]}"
+    return f"Liked by {names[0]} and {len(names) - 1} others"

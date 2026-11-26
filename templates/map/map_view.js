@@ -278,7 +278,9 @@
     }
     function drawRouteFacts() {
       const f = routeFacts;
-      const parts = [fact(f.km, "km"), fact(f.min, "min")];
+      // B: the big number above is the straight-line distance; this is the walk along paths.
+      // With only a straight line they are the same, so it isn't shown twice.
+      const parts = f.straight ? [fact(f.min, "min")] : [fact(f.km, "km walk"), fact(f.min, "min")];
       if (f.steps !== undefined) parts.push(fact(f.steps.toLocaleString(), "steps"), fact(f.kcal, "kcal"));
       const notes = [f.random && "new route", f.straight && "straight line", f.access && "step-free"].filter(Boolean);
       if (notes.length) {

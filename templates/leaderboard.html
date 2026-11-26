@@ -12,8 +12,10 @@
     .podium[hidden] { display: none; }
     .step { display: grid; justify-items: center; gap: 6px; text-align: center; animation: px-rise .4s steps(4) both; }
     .step__who { display: grid; justify-items: center; gap: 4px; min-width: 0; max-width: 100%; }
-    .step__who a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    /* B: long names wrap (a little smaller on phones) instead of being cut to "demo_p…" */
+    .step__who a { max-width: 100%; overflow-wrap: anywhere; line-height: 1;
                    color: var(--px-ink); font-size: 20px; }
+    @media (max-width: 420px) { .step__who a { font-size: 16px; } }
     .step__coins { color: var(--px-gold-dark); font-size: 18px; font-variant-numeric: tabular-nums; }
     .step__block { display: grid; place-items: start center; width: 100%; padding-top: 8px;
                    background: var(--px-wood); box-shadow: inset 0 4px 0 0 var(--px-wood-light), inset 0 -4px 0 0 var(--px-wood-dark);
@@ -27,6 +29,9 @@
     .step--3 { order: 3; }
     .step--1 .sprite--trophy { animation: px-bob 1s steps(2) infinite; }
     @media (prefers-reduced-motion: reduce) { .step, .step--1 .sprite--trophy { animation: none; } }
+    /* B: the podium shows the top 3, so the table (from #4) has no gold "top 3" ranks */
+    .table tbody tr:nth-child(-n+3) td:first-child { color: inherit; font-family: inherit; font-size: inherit; }
+    .step__found { color: var(--px-muted); font-size: 16px; }
   </style>
 </head>
 <body>
@@ -104,8 +109,11 @@
         art.setAttribute("aria-hidden", "true");
         const coins = document.createElement("span");
         coins.className = "step__coins";
-        coins.textContent = `${p.coins} coins · ${p.found} found`;
-        who.append(art, playerLink(p), coins);
+        coins.textContent = `${p.coins} coins`;
+        const found = document.createElement("span");  // B: its own line, so narrow steps don't break it up
+        found.className = "step__found";
+        found.textContent = `${p.found} found`;
+        who.append(art, playerLink(p), coins, found);
         const block = document.createElement("div");
         block.className = "step__block";
         block.textContent = p.rank;
