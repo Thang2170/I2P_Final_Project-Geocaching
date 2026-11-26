@@ -90,7 +90,8 @@
           ratingsById.set(t.id, { rating: t.rating, mine: t.my_rating });
           // B: Python marks the ones you were already paid for (found_by_me); they show a tick.
           if (t.found_by_me) foundIds.add(t.id);
-          infoById.set(t.id, { verified: t.verified, collectible: t.collectible, collected: t.collected_by_me });
+          infoById.set(t.id, { verified: t.verified, collectible: t.collectible, collected: t.collected_by_me,
+                               appears: t.appears, notFound: t.not_found });  // B
           valueById.set(t.id, t.value);  // B: what a find pays now
           if (t.id !== treasure.id) addTreasurePin(t, t.found_by_me ? "found" : "treasure");
           else addPinMarks(huntMarker, t);  // the first pin was drawn before the list arrived
@@ -98,6 +99,7 @@
           if (t.value && t.value.label === "bounty" && !t.found_by_me) {
             markersById.get(t.id)?.getElement()?.classList.add("pin--bounty");
           }
+          markMissingPin(t.id);  // B: "maybe missing" pins are greyed (not_found.js)
         }
         if (foundIds.has(treasure.id)) showTick(huntMarker);  // you found them all: even this one is ticked
         // B: /?treasure=<id> (from the welcome page) opens that treasure's board.
@@ -154,6 +156,7 @@
       collectibleLine.textContent = info.collected
         ? "◆ You collected this treasure's trophy"
         : "◆ Has a collectible: find the QR code at the spot and scan it (Collection > Scan)";
+      showBoardReports(t.id);  // B: rain / night line, "maybe missing" line (not_found.js)
       boardKm.textContent = "–";
       boardMin.textContent = "–";
       boardSteps.textContent = "–";
@@ -275,6 +278,11 @@
       boardKm.textContent = `${km} km`;
       boardMin.textContent = `${min} min`;
       boardNote.textContent = data.warning ? "Straight-line estimate: no walking-route service right now." : "";
+      // B: step-free routes (Account page): Python writes the note (route_access.py)
+      if (data.access) {
+        boardNote.textContent = data.access.note;
+        routeInfo.textContent = `${routeSummary} · ♿`;
+      }
       showWalkStats(data.distance_m);
       showWeather(data.weather);
     }

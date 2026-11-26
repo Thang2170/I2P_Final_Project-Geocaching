@@ -730,3 +730,77 @@ class ReportShare(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     week_start = db.Column(db.Date, nullable=False)  # the Monday (Taiwan time)
+
+
+class TreasureReport(db.Model):
+    """B: "I couldn't find it": one player looked at a treasure and it wasn't there (dnf.py).
+
+    Only reports after the treasure's last find count, so a find clears them without deleting.
+    """
+
+    __tablename__ = "treasure_reports"
+    id = db.Column(db.Integer, primary_key=True)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class MissingAlert(db.Model):
+    """B: the owner was told their treasure may be missing (which notification, for the bell)."""
+
+    __tablename__ = "missing_alerts"
+    id = db.Column(db.Integer, primary_key=True)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False)
+    count = db.Column(db.Integer, nullable=False)  # how many players had reported it
+    notification_id = db.Column(db.Integer, db.ForeignKey("notifications.id"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class RacePoint(db.Model):
+    """B: where a player was during a hunt race, kept for the replay (replay.py).
+
+    Its own table because the walk-proof trail (WalkPoint) forgets points after 30 minutes.
+    """
+
+    __tablename__ = "race_points"
+    id = db.Column(db.Integer, primary_key=True)
+    hunt_id = db.Column(db.Integer, db.ForeignKey("hunts.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    lat = db.Column(db.Float, nullable=False)
+    lon = db.Column(db.Float, nullable=False)
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class TreasureCondition(db.Model):
+    """B: a treasure that only appears in the rain or after dark (conditions.py).
+
+    No row means it is an ordinary treasure that is always there.
+    """
+
+    __tablename__ = "treasure_conditions"
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), primary_key=True)
+    condition = db.Column(db.String(10), nullable=False)  # conditions.RAIN or conditions.NIGHT
+
+
+class RouteAccess(db.Model):
+    """B: a player who wants step-free (wheelchair) routes (route_access.py). No row: walking."""
+
+    __tablename__ = "route_access"
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    access = db.Column(db.String(12), nullable=False)
+
+
+class HeatVisit(db.Model):
+    """B: a player walked through this 40 m hexagon on this day, for the heat map (heatmap.py).
+
+    Kept for heatmap.KEEP_DAYS days, then deleted. The map only shows hexagons that
+    heatmap.MIN_PLAYERS different players walked through, never one player's own path.
+    """
+
+    __tablename__ = "heat_visits"
+    __table_args__ = (db.UniqueConstraint("user_id", "day", "q", "r", name="one_heat_visit_per_day"),)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    q = db.Column(db.Integer, nullable=False)
+    r = db.Column(db.Integer, nullable=False)
+    day = db.Column(db.Date, nullable=False, index=True)  # Taiwan date

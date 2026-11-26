@@ -108,6 +108,8 @@ def seed_demo_story():
             db.session.add(TourSeen(user_id=player.id, how=SKIPPED))
 
     db.session.commit()
+    from demo_extras import seed_demo_extras  # B: heat map walkers, a race replay, rain / night treasures
+    added["extras"] = seed_demo_extras()
     return added
 
 

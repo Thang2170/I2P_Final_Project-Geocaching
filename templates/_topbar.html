@@ -6,7 +6,7 @@
             ("/territory", "territory", "Territory"), ("/trails", "trails", "My trails")]),
   ("You", [("/health", "health", "Health"), ("/report", "report", "Weekly report"),
            ("/collection", "collection", "Collection"), ("/shop", "shop", "Shop"), ("/login", "account", "Account")]),
-  ("Players", [("/leaderboard", "leaderboard", "Leaderboard")]),
+  ("Players", [("/leaderboard", "leaderboard", "Leaderboard"), ("/heatmap", "heatmap", "Heat map")]),
 ] %}
 {% set main_links = [("/", "map", "Map"), ("/hunts", "hunts", "Hunts"), ("/community", "community", "Community")] %}
 {% set ns = namespace(here=None) %}
@@ -69,3 +69,4 @@
     });
   })();
 </script>
+{% if presenter %}{% include "_presenter.html" %}{% endif %}{# B: presenter mode (presenter.py) #}

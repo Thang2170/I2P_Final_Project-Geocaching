@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Presenter mode · StepQuest</title>
+  <style>
+    /* B: presenter mode's start page (presenter.py). The run sheet doubles as a printout. */
+    .sheet-list { list-style: none; margin: 16px 0; padding: 0; counter-reset: step; }
+    .sheet-list li { padding: 12px 0; border-top: 2px dashed var(--line); }
+    .sheet-list__head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+    .sheet-list__num { font-family: var(--font-pixel); font-size: 10px; }
+    .sheet-list__who { font-family: var(--font-pixel); font-size: 9px; padding: 3px 6px;
+                       box-shadow: 0 0 0 2px var(--px-ink); }
+    .sheet-list__title { margin: 0; font-size: 22px; }
+    .sheet-list__page { color: var(--px-muted); font-size: 16px; overflow-wrap: anywhere; }
+    .sheet-list ul { margin: 6px 0 0; padding-left: 20px; font-size: 18px; }
+    .present-keys { color: var(--px-muted); font-size: 17px; }
+    @media print { .topbar, .present-start, .present-keys { display: none; } }
+  </style>
+</head>
+<body>
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Presenter mode</h1>
+    {% if done %}
+      <p class="message ok">That was the last step. Well done!</p>
+    {% endif %}
+    <p>
+      A small panel follows you through the demo: who talks, a few talking points, and a Next button
+      that opens the next page. Log in as the demo player first
+      ({{ who }}).
+    </p>
+    <p class="present-keys">A clicker works: Page Down for next, Page Up for back. The panel can be hidden.</p>
+    <button type="button" class="btn present-start" id="presentStart">Start presenting</button>
+
+    <h2>Run sheet</h2>
+    <ol class="sheet-list">
+      {% for step in steps %}
+      <li>
+        <div class="sheet-list__head">
+          <span class="sheet-list__num">{{ step.number }}</span>
+          <span class="sheet-list__who">{{ step.who }}</span>
+          <h3 class="sheet-list__title">{{ step.title }}</h3>
+        </div>
+        <span class="sheet-list__page">{{ step.page }}</span>
+        <ul>{% for line in step.say %}<li>{{ line }}</li>{% endfor %}</ul>
+      </li>
+      {% endfor %}
+    </ol>
+  </main>
+
+  <script>
+    document.getElementById("presentStart").addEventListener("click", async () => {
+      const res = await fetch("/api/present", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" })
+      });
+      const data = await res.json();
+      if (res.ok) location.href = data.url;
+    });
+  </script>
+</body>
+</html>

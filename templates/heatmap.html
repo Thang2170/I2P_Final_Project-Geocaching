@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <title>Heat map · StepQuest</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    /* B: the campus heat map (heatmap.py). Python decides which hexagons show (5+ different
+       players), their shade and every sentence; this page draws them. One orange, light to dark. */
+    .map-card { max-width: 920px; }
+    .heat-days { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    .heat-days .btn { width: auto; margin: 0; padding: 8px 12px; }
+    .heat-days .btn[aria-pressed=true] { background: var(--px-ink); color: var(--px-paper); }
+    .heat-map { height: 58vh; min-height: 320px; margin: 12px 0; box-shadow: 0 0 0 3px var(--px-ink); }
+    .heat-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; padding: 0; margin: 0 0 14px;
+                   font-size: 17px; color: var(--px-muted); }
+    .heat-legend li { display: flex; align-items: center; gap: 6px; }
+    .heat-legend span { width: 18px; height: 18px; box-shadow: 0 0 0 2px var(--px-ink); }
+    .l1 { --h: #f5a56b; } .l2 { --h: #ec7f3c; } .l3 { --h: #d9622b; } .l4 { --h: #a8441a; } .l5 { --h: #6e2a0e; }
+    .heat-legend span, .heat-swatch { background: var(--h); }
+    .heat-table { width: 100%; border-collapse: collapse; font-size: 18px; }
+    .heat-table th, .heat-table td { text-align: left; padding: 6px 4px; border-top: 2px dashed var(--line); }
+    .heat-table td:last-child, .heat-table th:last-child { text-align: right; }
+    .heat-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; box-shadow: 0 0 0 2px var(--px-ink); }
+    .heat-tip { font-family: var(--font-body), monospace; font-size: 15px; }
+  </style>
+</head>
+<body>
+  {% set active = "heatmap" %}
+  {% include "_topbar.html" %}
+
+  <main class="card map-card">
+    <h1>Campus heat map</h1>
+    <p class="muted">Where StepQuest players walk most. A spot only shows once several different
+      players have walked through it, so nobody's own path can be seen.</p>
+    <div class="heat-days" id="days" role="group" aria-label="How far back"></div>
+    <p id="summary" role="status">Loading…</p>
+    <ul id="legend" class="heat-legend" aria-label="Legend"></ul>
+    <div id="heatMap" class="heat-map" aria-label="Heat map of campus"></div>
+
+    <h2>Busiest spots</h2>
+    <table class="heat-table">
+      <thead><tr><th>Spot</th><th>Players</th></tr></thead>
+      <tbody id="table"></tbody>
+    </table>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const SHADES = [null, "#f5a56b", "#ec7f3c", "#d9622b", "#a8441a", "#6e2a0e"];  // level 1..5
+    const map = L.map("heatMap");
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    // A light grey map, so light means "a few" and dark means "many" (the satellite map is too dark).
+    L.tileLayer(`${ESRI}/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 16, maxNativeZoom: 16, attribution: "Tiles &copy; Esri"
+    }).addTo(map);
+    L.tileLayer(`${ESRI}/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16, maxNativeZoom: 16 }).addTo(map);
+    const layer = L.layerGroup().addTo(map);
+    let firstLoad = true;
+
+    async function load(days) {
+      const res = await fetch(`/api/heatmap${days ? `?days=${days}` : ""}`);
+      const data = await res.json();
+      if (!res.ok) { document.getElementById("summary").textContent = data.error || "Could not load the heat map."; return; }
+
+      const daysBox = document.getElementById("days");
+      daysBox.replaceChildren();
+      for (const d of data.day_choices) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn btn--ghost";
+        b.textContent = `${d} days`;
+        b.setAttribute("aria-pressed", String(d === data.days));
+        b.addEventListener("click", () => load(d));
+        daysBox.append(b);
+      }
+      document.getElementById("summary").textContent = data.summary;
+
+      const legend = document.getElementById("legend");
+      legend.replaceChildren();
+      for (const row of data.legend) {
+        const li = document.createElement("li");
+        const swatch = document.createElement("span");
+        swatch.className = `l${row.level}`;
+        li.append(swatch, row.label);
+        legend.append(li);
+      }
+
+      layer.clearLayers();
+      const table = document.getElementById("table");
+      table.replaceChildren();
+      const bounds = [];
+      for (const cell of data.cells) {
+        const hex = L.polygon(cell.corners, {
+          color: "#ffffff", weight: 2, fillColor: SHADES[cell.level], fillOpacity: 0.85
+        }).addTo(layer);
+        hex.bindTooltip(cell.tip, { sticky: true, className: "heat-tip" });
+        hex.on("mouseover", () => hex.setStyle({ color: "#14231f", weight: 3 }));
+        hex.on("mouseout", () => hex.setStyle({ color: "#ffffff", weight: 2 }));
+        bounds.push(...cell.corners);
+      }
+      for (const cell of data.cells.slice(0, 8)) {  // the table view of the busiest spots
+        const tr = document.createElement("tr");
+        const where = document.createElement("td");
+        const swatch = document.createElement("span");
+        swatch.className = `heat-swatch l${cell.level}`;
+        where.append(swatch, cell.place);
+        const n = document.createElement("td");
+        n.textContent = String(cell.players);
+        tr.append(where, n);
+        table.append(tr);
+      }
+      if (!data.cells.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 2;
+        td.textContent = "No spot is busy enough yet.";
+        tr.append(td);
+        table.append(tr);
+      }
+      if (firstLoad) {
+        if (bounds.length) map.fitBounds(L.latLngBounds(bounds).pad(0.15));
+        else map.setView(data.centre, 16);
+        firstLoad = false;
+      }
+    }
+    load().catch(err => { document.getElementById("summary").textContent = "Could not load the heat map."; console.error(err); });
+  </script>
+</body>
+</html>

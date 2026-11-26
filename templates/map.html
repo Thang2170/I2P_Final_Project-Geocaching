@@ -159,6 +159,9 @@
       <p id="boardVerified" class="board__verified"></p>
       <!-- A: a QR collectible is hidden here (scan it for a 3D trophy) -->
       <p id="boardCollectible" class="board__verified" hidden></p>
+      <!-- B: a rain or night treasure, and "maybe missing" reports (conditions.py, dnf.py) -->
+      <p id="boardAppears" class="board__verified" hidden></p>
+      <p id="boardMissing" class="board__missing" hidden></p>
       <!-- The photo the hider took of the spot (loads only if the treasure has one) -->
       <img id="boardPhoto" class="board__photo" alt="Photo of the spot" hidden>
       <div class="board__stats">
@@ -173,6 +176,8 @@
         <a href="/login">Save your weight</a> for a better estimate.
       </p>
       <button type="button" id="startBtn" class="btn" disabled>Start journey</button>
+      <button type="button" id="dnfBtn" class="btn btn--ghost board__dnf">I looked, but couldn't find it</button>
+      <p id="dnfNote" class="board__note" role="status" hidden></p>
     </aside>
   </div>
 
@@ -194,6 +199,7 @@
     {% include "map/offline.js" %}
     {% include "map/coins_rating.js" %}
     {% include "map/position.js" %}
+    {% include "map/not_found.js" %}
   </script>
   {% include "_tour.html" %}
   {% include "_celebrate.html" %}

@@ -2134,3 +2134,37 @@ button.post__likes[hidden] { display: none; }
 /* While you plan a trail the card may grow, so all the choices fit without scrolling */
 .sheet:has(#trailBox:not([hidden])) { max-height: 60vh; }
 .trail-box__history { margin: 8px 0 0; font-size: 17px; }
+
+/* ------------------------------------------------------------ B: "I couldn't find it" (dnf.py) */
+.pin.pin--missing { filter: grayscale(1); opacity: .75; }
+.pin.pin--missing::after {
+  content: "?"; position: absolute; top: -6px; right: -6px; width: 16px; height: 16px;
+  font: 9px/16px var(--font-pixel); text-align: center; color: var(--px-paper);
+  background: var(--px-ink); box-shadow: 0 0 0 2px var(--px-paper);
+}
+.board__missing { margin: 6px 0 0; font-size: 17px; color: var(--px-muted); }
+.board__missing.is-missing { color: var(--px-bad); }
+.board__dnf { margin-top: 8px; font-size: 16px; }
+
+/* ------------------------------------------------------------ B: presenter mode (presenter.py) */
+.presenter {
+  position: fixed; right: 12px; bottom: 12px; z-index: 2000; width: min(340px, calc(100vw - 24px));
+  padding: 10px 12px; background: var(--px-paper); color: var(--px-ink);
+  box-shadow: 0 0 0 3px var(--px-ink), 6px 6px 0 0 rgba(20, 35, 31, .35);
+}
+.presenter__top { display: flex; align-items: center; gap: 8px; }
+.presenter__step { font: 10px var(--font-pixel); }
+.presenter__who { font: 9px var(--font-pixel); padding: 3px 6px; background: var(--px-gold); box-shadow: 0 0 0 2px var(--px-ink); }
+.presenter__fold { margin-left: auto; border: 0; background: none; font: inherit; font-size: 16px;
+                   color: var(--px-muted); cursor: pointer; text-decoration: underline; }
+.presenter__title { margin: 8px 0 4px; font-size: 21px; font-weight: 700; }
+.presenter__say { margin: 0 0 8px; padding-left: 18px; font-size: 16px; line-height: 1.3; }
+.presenter__say li + li { margin-top: 4px; }
+.presenter__buttons { display: flex; gap: 8px; }
+.presenter__buttons .btn { margin: 0; padding: 8px 10px; font-size: 15px; }
+.presenter__buttons .btn:first-child { flex: 0 0 auto; width: auto; }
+.presenter__stop { margin-top: 6px; border: 0; background: none; font: inherit; font-size: 15px;
+                   color: var(--px-muted); cursor: pointer; text-decoration: underline; padding: 0; }
+.presenter__elsewhere { margin: 6px 0; font-size: 16px; color: var(--px-bad); }
+.is-presenting { outline: 4px dashed var(--px-gold); outline-offset: 4px; }
+@media print { .presenter { display: none; } }

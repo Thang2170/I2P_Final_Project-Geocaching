@@ -111,6 +111,12 @@
           go.href = `/?hunt=${Number(hunt.id)}&treasure=${Number(game.treasure.id)}`;
           buttons.append(go);
         }
+        // B: a finished race can be watched again by the players who were in it (the server checks)
+        if (game.state === "finished" && hunt.me) {
+          const replay = el("a", "Watch replay", "btn btn--ghost");
+          replay.href = `/hunts/${Number(hunt.id)}/replay`;
+          buttons.append(replay);
+        }
         // Once a race has started nobody new can join it (leaving is still fine)
         if (hunt.me || game.state === "open" || !game.state) {
           const button = el("button", hunt.me ? "Leave" : "Join", hunt.me ? "btn btn--ghost" : "btn");

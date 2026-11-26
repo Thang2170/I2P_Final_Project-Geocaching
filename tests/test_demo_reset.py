@@ -7,6 +7,7 @@ from app import create_app
 from coin_api import get_balance
 from demo_content import DEMO_FULL_HUNT
 from demo_data import seed_demo_story
+from demo_extras import DEMO_WALKERS
 from demo_reset import reset_demo as do_reset
 from models import (CoinTransaction, Hunt, HuntMember, Journey, Post, PostLike, TrailWalk, TrailWalkDetail, Treasure,
                     User, ZoneBonus, db)
@@ -81,7 +82,8 @@ class ResetTest(unittest.TestCase):
         self.rehearse()
         self.assertNotEqual(self.snapshot(), self.fresh)
         result = do_reset(["stage_kid"])
-        self.assertEqual(sorted(result["removed"]), ["alice", "ben", "demo_player", "stage_kid"])
+        self.assertEqual(sorted(result["removed"]),
+                         sorted(["alice", "ben", "demo_player", "stage_kid", *DEMO_WALKERS]))  # B: + heat map walkers
         self.assertEqual(self.snapshot() | {"posts": None}, self.fresh | {"posts": None})
         self.assertEqual(count(Post), self.fresh["posts"] + 1)  # + zoe's own post
         self.assertIsNone(user("stage_kid"))

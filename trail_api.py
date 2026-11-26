@@ -57,6 +57,9 @@ def make_trail():
     found = set(found_treasure_ids(user.id))
     treasures = [t for t in db.session.execute(db.select(Treasure)).scalars()
                  if t.id not in found and t.created_by != user.id]
+    from condition_api import hidden_ids  # B: no rain / night treasure that isn't out now
+    hidden = hidden_ids(treasures, user.id)
+    treasures = [t for t in treasures if t.id not in hidden]
     skipped = 0
     if skip_low:  # B: leave out treasures other players didn't enjoy
         ratings = {}
@@ -75,7 +78,9 @@ def make_trail():
     stops = [by_id[i] for i in plan["ids"]]
     weather, choice = weather_for(lat, lon)  # B: shortest in the rain, greener in the heat
     back = [(lat, lon)] if loop else []  # B: a one-way trail ends at the last treasure
-    route = get_route([(lat, lon), *[(t.lat, t.lon) for t in stops], *back], extra=choice["route_options"])
+    from route_access_api import route_settings  # B: step-free routes (route_access.py)
+    _, profile, extra = route_settings(user, choice["route_options"])
+    route = get_route([(lat, lon), *[(t.lat, t.lon) for t in stops], *back], extra=extra, profile=profile)
     return jsonify(
         goal=label,
         stops=[{"order": n, "id": t.id, "name": t.name, "lat": t.lat, "lon": t.lon}

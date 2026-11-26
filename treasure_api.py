@@ -18,7 +18,8 @@ treasure_api = Blueprint("treasure_api", __name__)
 @treasure_api.route("/upload")
 def upload_page():
     """The form where a player hides a new treasure."""
-    return render_template("upload.html")
+    from conditions import CONDITIONS, LABELS  # B: "When can players see it?"
+    return render_template("upload.html", appear_choices=[(c, LABELS[c]) for c in CONDITIONS])
 
 
 @treasure_api.route("/api/treasures", methods=["POST"])
@@ -36,8 +37,10 @@ def create_treasure():
     if data is None:
         data = request.form.to_dict()
 
+    from conditions import parse_condition, saved_text  # B: rain and night treasures
     try:
         clean = parse_treasure(data)
+        condition = parse_condition(data.get("appears"))
     except ValueError as err:
         return jsonify(error=str(err)), 400
 
@@ -49,8 +52,11 @@ def create_treasure():
 
     treasure = Treasure(**clean, created_by=user.id)
     db.session.add(treasure)
+    db.session.flush()
+    from condition_api import save_condition  # here, not at the top (weather_api imports routing)
+    save_condition(treasure.id, condition)
     db.session.commit()
-    return jsonify(treasure.to_dict()), 201
+    return jsonify({**treasure.to_dict(), "appears": condition, "appears_note": saved_text(condition)}), 201
 
 
 @treasure_api.route("/api/treasures", methods=["GET"])
@@ -67,6 +73,15 @@ def list_treasures():
     from rating_api import my_ratings, rating_summaries  # (same reason)
 
     user = current_user()
+    # B: rain and night treasures stay off the map until it rains / gets dark (conditions.py)
+    from condition_api import appears_info, conditions_by_id, hidden_ids
+    conditions = conditions_by_id()
+    hidden = hidden_ids(treasures, user.id if user else None, conditions)
+    treasures = [t for t in treasures if t.id not in hidden]
+    appears = appears_info(treasures, user.id if user else None, conditions)
+    from dnf_api import report_counts  # B: "I couldn't find it" reports (dnf.py)
+    reports = report_counts()
+    no_reports = {"count": 0, "missing": False, "text": ""}
     found = set(found_treasure_ids(user.id)) if user else set()
     ratings = rating_summaries()
     mine = my_ratings(user.id) if user else {}
@@ -83,4 +98,6 @@ def list_treasures():
                      "collected_by_me": collectibles.get(t.id, False),
                      # B: stars for the map's info board (see ratings.py)
                      "rating": {k: ratings.get(t.id, none)[k] for k in ("average", "count")},
-                     "my_rating": mine.get(t.id)} for t in treasures])
+                     "my_rating": mine.get(t.id),
+                     "appears": appears.get(t.id),            # B: None, or a rain / night treasure
+                     "not_found": reports.get(t.id, no_reports)} for t in treasures])

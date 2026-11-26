@@ -62,6 +62,15 @@
         </div>
       </form>
 
+      {# B: step-free routes for a wheelchair or a buggy (route_access.py) #}
+      <form id="accessBox">
+        <label for="access">Routes <span class="muted">(how the map plans your walks)</span></label>
+        <div class="account-settings__row">
+          <select id="access" name="access"></select>
+          <button type="submit" class="btn btn--ghost">Save routes</button>
+        </div>
+      </form>
+
       <div class="account-settings__row">
         <a id="toMap" class="btn" href="/">Go to the map</a>
         <a class="btn btn--ghost" href="/?tour">Replay the tour</a>
@@ -100,6 +109,7 @@
         document.title = `${user.username} · Account · StepQuest`;
         loadWeight();
         loadHeight();
+        loadAccess();
         loadCoins();
         // Your profile, exactly as other players see it on /players/<name>
         loadProfile(user.username).then(() => {
@@ -130,6 +140,34 @@
       if (!res.ok) return;
       document.getElementById("height").value = (await res.json()).height_cm ?? "";
     }
+
+    // B: walking or step-free routes. Python lists the choices and saves yours.
+    async function loadAccess() {
+      const res = await fetch("/api/me/route-access");
+      if (!res.ok) return;
+      const data = await res.json();
+      const select = document.getElementById("access");
+      select.replaceChildren();
+      for (const choice of data.choices) {
+        const option = document.createElement("option");
+        option.value = choice.id;
+        option.textContent = choice.label;
+        select.append(option);
+      }
+      select.value = data.access;
+    }
+
+    document.getElementById("accessBox").addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const data = await send("/api/me/route-access", Object.fromEntries(new FormData(event.target)));
+        show(data.access === "wheelchair"
+          ? "Saved. The map now plans step-free routes: no steps, gentle slopes, low kerbs."
+          : "Saved. The map plans normal walking routes.", true);
+      } catch (error) {
+        show(error.message, false);
+      }
+    });
 
     document.getElementById("heightForm").addEventListener("submit", async event => {
       event.preventDefault();

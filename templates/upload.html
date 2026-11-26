@@ -29,6 +29,12 @@
       <input type="hidden" id="lon" name="lon">
       <button type="button" id="locate" class="btn btn--ghost">Use my location</button>
 
+      {# B: rain and night treasures (conditions.py) #}
+      <label for="appears">When can players see it?</label>
+      <select id="appears" name="appears">
+        {% for value, label in appear_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+
       <label for="photo">Photo of the spot <span class="muted">(optional, JPG, PNG or WebP, up to 5 MB)</span></label>
       <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
 
@@ -126,7 +132,7 @@
       submitButton.disabled = true;
       const body = {
         name: form.name.value, description: form.description.value,
-        lat: form.lat.value, lon: form.lon.value
+        lat: form.lat.value, lon: form.lon.value, appears: form.appears.value
       };
       try {
         const res = await fetch("/api/treasures", {
@@ -147,7 +153,7 @@
             return;
           }
         }
-        show(`Saved "${data.name}". It is on the map now.`, true);
+        show(`Saved "${data.name}". It is on the map now. ${data.appears_note || ""}`.trim(), true);
         form.reset();
         if (pin) { pin.remove(); pin = null; }
         spot.textContent = "No spot chosen yet";
