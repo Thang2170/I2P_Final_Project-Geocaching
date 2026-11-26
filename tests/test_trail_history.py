@@ -62,12 +62,12 @@ class ApiTest(unittest.TestCase):
     def test_personal_bests(self):
         first = self.walk(700).get_json()
         self.assertTrue(first["best"]["first_time"])
-        self.assertNotIn("🏅", first["text"])
+        self.assertNotIn("personal best", first["text"])
         slower = self.walk(760, ids=(3, 7)).get_json()  # same treasures, other order: same trail
         self.assertFalse(slower["best"]["personal_best"])
         faster = self.walk(640).get_json()
         self.assertEqual((faster["best"]["personal_best"], faster["best"]["faster_by_s"]), (True, 60))
-        self.assertIn("🏅 New personal best, 1:00 faster", faster["text"])
+        self.assertIn("New personal best, 1:00 faster", faster["text"])
         other = self.walk(500, ids=(3,)).get_json()  # a different trail starts its own bests
         self.assertTrue(other["best"]["first_time"])
 
@@ -79,7 +79,7 @@ class ApiTest(unittest.TestCase):
         self.assertFalse(by_time["8:20"]["personal_best"])  # walked once: nothing to beat yet
         self.assertEqual((by_time["10:40"]["times_walked"], by_time["10:40"]["best"]), (3, "10:40"))
         self.assertEqual(by_time["10:40"]["treasures"], ["Library", "Pond"])
-        self.assertEqual(by_time["10:40"]["splits"], "1 at 5:20 · 🏁 10:40")
+        self.assertEqual(by_time["10:40"]["splits"], "1 at 5:20 · finish 10:40")
         self.assertEqual(walks["walks"][0]["duration"], "8:20")  # newest first
 
     def test_older_walk_without_details(self):

@@ -585,6 +585,7 @@
 /* A small pixel arrow (the pixel fonts have no arrow characters).
    Down: the "more text" marker in a dialogue box. Right: a menu cursor. */
 .px-arrow-down,
+.px-arrow-left,
 .px-arrow-right {
   display: inline-block;
   flex: none;
@@ -598,6 +599,10 @@
                      4px 6px, 4px 4px, 2px 4px, 2px 2px, 0 2px);
 }
 
+/* A: "back" links: the right arrow, mirrored */
+.px-arrow-left { transform: scaleX(-1); }
+
+.px-arrow-left,
 .px-arrow-right {
   width: 6px;
   height: 12px;
@@ -638,6 +643,21 @@
 .px-icon--clock { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/clock.svg"); }
 .px-icon--gps { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/gps.svg"); }
 .px-icon--next { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/chevron-right.svg"); }
+/* A: these replace emoji and arrow characters (the pixel fonts have none) */
+.px-icon--heart { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/heart.svg"); }
+.px-icon--lock { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/lock.svg"); }
+.px-icon--play { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/play.svg"); }
+.px-icon--pause { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/pause.svg"); }
+.px-icon--download { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/download.svg"); }
+.px-icon--close { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/close.svg"); }
+.px-icon--reload { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/reload.svg"); }
+.px-icon--check { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/check.svg"); }
+.px-icon--share { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/external-link.svg"); }
+.px-icon--phone { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/device-phone.svg"); }
+.px-icon--alert { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/warning-box.svg"); }
+.px-icon--trending { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/trending-up.svg"); }
+/* A: a smaller icon that sits inside a line of text or a button */
+.px-icon--sm { width: 16px; height: 16px; -webkit-mask-size: 16px 16px; mask-size: 16px 16px; vertical-align: -2px; }
 .px-icon--down { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/chevron-down.svg"); }
 .px-icon--buildings { --icon: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/buildings.svg"); }
 

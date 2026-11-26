@@ -110,12 +110,12 @@ def highlights(bars, totals, zones, ring_key, ring_target):
 def share_text(report):
     """The Community post for the week (no health details: just steps, walks and the streak)."""
     t = report["totals"]
-    text = f"📊 My StepQuest week: {t['steps']:,} steps"
+    text = f"My StepQuest week: {t['steps']:,} steps"
     if t["steps_change"] and t["steps_change"] != "new this week":
         text += f" ({t['steps_change']})"
     walks = t["hunts"] + t["trails"]
     if walks:
         text += f", {walks} walk{'s' if walks != 1 else ''} ({t['distance_m'] / 1000:.1f} km)"
     if t["streak"]:
-        text += f", and a {t['streak']}-day streak 🔥"
+        text += f", and a {t['streak']}-day streak"
     return text + "."

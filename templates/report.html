@@ -52,9 +52,9 @@
     <p class="muted">Your week at a glance: steps, active minutes, heart-rate zones, hunts and trails.</p>
 
     <nav class="week-nav" aria-label="Choose a week">
-      <button type="button" class="btn btn--ghost" id="prevWeek" aria-label="Earlier week">←</button>
+      <button type="button" class="btn btn--ghost" id="prevWeek" aria-label="Earlier week"><span class="px-arrow-left" aria-hidden="true"></span></button>
       <h2 id="weekTitle">This week</h2>
-      <button type="button" class="btn btn--ghost" id="nextWeek" aria-label="Later week">→</button>
+      <button type="button" class="btn btn--ghost" id="nextWeek" aria-label="Later week"><span class="px-arrow-right" aria-hidden="true"></span></button>
     </nav>
 
     <section class="tiles" id="tiles" aria-label="Totals"></section>
@@ -83,10 +83,10 @@
     </details>
 
     <div class="share-row" style="margin-top: 20px">
-      <button type="button" class="btn" id="shareBtn" hidden>📊 Share my week</button>
+      <button type="button" class="btn" id="shareBtn" hidden>Share my week</button>
       <p class="muted" id="msg" role="status"></p>
     </div>
-    <p><a href="/health">← Health page</a></p>
+    <p><a href="/health"><span class="px-arrow-left" aria-hidden="true"></span> Health page</a></p>
   </main>
 
   <script>
@@ -210,7 +210,7 @@
         tile("Hunts and trails", `${t.hunts + t.trails}`, `${(t.distance_m / 1000).toFixed(1)} km`),
         tile("Calories", `${t.calories}`, "kcal on hunts and trails"),
       ];
-      if (t.streak !== null) tiles.push(tile("Streak", `🔥 ${t.streak}`, t.streak === 1 ? "day" : "days"));
+      if (t.streak !== null) tiles.push(tile("Streak", `${t.streak}`, t.streak === 1 ? "day" : "days"));
       $("tiles").replaceChildren(...tiles);
       drawSteps(r);
       drawZones(r.zones);
@@ -223,7 +223,7 @@
       }));
       $("shareBtn").hidden = !r.is_current;
       $("shareBtn").disabled = r.shared;
-      $("shareBtn").textContent = r.shared ? "✓ Shared this week" : "📊 Share my week";
+      $("shareBtn").textContent = r.shared ? "Shared this week" : "Share my week";
     }
 
     async function load(week) {
@@ -244,7 +244,7 @@
       const res = await fetch("/api/report/share", { method: "POST" });
       const data = await res.json();
       $("msg").textContent = res.ok ? "Shared to the Community!" : (data.error || "Could not share");
-      if (res.ok) { $("shareBtn").textContent = "✓ Shared this week"; } else { $("shareBtn").disabled = false; }
+      if (res.ok) { $("shareBtn").textContent = "Shared this week"; } else { $("shareBtn").disabled = false; }
     });
     load(params.get("week"));
   </script>

@@ -16,7 +16,7 @@ class TextRulesTest(unittest.TestCase):
         self.assertEqual(fmt_duration(4000), "1:06:40")
 
     def test_splits(self):
-        self.assertEqual(splits_text([185, 460, 751]), "1 at 3:05 · 2 at 7:40 · 🏁 12:31")
+        self.assertEqual(splits_text([185, 460, 751]), "1 at 3:05 · 2 at 7:40 · finish 12:31")
         self.assertEqual(splits_text([]), "")
 
     def test_post_text(self):
@@ -24,7 +24,7 @@ class TextRulesTest(unittest.TestCase):
         self.assertIn("3 checkpoints, 2.14 km in 24:10", text)
         self.assertIn("(11:17 /km)", text)
         self.assertIn("2,850 steps, 132 kcal", text)
-        self.assertIn("🏁 24:10", text)
+        self.assertIn("finish 24:10", text)
         self.assertIn("1 checkpoint,", trail_post_text(1, 500, 300, 600, 20))
 
 

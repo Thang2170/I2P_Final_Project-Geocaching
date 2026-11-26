@@ -25,7 +25,7 @@ KCAL_PER_LITRE_O2 = 5.0
 
 HEART, SPEED, DISTANCE = "heart rate", "speed", "distance"
 SOURCE_TEXT = {
-    HEART: "❤ from your band's heart rate",
+    HEART: "from your band's heart rate",
     SPEED: "from your speed and weight",
     DISTANCE: "from the distance and your weight",
 }

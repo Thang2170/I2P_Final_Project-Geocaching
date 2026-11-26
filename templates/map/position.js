@@ -61,7 +61,7 @@
         firstFix = false;
         drawRoute(currentPos, routeTarget, true);
         if (trail && !trailLayer) drawTrailLeg(true);  // B: a trail carried on before the GPS answered
-        else if (againId && !trail) walkAgain();      // B: ↻ Walk it again, from My trails
+        else if (againId && !trail) walkAgain();      // B: Walk it again, from My trails
         sendPosition();  // show up on the admin map straight away, not after 10 seconds
       } else if (!dragMode && routeFrom && map.distance(routeFrom, currentPos) > REROUTE_DISTANCE_M) {
         // Real GPS: the user walked away from where the route started, so make a new one.

@@ -2224,3 +2224,20 @@ button.post__likes[hidden] { display: none; }
   .trek__walker, .sheet__btn, .sheet__btn--more .sprite--icon-chevron { transition: none; }
   .trek__goal .sprite, .route-fact, .sheet__btn--main:hover .sprite--icon-refresh { animation: none; }
 }
+
+/* ---------- A: icons that replace emoji around the site ---------- */
+/* A passed trail checkpoint shows a pixel tick (it used to be the ✓ character) */
+.trail-stop--done .trail-stop__n { display: block; width: 12px; height: 12px; background: var(--px-good);
+  -webkit-mask: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/check.svg") center / 12px 12px no-repeat;
+  mask: url("https://cdn.jsdelivr.net/npm/pixelarticons@1.8.1/svg/check.svg") center / 12px 12px no-repeat; }
+/* The onboarding checklist: an empty pixel box, ticked when done */
+.tour__tick { display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 8px;
+              box-shadow: inset 0 0 0 2px var(--px-ink); vertical-align: -2px; }
+.tour__tick.is-done { background: var(--px-good); box-shadow: inset 0 0 0 2px var(--px-ink), inset 0 0 0 4px var(--px-paper); }
+/* The journey panel's Less / More: same chevron as the map card */
+.journey__fold { display: inline-flex; align-items: center; gap: 6px; }
+.journey__fold .sprite--icon-chevron { transform: rotate(180deg); transition: transform .15s steps(2); }
+.journey__fold[aria-expanded="false"] .sprite--icon-chevron { transform: none; }
+/* Sprites inside a heading or a button line up with the words */
+h2 > .sprite, .btn > .sprite, .mode-pick > .sprite, .safety__eyebrow > .sprite { margin-right: 6px; vertical-align: -2px; }
+@media (prefers-reduced-motion: reduce) { .journey__fold .sprite--icon-chevron { transition: none; } }

@@ -90,13 +90,13 @@ def pace_status(distance_m, duration_s):
         return {"on_pace": None, "pace": None, "target": target, "text": f"Go! Target pace {target} /km."}
     on_pace = pace <= TRYHARD_PACE_S
     if on_pace:
-        text = f"🔥 On pace: {fmt_pace(pace)} /km (target {target}). Keep it up!"
+        text = f"On pace: {fmt_pace(pace)} /km (target {target}). Keep it up!"
     else:
         text = f"Speed up: {fmt_pace(pace)} /km, the target is {target} /km."
     return {"on_pace": on_pace, "pace": fmt_pace(pace), "target": target, "text": text}
 
 
-CALM_LINE = "🌿 No rush. Breathe slowly and notice what is around you."
+CALM_LINE = "No rush. Breathe slowly and notice what is around you."
 
 
 def mode_line(mode, distance_m, duration_s):

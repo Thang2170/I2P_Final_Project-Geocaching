@@ -177,10 +177,10 @@ def fmt_duration(seconds):
 
 
 def splits_text(splits):
-    """The time at each checkpoint, e.g. '1 at 3:05 · 2 at 7:40 · 🏁 12:31'. splits: seconds, in order."""
+    """The time at each checkpoint, e.g. '1 at 3:05 · 2 at 7:40 · finish 12:31'. splits: seconds, in order."""
     parts = [f"{n} at {fmt_duration(s)}" for n, s in enumerate(splits[:-1], start=1)]
     if splits:
-        parts.append(f"🏁 {fmt_duration(splits[-1])}")
+        parts.append(f"finish {fmt_duration(splits[-1])}")
     return " · ".join(parts)
 
 
@@ -188,7 +188,7 @@ def trail_post_text(checkpoints, distance_m, duration_s, steps, calories, splits
     """The Community post for a finished trail, written by Python (like a run tracker)."""
     pace = duration_s / (distance_m / 1000) if distance_m >= 20 else None
     kind = "Treasure Trail" if shape == "loop" else "one-way Treasure Trail"
-    text = (f"🧭 Walked a {kind}: {checkpoints} checkpoint{'s' if checkpoints != 1 else ''}, "
+    text = (f"Walked a {kind}: {checkpoints} checkpoint{'s' if checkpoints != 1 else ''}, "
             f"{distance_m / 1000:.2f} km in {fmt_duration(duration_s)}")
     if pace:
         text += f" ({fmt_duration(pace)} /km)"
@@ -298,7 +298,7 @@ def best_change(previous_best_s, duration_s):
 def best_text(change):
     """The line added to the Community post, or "" if there is nothing to brag about."""
     if change["personal_best"] and not change["first_time"]:
-        return f" 🏅 New personal best, {fmt_duration(change['faster_by_s'])} faster than before!"
+        return f" New personal best, {fmt_duration(change['faster_by_s'])} faster than before!"
     return ""
 
 

@@ -72,7 +72,7 @@
           <p>Three steps from the map to your first coins.</p>
           <a href="/?tour">Take the tour <span class="px-arrow-right"></span></a>
           {# B: appears only when the browser can install StepQuest (static/js/install.js) #}
-          <button type="button" class="btn btn--small install-btn" data-install hidden>📲 Install the app</button>
+          <button type="button" class="btn btn--small install-btn" data-install hidden><span class="px-icon px-icon--phone px-icon--sm" aria-hidden="true"></span> Install the app</button>
         </div>
 
         <a class="side-nav__link" href="/login">
@@ -308,7 +308,7 @@
 
           <div class="section-heading">
             <div>
-              <h2>⭐ Top rated</h2>
+              <h2><span class="sprite sprite--icon-star" aria-hidden="true"></span> Top rated</h2>
               <p>Players rate a treasure after they find it. Tap one to open it on the map.</p>
             </div>
 
@@ -360,7 +360,7 @@
           <!-- B: TRENDING THIS WEEK: found or rated a lot in the last 7 days -->
           <div class="section-heading section-heading--compact">
             <div>
-              <h2>🔥 Trending this week</h2>
+              <h2><span class="sprite sprite--icon-flame" aria-hidden="true"></span> Trending this week</h2>
             </div>
           </div>
 
@@ -639,7 +639,7 @@
         bar.setAttribute("aria-label", `${m.title}: ${m.progress} of ${m.target}`);
         const end = document.createElement(m.done && !m.claimed ? "button" : "span");
         end.className = m.done && !m.claimed ? "btn btn--small" : "challenge__state";
-        end.textContent = m.claimed ? "✓ Collected" : m.done ? `Collect +${m.reward}`
+        end.textContent = m.claimed ? "Collected" : m.done ? `Collect +${m.reward}`
           : `${goalUnit(m.progress, m.unit)} / ${goalUnit(m.target, m.unit)}`;
         if (end.tagName === "BUTTON") {
           end.type = "button";

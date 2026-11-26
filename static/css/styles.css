@@ -1231,3 +1231,9 @@ h1, h2 {
   .hud-tile, .quest, .blocks i.is-on, .pixel-ring.is-closed, .quest .qbtn--claim { animation: none; }
   .pixel-ring__blocks rect { transition: none; }
 }
+
+/* A: sprites inside headings and buttons line up with the words (they replace emoji) */
+h2 > .sprite, .btn > .sprite { margin-right: 6px; vertical-align: -2px; }
+.tour__tick { display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 8px;
+              box-shadow: inset 0 0 0 2px var(--px-ink); vertical-align: -2px; }
+.tour__tick.is-done { background: var(--px-good); box-shadow: inset 0 0 0 2px var(--px-ink), inset 0 0 0 4px var(--px-paper); }

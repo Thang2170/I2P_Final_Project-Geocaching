@@ -99,7 +99,7 @@
           claimNotes.delete(treasureId);
           showBalance(data.balance, data.coins_earned);
           for (const chain of data.chains_completed || []) {  // B: this find finished a riddle chain
-            coinInfo.textContent += ` · 🧩 "${chain.title}" solved: +${chain.bonus}!`;
+            coinInfo.textContent += ` · riddle chain "${chain.title}" solved: +${chain.bonus}`;
           }
           collectPin(treasureId);
           showRateBox(treasureId, name);

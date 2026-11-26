@@ -226,7 +226,7 @@ def trails_page():
 
 @trail_api.route("/api/trail/walks", methods=["GET"])
 def my_trail_walks():
-    """Your saved trails, newest first, with pace, splits and personal bests (🏅)."""
+    """Your saved trails, newest first, with pace, splits and personal bests."""
     user = current_user()
     if user is None:
         return jsonify(error="Log in first"), 401

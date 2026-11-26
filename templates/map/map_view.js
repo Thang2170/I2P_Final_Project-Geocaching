@@ -148,14 +148,14 @@
       const info = infoById.get(t.id) || {};
       const verifiedLine = document.getElementById("boardVerified");
       verifiedLine.textContent = info.verified
-        ? "✓ Verified by StepQuest"
+        ? "Verified by StepQuest"
         : "Not verified yet: hidden by a player and not checked by an admin. You can still go.";
       verifiedLine.classList.toggle("is-verified", Boolean(info.verified));
       const collectibleLine = document.getElementById("boardCollectible");
       collectibleLine.hidden = !info.collectible;
       collectibleLine.textContent = info.collected
-        ? "◆ You collected this treasure's trophy"
-        : "◆ Has a collectible: find the QR code at the spot and scan it (Collection > Scan)";
+        ? "You collected this treasure's trophy"
+        : "Has a collectible: find the QR code at the spot and scan it (Collection > Scan)";
       showBoardReports(t.id);  // B: rain / night line, "maybe missing" line (not_found.js)
       boardKm.textContent = "–";
       boardMin.textContent = "–";
@@ -206,7 +206,7 @@
     function showBoardStars(treasureId) {
       const info = ratingsById.get(treasureId);
       const stars = info ? starsText(info.rating) : "";
-      boardStars.textContent = foundIds.has(treasureId) ? `✓ You found this one · ${stars}` : stars;
+      boardStars.textContent = foundIds.has(treasureId) ? `You found this one · ${stars}` : stars;
     }
 
     function closeBoard() {

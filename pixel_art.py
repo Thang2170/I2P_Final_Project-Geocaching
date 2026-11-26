@@ -380,6 +380,28 @@ SPRITES = {
         ".oddddo.",
         "..oooo..",
     ]],
+    "icon-leaf": [[             # a calm walk
+        "......ooo",
+        "....ooRRo",
+        "...oRRRlo",
+        "..oRRRllo",
+        ".oRRRlllo",
+        ".oRllllo.",
+        ".olllloo.",
+        "o.oooo...",
+        "o........",
+    ]],
+    "icon-star": [[             # top rated
+        "....o....",
+        "...ogo...",
+        "...ogo...",
+        "oooGggooo",
+        "oGGggggdo",
+        ".oGgggdo.",
+        "..oggdo..",
+        ".odo.odo.",
+        ".oo...oo.",
+    ]],
     # Weather (weather.py says which one: "icon" in its choice)
     "icon-sun": [[
         "....g....",

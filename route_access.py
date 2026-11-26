@@ -56,6 +56,6 @@ def route_note(choice, used_service):
     if choice != WHEELCHAIR:
         return ""
     if used_service:
-        return "♿ Step-free route: no steps, gentle slopes, low kerbs."
-    return ("♿ No step-free route could be found right now, so this is a straight line. "
+        return "Step-free route: no steps, gentle slopes, low kerbs."
+    return ("No step-free route could be found right now, so this is a straight line. "
             "It may cross steps: check before you go.")

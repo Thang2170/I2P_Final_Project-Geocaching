@@ -90,12 +90,12 @@
         name.textContent = `${t.name} · ${t.players} player${t.players === 1 ? "" : "s"}`;
         const hexes = document.createElement("span");
         hexes.className = "team__hexes";
-        hexes.textContent = `${t.hexes} ⬢`;
+        hexes.textContent = `${t.hexes} hex${t.hexes === 1 ? "" : "es"}`;
         li.append(swatch, name, hexes);
         list.append(li);
       }
       const lead = data.teams.find(t => t.id === data.leader);
-      say("leader", lead ? `👑 ${lead.name} is in front` : data.hexes.length ? "It's a tie!" : "No hexagons claimed yet this week.");
+      say("leader", lead ? `${lead.name} is in front` : data.hexes.length ? "It's a tie!" : "No hexagons claimed yet this week.");
       const mine = data.teams.find(t => t.id === data.my_team);
       say("myTeam", mine ? `You walk for ${mine.name}. You coloured ${data.my_visits} hexagon visit${data.my_visits === 1 ? "" : "s"} this week.`
                          : "No team yet: pick one to start claiming.");

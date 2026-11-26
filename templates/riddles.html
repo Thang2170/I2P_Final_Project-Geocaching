@@ -90,7 +90,8 @@
       const list = el("ol", undefined, "steps");
       for (const s of c.steps) {
         const li = el("li", undefined, `step step--${s.state}`);
-        const mark = s.state === "found" ? "✓" : s.state === "current" ? `${s.n}.` : "🔒";
+        // A: a pixel tick or lock instead of the tick and lock characters
+        const mark = s.state === "current" ? `${s.n}.` : "";
         const text = el("div");
         if (s.state === "found") {
           text.append(el("span", `${s.treasure}: `), el("span", s.clue, "step__clue"));
@@ -100,7 +101,14 @@
         } else {
           text.append(el("span", "Find the step before to unlock this riddle."));
         }
-        li.append(el("span", mark, "step__mark"), text);
+        const markBox = el("span", mark, "step__mark");
+        if (s.state !== "current") {
+          const glyph = document.createElement("span");
+          glyph.className = `px-icon px-icon--${s.state === "found" ? "check" : "lock"} px-icon--sm`;
+          glyph.setAttribute("aria-label", s.state === "found" ? "Found" : "Locked");
+          markBox.append(glyph);
+        }
+        li.append(markBox, text);
         list.append(li);
       }
       box.append(list);

@@ -28,7 +28,7 @@
 
   <main class="card">
     <h1>My trails</h1>
-    <p class="muted">Every Treasure Trail you walked with ▶ Start trail. Walk the same trail again to beat your time: a 🏅 marks your personal best.</p>
+    <p class="muted">Every Treasure Trail you walked with Start trail. Walk the same trail again to beat your time: "Best" marks your personal best.</p>
 
     <div class="totals" id="totals" hidden>
       <div><strong id="tWalks"></strong><span>trails</span></div>
@@ -36,12 +36,19 @@
       <div><strong id="tSteps"></strong><span>steps</span></div>
     </div>
     <section id="walks" aria-live="polite"></section>
-    <p id="empty" class="muted" hidden>No trails yet. On the map, tap 🧭 Plan a trail, then ▶ Start trail.</p>
+    <p id="empty" class="muted" hidden>No trails yet. On the map, tap Plan a trail, then Start trail.</p>
     <p id="msg" class="muted" role="status"></p>
-    <p><a class="btn btn--ghost" href="/">🧭 Plan a trail on the map</a></p>
+    <p><a class="btn btn--ghost" href="/"><span class="sprite sprite--icon-compass" aria-hidden="true"></span> Plan a trail on the map</a></p>
   </main>
 
   <script>
+    // A: a pixel icon element (pixelarticons mask or a pixel_art.py sprite), in place of emoji
+    function pxIcon(cls) {
+      const node = document.createElement("span");
+      node.className = cls;
+      node.setAttribute("aria-hidden", "true");
+      return node;
+    }
     // B: the page only shows what Python sends; everything is set with textContent.
     function el(tag, className, text) {
       const node = document.createElement(tag);
@@ -54,9 +61,9 @@
       const card = el("article", "walk");
       const head = el("div", "walk__head");
       const title = el("h2", "walk__title",
-        `${w.shape === "oneway" ? "→ One-way" : "↺ Loop"} · ${w.checkpoints} checkpoint${w.checkpoints === 1 ? "" : "s"}`);
+        `${w.shape === "oneway" ? "One-way" : "Loop"} · ${w.checkpoints} checkpoint${w.checkpoints === 1 ? "" : "s"}`);
       head.append(title);
-      if (w.personal_best) head.append(el("span", "pb", "🏅 Best"));
+      if (w.personal_best) head.append(el("span", "pb", "Best"));
       head.append(el("span", "walk__when", new Date(w.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })));
       card.append(head);
 
@@ -68,11 +75,12 @@
         stats.append(part);
       }
       card.append(stats);
-      if (w.treasures.length) card.append(el("p", "walk__line", `Through: ${w.treasures.join(" → ")}`));
+      if (w.treasures.length) card.append(el("p", "walk__line", `Through: ${w.treasures.join(" · ")}`));
       if (w.splits) card.append(el("p", "walk__line", `Splits: ${w.splits}`));
       if (w.times_walked > 1) card.append(el("p", "walk__line", `Walked ${w.times_walked} times · best ${w.best}`));
       if (w.treasures.length) {
-        const again = el("a", "btn btn--small btn--ghost walk__again", "↻ Walk it again");
+        const again = el("a", "btn btn--small btn--ghost walk__again", "Walk it again");
+        again.prepend(pxIcon("sprite sprite--icon-refresh"));
         again.href = `/?trail=${encodeURIComponent(w.id)}`;  // the map sets the same trail up from where you are
         card.append(again);
       }

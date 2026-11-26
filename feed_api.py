@@ -268,7 +268,7 @@ def share_post(post_id):
 
 @feed_api.route("/api/posts/<int:post_id>/likes")
 def who_liked(post_id):
-    """Everyone who liked a post, newest first (tap "♥ ann and 2 others" to see them)."""
+    """Everyone who liked a post, newest first (tap the "ann and 2 others" line to see them)."""
     me = current_user()
     if me is None:
         return _login_needed()

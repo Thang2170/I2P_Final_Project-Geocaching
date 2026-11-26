@@ -79,9 +79,9 @@ def is_visible(condition, raining, dark):
 def board_text(condition, visible_now, is_owner):
     """The line on the map's info board ("" for ordinary treasures)."""
     if condition == RAIN:
-        what = "🌧 Rain treasure: it only appears while it is raining"
+        what = "Rain treasure: it only appears while it is raining"
     elif condition == NIGHT:
-        what = "🌙 Night treasure: it only appears after dark"
+        what = "Night treasure: it only appears after dark"
     else:
         return ""
     if is_owner and not visible_now:

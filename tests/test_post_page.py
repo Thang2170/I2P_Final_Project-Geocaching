@@ -48,7 +48,7 @@ class TestPostPage(unittest.TestCase):
         html = self.bob.get("/community").get_data(as_text=True)
         self.assertIn("/likes`", html)
         self.assertIn('el("button", "", "post__likes")', html)
-        self.assertIn('el("button", "✕ Close", "likers__close")', html)  # a long list can be closed
+        self.assertIn('"likers__close"', html)  # a long list can be closed
 
     def test_page(self):
         html = self.bob.get(f"/posts/{self.post_id}").get_data(as_text=True)
