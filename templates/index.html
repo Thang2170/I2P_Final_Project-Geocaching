@@ -15,45 +15,19 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/pixel.css') }}">
   <!-- A: the bigger sprites, made by pixel_art.py -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/sprites.css') }}">
+  {# B: app.css for the shared top bar (Menu, bell), loaded first so this page's own styles.css wins #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 
-<body>
+<body class="home-page">
+  {# B: the same top bar as every other page: Map, Hunts, Community, Menu and the bell #}
+  {% include "_topbar.html" %}
   <div class="app">
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
-      <a class="brand" href="#discover">
-        <span class="brand__mark sprite sprite--coin" aria-hidden="true"></span>
-        <span class="brand__words">StepQuest</span>
-      </a>
-
-      <div class="sidebar__label">Pages</div>
-
-      <nav class="side-nav">
-        <a class="side-nav__link is-active" href="#discover">
-          <span class="px-icon px-icon--gps"></span> Discover
-        </a>
-        <a class="side-nav__link" href="/">
-          <span class="px-icon px-icon--map"></span> Map
-        </a>
-        <a class="side-nav__link" href="/upload">
-          <span class="px-icon px-icon--flag"></span> Hide a treasure
-        </a>
-        <a class="side-nav__link" href="/hunts">
-          <span class="px-icon px-icon--users"></span> Hunts
-        </a>
-        <a class="side-nav__link" href="/community">
-          <span class="px-icon px-icon--comment"></span> Community
-        </a>
-        <a class="side-nav__link" href="/leaderboard">
-          <span class="px-icon px-icon--chart"></span> Leaderboard
-        </a>
-        <a class="side-nav__link" href="/shop">
-          <span class="px-icon px-icon--bag"></span> Shop
-        </a>
-      </nav>
-
+      {# B: the logo and page links are in the shared top bar now (_topbar.html) #}
       <div class="sidebar__label">You</div>
 
       <!-- Filled in by Python's /api/me and /api/coins; shows "Log in" until then -->
@@ -85,13 +59,13 @@
     <main class="main" id="discover">
 
       <!-- TOP BAR -->
-      <header class="topbar">
+      <header class="home-head">
         <div class="breadcrumb">
           <span>StepQuest</span>
           <b>/</b> Discover
         </div>
 
-        <div class="topbar__right">
+        <div class="home-head__right">
           <a class="profile" href="/login">
             <span class="profile__avatar" id="avatar">?</span>
             <span class="profile__name">
@@ -454,7 +428,8 @@
     function showRankings(rankings) {
       if (!rankings) return;
       // Top rated first; then the new ones nobody rated yet, so fresh treasures still get seen.
-      const [first, ...rest] = [...rankings.top_rated, ...rankings.new];
+      // B: Python picks how many and leaves out repeats (ratings.home_lists).
+      const [first, ...rest] = rankings.home.top;
       if (first) {
         setText("firstName", first.name);
         setText("firstHint", first.description || "No hint for this one.");
@@ -465,14 +440,14 @@
       } else {
         setText("firstName", "No treasures yet");
       }
-      fillRow("moreTreasures", rest.slice(0, 6), badgeText);
+      fillRow("moreTreasures", rest, badgeText);
       document.getElementById("moreEmpty").hidden = rest.length > 0;
 
-      fillRow("trendTreasures", rankings.trending,
+      fillRow("trendTreasures", rankings.home.trending,
               (t) => t.finds_this_week
                 ? `${t.finds_this_week} find${t.finds_this_week === 1 ? "" : "s"} this week`
                 : "Rated this week");
-      document.getElementById("trendEmpty").hidden = rankings.trending.length > 0;
+      document.getElementById("trendEmpty").hidden = rankings.home.trending.length > 0;
     }
 
     function showTopPlayers(players) {

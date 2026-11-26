@@ -151,7 +151,9 @@ class TestChatPages(ChatTestCase):
         self.assertEqual(self.app.test_client().get("/hunts/999/chat").status_code, 404)
 
     def test_the_hunts_page_has_the_chat_button(self):
-        html = self.app.test_client().get("/hunts").get_data(as_text=True)
+        c = self.app.test_client()
+        c.post("/api/register", json={"username": "pagecheck", "password": "secret1"})  # B: /hunts needs a login now
+        html = c.get("/hunts").get_data(as_text=True)
         self.assertIn("Open group chat", html)
         self.assertIn('hunt.me.state === "playing"', html)  # only players get the button
         self.assertIn("Chat opens when you play", html)

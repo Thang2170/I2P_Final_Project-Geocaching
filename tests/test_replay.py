@@ -49,6 +49,13 @@ class ReplayRulesTest(unittest.TestCase):
         self.assertEqual(data["headline"], "ben won the race in 1:00.")
         self.assertEqual(data["players"][1]["walked_m"], 0)
 
+    def test_a_point_just_before_the_finish_is_kept(self):
+        # The race lasted 30.45 s: a point at 30.4 s must not count as "after the finish".
+        paths = {"amy": [(T0 + timedelta(seconds=30.4), 24.79, 120.99)]}
+        data = build_replay(T0, T0 + timedelta(seconds=30.45), paths, None, TREASURE)
+        self.assertEqual(data["duration_s"], 31)
+        self.assertEqual(len(data["players"]), 1)
+
     def test_more_than_eight_players_are_grey(self):
         paths = {f"p{i}": [(T0, 24.79, 120.99)] for i in range(10)}
         slots = [p["slot"] for p in build_replay(T0, T0 + timedelta(seconds=9), paths, None, TREASURE)["players"]]

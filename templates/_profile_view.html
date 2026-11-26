@@ -32,7 +32,10 @@
       <section class="panel">
         <h2>Recent hunts</h2>
         <ul id="hunts" class="profile__list"></ul>
-        <p id="noHunts" class="muted" hidden>No finished hunts yet.</p>
+        <p id="noHunts" class="muted" hidden>No treasure walks yet.</p>
+        {# B: group hunt races (hunt_game.py); the replay link only for players who raced in it #}
+        <h2 id="racesTitle" hidden>Races</h2>
+        <ul id="races" class="profile__list"></ul>
       </section>
 
       <section class="panel">
@@ -53,7 +56,7 @@
       <h2>Posts</h2>
       <ul id="posts" class="profile__list"></ul>
       <p id="noPosts" class="muted" hidden>No posts yet.</p>
-      <a href="/community">See the Community feed <span class="px-arrow-right" aria-hidden="true"></span></a>
+      <a class="text-link" href="/community">See the Community feed <span class="px-arrow-right" aria-hidden="true"></span></a>
     </section>
 
 <script>
@@ -99,6 +102,17 @@
         return row;
       });
       fillList("hidden", "noHidden", p.hidden_treasures, name => el("li", name));
+      $("racesTitle").hidden = !(p.races && p.races.length);
+      $("races").replaceChildren(...(p.races || []).map(r => {
+        const row = el("li");
+        row.append(el("strong", r.name), el("span", `${r.result} · ${r.ago}`, "muted"));
+        if (r.replay) {
+          const link = el("a", "Watch replay", "btn btn--small btn--ghost");
+          link.href = r.replay;
+          row.append(link);
+        }
+        return row;
+      }));
       // B: each post opens on its own page, with its likes, comments and replies.
       fillList("posts", "noPosts", p.recent_posts, post => {
         const row = el("li");

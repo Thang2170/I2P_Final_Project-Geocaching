@@ -54,7 +54,7 @@ class TestProfileApi(ProfileTestCase):
         data = self.player("bob").get("/api/players/ann").get_json()
         stats = data["stats"]
         self.assertEqual((stats["coins"], stats["found"], stats["hidden"]), (10, 1, 1))
-        self.assertEqual((stats["hunts"], stats["distance_km"], stats["rank"], stats["players"]), (1, 0.75, 1, 2))
+        self.assertEqual((stats["hunts"], stats["distance_km"], stats["rank"], stats["players"]), (1, 0.75, 1, 1))  # B: bob has done nothing yet, so only ann is on the board
         self.assertEqual(data["hidden_treasures"], ["Bike rack"])
         self.assertEqual([p["text"] for p in data["recent_posts"]], ["Hello everyone"])
         self.assertEqual(data["recent_hunts"][0]["treasure"], DEMO_TREASURE["name"])

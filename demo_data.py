@@ -5,7 +5,7 @@ What gets saved is listed in demo_content.py.
 """
 
 from calculator import calories_from_distance, steps_from_distance
-from demo_content import (DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FRIEND_REQUESTS, DEMO_FRIENDS, DEMO_FULL_HUNT,
+from demo_content import (DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FIND_COINS, DEMO_FRIEND_REQUESTS, DEMO_FRIENDS, DEMO_FULL_HUNT,
                           DEMO_HUNT_REACTIONS, DEMO_JOURNEYS, DEMO_PASSWORD, DEMO_POSTS, DEMO_RATINGS, DEMO_REPLIES,
                           DEMO_SHARES, DEMO_TOUR_SEEN, DEMO_TREASURES, DEMO_USERS, GIFT_REASON, TREASURE_CREATOR)
 from friends import ACCEPTED, PENDING
@@ -68,10 +68,14 @@ def seed_demo_story():
             continue
         profile = db.session.get(Profile, player.id)
         weight = profile.weight_kg if profile else DEFAULT_WEIGHT_KG
+        when = _hours_ago(spec.get("hours_ago", 0))
         db.session.add(Journey(
             user_id=player.id, treasure_id=treasure.id, distance_m=spec["distance_m"],
             duration_s=spec["duration_s"], steps=steps_from_distance(spec["distance_m"]),
-            calories=round(calories_from_distance(spec["distance_m"], weight), 1)))
+            calories=round(calories_from_distance(spec["distance_m"], weight), 1), created_at=when))
+        # B: a walk to a treasure ends with finding it, so the coins and "found" count agree
+        db.session.add(CoinTransaction(user_id=player.id, amount=DEMO_FIND_COINS, reason="found_treasure",
+                                       treasure_id=treasure.id, created_at=when))
         added["journeys"].append(f"{player.username} -> {treasure.name}")
 
     db.session.commit()
@@ -85,7 +89,7 @@ def seed_demo_story():
             Post.user_id == author.id, Post.text == spec["text"])).first()
         if exists is not None:
             continue
-        post = Post(user_id=author.id, text=spec["text"])
+        post = Post(user_id=author.id, text=spec["text"], created_at=_hours_ago(spec.get("hours_ago", 0)))
         db.session.add(post)
         db.session.flush()
         _react(post, spec)
@@ -150,7 +154,7 @@ def _seed_social():
             PostShare.original_id == original.id, Post.user_id == sharer.id)).first()
         if done is not None:
             continue
-        share = Post(user_id=sharer.id, text=spec["text"])
+        share = Post(user_id=sharer.id, text=spec["text"], created_at=_hours_ago(spec.get("hours_ago", 0)))
         db.session.add(share)
         db.session.flush()
         db.session.add(PostShare(post_id=share.id, original_id=original.id))
@@ -205,16 +209,25 @@ def _seed_chat():
     return added
 
 
+def _hours_ago(hours):
+    """B: a time `hours` ago, as the naive UTC the database keeps."""
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).replace(tzinfo=None)
+
+
 def _react(post, spec):
     """Add the likes and comments listed in spec to post."""
     for name in spec["likes"]:
         fan = _get_user(name)
         if fan is not None:
             db.session.add(PostLike(post_id=post.id, user_id=fan.id))
-    for name, text in spec["comments"]:
+    from datetime import timedelta
+    for i, (name, text) in enumerate(spec["comments"], start=1):
         writer = _get_user(name)
         if writer is not None:
-            db.session.add(PostComment(post_id=post.id, user_id=writer.id, text=text))
+            # B: comments come after the post, half an hour apart (never in the future)
+            when = min((post.created_at or _hours_ago(0)) + timedelta(minutes=30 * i), _hours_ago(0))
+            db.session.add(PostComment(post_id=post.id, user_id=writer.id, text=text, created_at=when))
 
 
 def _hunt_post(username, treasure_name):

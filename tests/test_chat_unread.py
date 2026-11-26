@@ -61,7 +61,9 @@ class TestUnreadApi(unittest.TestCase):
         self.assertEqual(self.unread(self.app.test_client(), hid), 0)  # logged out
 
     def test_the_page_shows_the_badge_and_refreshes(self):
-        html = self.app.test_client().get("/hunts").get_data(as_text=True)
+        c = self.app.test_client()
+        c.post("/api/register", json={"username": "pagecheck", "password": "secret1"})  # B: /hunts needs a login now
+        html = c.get("/hunts").get_data(as_text=True)
         self.assertIn("unread-badge", html)
         self.assertIn("setInterval", html)
 

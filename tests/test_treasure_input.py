@@ -45,9 +45,17 @@ class TestParseTreasure(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     parse_treasure(self.good(**{field: value}))
 
-    def test_edge_coordinates_allowed(self):
-        clean = parse_treasure(self.good(lat=90, lon=-180))
-        self.assertEqual((clean["lat"], clean["lon"]), (90.0, -180.0))
+    def test_spots_far_from_campus_are_refused(self):
+        # B: the numbers are valid, but treasures belong in the play area (not 0, 0 in the ocean)
+        for lat, lon in ((90, -180), (0, 0), (25.0330, 121.5654)):  # the North Pole, the ocean, Taipei
+            with self.assertRaises(ValueError) as caught:
+                parse_treasure(self.good(lat=lat, lon=lon))
+            self.assertIn("within 15 km of NTHU", str(caught.exception))
+
+    def test_the_edge_of_the_play_area_is_allowed(self):
+        from treasure_input import PLAY_CENTRE
+        clean = parse_treasure(self.good(lat=PLAY_CENTRE[0] + 0.13, lon=PLAY_CENTRE[1]))  # about 14.5 km north
+        self.assertAlmostEqual(clean["lat"], PLAY_CENTRE[0] + 0.13)
 
     def test_missing_coordinate_rejected(self):
         data = self.good()

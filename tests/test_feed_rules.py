@@ -86,14 +86,14 @@ class TestLikeSummary(unittest.TestCase):
         self.assertEqual(like_summary([], False), "")
 
     def test_others_only(self):
-        self.assertEqual(like_summary(["ben"], False), "ben")
-        self.assertEqual(like_summary(["ben", "cyd"], False), "ben and cyd")
-        self.assertEqual(like_summary(["ben", "cyd", "dora"], False), "ben and 2 others")
+        self.assertEqual(like_summary(["ben"], False), "Liked by ben")
+        self.assertEqual(like_summary(["ben", "cyd"], False), "Liked by ben and cyd")
+        self.assertEqual(like_summary(["ben", "cyd", "dora"], False), "Liked by ben and 2 others")
 
     def test_with_you(self):
-        self.assertEqual(like_summary([], True), "You")
-        self.assertEqual(like_summary(["ben"], True), "You and ben")
-        self.assertEqual(like_summary(["ben", "cyd"], True), "You and 2 others")
+        self.assertEqual(like_summary([], True), "Liked by you")
+        self.assertEqual(like_summary(["ben"], True), "Liked by you and ben")
+        self.assertEqual(like_summary(["ben", "cyd"], True), "Liked by you and 2 others")
 
 
 if __name__ == "__main__":

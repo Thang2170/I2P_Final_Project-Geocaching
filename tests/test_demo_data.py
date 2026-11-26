@@ -5,6 +5,8 @@ from coin_api import get_balance
 from demo_content import (BUILT_IN_TREASURE_NAME, DEMO_CHAT, DEMO_CHAT_HUNT, DEMO_FULL_HUNT, DEMO_JOURNEYS,
                           DEMO_PASSWORD, DEMO_POSTS, DEMO_RATINGS, DEMO_SHARES, DEMO_TREASURES, DEMO_USERS)
 from demo_data import seed_demo_story
+from demo_content import GIFT_REASON
+from models import CoinTransaction
 from models import (DEMO_TREASURE, Hunt, HuntMember, HuntMessage, Journey, Post, PostComment, PostLike, Profile,
                     Treasure, User, db)
 from queue_logic import queue_status
@@ -31,7 +33,11 @@ class TestDemoData(unittest.TestCase):
             user = self.user(spec["username"])
             self.assertTrue(user.check_password(DEMO_PASSWORD))
             self.assertEqual(db.session.get(Profile, user.id).weight_kg, spec["weight_kg"])
-            self.assertEqual(get_balance(user.id), spec["coins"])
+            # B: the starting gift; finds and race bonuses come on top (demo_content.DEMO_JOURNEYS)
+            gift = db.session.query(db.func.coalesce(db.func.sum(CoinTransaction.amount), 0)).filter_by(
+                user_id=user.id, reason=GIFT_REASON).scalar()
+            self.assertEqual(gift, spec["coins"])
+            self.assertGreaterEqual(get_balance(user.id), spec["coins"])
 
     def test_saves_the_treasures_hidden_by_alice(self):
         seed_demo_story()

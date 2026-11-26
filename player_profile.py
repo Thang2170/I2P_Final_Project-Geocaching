@@ -51,3 +51,15 @@ def walk_totals(journeys):
         "distance_km": round(distance_m / 1000, 2),
         "steps": sum(s for _, s in journeys),
     }
+
+
+def race_result(winner, player, is_me):
+    """B: one finished hunt race on a profile: who won it, from the profile's point of view.
+
+    winner: the winner's username (or None). player: whose profile this is.
+    """
+    if winner is None:
+        return "Nobody won"
+    if winner == player:
+        return "You won" if is_me else "Won it"
+    return f"{winner} won"

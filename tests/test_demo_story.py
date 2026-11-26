@@ -62,7 +62,7 @@ class TestDemoStory(unittest.TestCase):
         reply = player.post(f"/api/hunts/{full['id']}/join")
         self.assertEqual(reply.status_code, 200)
         me_now = next(h for h in player.get("/api/hunts").get_json() if h["id"] == full["id"])["me"]
-        self.assertEqual(me_now, {"state": "waiting", "position": 1})
+        self.assertEqual({k: me_now[k] for k in ("state", "position")}, {"state": "waiting", "position": 1})
 
         # 7. they reach a treasure; the finished hunt is saved and they appear in the Community
         pond = db.session.query(Treasure).filter_by(name="Pond bench").one()

@@ -18,6 +18,7 @@ class TestHuntPages(unittest.TestCase):
             db.engine.dispose()
 
     def test_hunts_page_uses_shared_style_and_is_highlighted(self):
+        self.client.post("/api/register", json={"username": "pagecheck", "password": "secret1"})  # B: login needed
         html = self.client.get("/hunts").get_data(as_text=True)
         self.assertIn("css/app.css", html)
         self.assertIn('href="/hunts" class="is-active"', html)
