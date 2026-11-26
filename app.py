@@ -184,6 +184,10 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     # B: weather-aware routes (weather.py) ask Open-Meteo. Off in tests (they never call it),
     # and off if STEPQUEST_WEATHER=off.
     app.config["WEATHER"] = not testing and os.environ.get("STEPQUEST_WEATHER", "on").lower() != "off"
+    # B: the login cookie only travels over HTTPS ("python app.py" and hosting both use HTTPS).
+    # Off in tests (their client talks plain http), and off if STEPQUEST_HTTP=1, for anyone who
+    # really has to run without HTTPS (browsers still accept it on http://localhost).
+    app.config["SESSION_COOKIE_SECURE"] = not testing and os.environ.get("STEPQUEST_HTTP") != "1"
     db.init_app(app)
 
     # Create the tables (if missing) and save the demo treasure on the first run.
@@ -236,6 +240,8 @@ def create_app(database_uri="sqlite:///geohunt.db"):
         return jsonify(treasure=treasure.name, meters=round(meters, 1), found=meters <= FOUND_RADIUS_M)
 
     _add_error_pages(app)  # B: StepQuest pages for "not found" and "something went wrong"
+    from gzip_responses import add_compression
+    add_compression(app)  # B: gzip styles, scripts, pages and JSON (gzip_responses.py)
     return app
 
 
