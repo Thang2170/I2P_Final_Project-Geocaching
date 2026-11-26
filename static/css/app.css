@@ -225,7 +225,7 @@ body {
   padding: 28px 24px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
-  animation: px-boot .4s steps(6) both;
+  animation: px-boot .4s steps(6) backwards;
 }
 
 /* 16px side gutter on phones (plus 4px for the pixel edge) */
@@ -386,7 +386,7 @@ summary {
   padding: 12px 16px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
-  animation: px-boot .4s steps(5) both;
+  animation: px-boot .4s steps(5) backwards;
 }
 
 .sheet__status {
@@ -450,7 +450,7 @@ body.is-journey .sheet { display: none; }
   padding: 8px 12px 10px;
   background: var(--px-paper);
   box-shadow: var(--px-edge), var(--px-drop);
-  animation: px-boot .4s steps(5) both;
+  animation: px-boot .4s steps(5) backwards;
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) 150px;
   grid-template-areas:
@@ -812,7 +812,7 @@ input[type="file"]:focus-visible::file-selector-button { outline: 4px solid var(
   max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
-  animation: px-boot .4s steps(6) both;
+  animation: px-boot .4s steps(6) backwards;
 }
 
 .admin__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
@@ -1230,7 +1230,7 @@ body.has-tour { overflow: hidden; }
   text-align: center;
 }
 
-.tour__box.is-turning { animation: px-boot .3s steps(4) both; }
+.tour__box.is-turning { animation: px-boot .3s steps(4) backwards; }
 
 .tour__skip {
   position: absolute;
@@ -1895,7 +1895,7 @@ button.post__likes[hidden] { display: none; }
 .fancy-select.is-open .fancy-select__arrow { transform: rotate(180deg); }
 .fancy-select__panel { position: absolute; top: calc(100% + 10px); left: 0; right: 0; z-index: 7000;
                        padding: 6px; background: var(--px-paper); box-shadow: var(--px-edge), var(--px-drop);
-                       animation: px-boot .2s steps(3) both; }
+                       animation: px-boot .2s steps(3) backwards; }
 .fancy-select__panel[hidden] { display: none; }
 .fancy-select.opens-up .fancy-select__panel { top: auto; bottom: calc(100% + 10px); }
 .fancy-select__search { width: 100%; margin: 0 0 6px; }
@@ -2244,9 +2244,12 @@ h2 > .sprite, .btn > .sprite, .mode-pick > .sprite, .safety__eyebrow > .sprite {
 
 /* ---------- A: the login title screen ---------- */
 /* The pixel world fills the page behind the form; the form is a dialogue box on the sky */
-.title-screen { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--px-sky-bands); }
+/* Not position: fixed with a negative z-index: iPhone Safari drew that badly. It is a normal layer
+   that covers the page, and the form sits above it. */
+body.has-title-screen { position: relative; min-height: 100vh; min-height: 100dvh; }
+.title-screen { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--scene-sky, var(--px-sky-bands)); }
 .title-screen[hidden] { display: none; }
-.title-card { position: relative; margin-top: 8vh; }
+.title-card { position: relative; z-index: 1; margin-top: 8vh; }
 .title-card__logo { display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
                     color: var(--px-gold-dark); font-family: var(--font-pixel); font-size: 14px; }
 .title-card__logo .sprite { animation: px-bob 1s steps(2) infinite; }

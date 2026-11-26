@@ -41,6 +41,8 @@ PALETTE = {
     "a": "--px-water",
     "p": "--px-paper",
     "n": "--px-bad",
+    "k": "--px-pink",         # A: sakura blossom
+    "P": "--px-pink-dark",
 }
 
 # ------------------------------------------------------------------ the pictures
@@ -113,6 +115,19 @@ COIN_EDGE = [
     "....oGdo....",
     ".....oo.....",
 ]
+
+def waterfall_frame(step, height=16, width=8):
+    """A: one frame of the waterfall: rock on both sides, water in the middle with light
+    streaks that sit one row lower in each frame, then a foamy pool. step = 0, 1, 2."""
+    rows = []
+    for y in range(height):
+        water = "".join("p" if (x * 2 + y - step) % 5 == 0 else "a" for x in range(width))
+        rows.append("ot" + water + "to")
+    foam = "papa" if step % 2 == 0 else "apap"  # the splash at the bottom flickers
+    rows.append("ot" + foam * 2 + "to")
+    rows.append("pp" + foam[::-1] * 2 + "pp")
+    return rows
+
 
 SPRITES = {
     # name: list of frames (each frame is a list of rows)
@@ -465,12 +480,162 @@ SPRITES = {
         "oooooooo..",
         "........o.",
     ]],
+
+    # ---- A: creatures and scenery for the random backgrounds (scenery.py places them)
+    "butterfly": [[             # wings open, then closed: it flutters
+        "cc.....cc",
+        "cgc...cgc",
+        "cccoooccc",
+        ".cc.o.cc.",
+        "..c.o.c..",
+    ], [
+        "..c...c..",
+        "..cc.cc..",
+        "...coc...",
+        "...coc...",
+        "....o....",
+    ]],
+    "bird": [[                  # wings up, then down
+        "o......o",
+        ".o....o.",
+        "..oooo..",
+        "...oooc.",
+    ], [
+        "........",
+        "...oooc.",
+        "..oooo..",
+        ".o....o.",
+    ]],
+    "cat": [[                   # a cat asleep: its back rises and falls
+        "..............",
+        "o.o...........",
+        "ooo..oooooo...",
+        "otoooottttoo..",
+        "ottttttttttto.",
+        "ottttttttttbbo",
+        "oooooooooooooo",
+    ], [
+        "..............",
+        "o.o..oooooo...",
+        "ooo.ottttttoo.",
+        "otoottttttttto",
+        "ottttttttttto.",
+        "ottttttttttbbo",
+        "oooooooooooooo",
+    ]],
+    "dog": [[                   # wagging its tail
+        ".oo.......o.",
+        "obwo......wo",
+        "owowooooooo.",
+        "owwwwwwwwwo.",
+        ".oowwwwwwwo.",
+        "..owwwwwwwo.",
+        "..owo..owo..",
+        "..ooo..ooo..",
+    ], [
+        ".oo.........",
+        "obwo........",
+        "owowooooooo.",
+        "owwwwwwwwwoo",
+        ".oowwwwwwwow",
+        "..owwwwwwwo.",
+        "..owo..owo..",
+        "..ooo..ooo..",
+    ]],
+    "pine": [[                  # the top sways in the wind
+        ".....o.....",
+        "....olo....",
+        "...ollho...",
+        "..ollllho..",
+        "...olllo...",
+        "..ollllho..",
+        ".olllllllo.",
+        "...ollho...",
+        "..olllllo..",
+        ".ollllllho.",
+        "olllllllllo",
+        "ooooobooooo",
+        "....obo....",
+        "....obo....",
+        "...ooooo...",
+    ], [
+        "......o....",
+        ".....olo...",
+        "....ollho..",
+        "...ollllho.",
+        "...olllo...",
+        "..ollllho..",
+        ".olllllllo.",
+        "...ollho...",
+        "..olllllo..",
+        ".ollllllho.",
+        "olllllllllo",
+        "ooooobooooo",
+        "....obo....",
+        "....obo....",
+        "...ooooo...",
+    ]],
+    "sakura": [[                # cherry blossom: the crown sways
+        "...oooooo.....",
+        ".ookkkPkkoo...",
+        "okkPkkkkkkPo..",
+        "okkkkkkPkkkko.",
+        ".okkPkkkkPkko.",
+        "..ookkkkkkoo..",
+        "....oobbo.....",
+        ".....obo......",
+        ".....obbo.....",
+        ".....obo......",
+        "....obbbo.....",
+        "...ooooooo....",
+    ], [
+        "....oooooo....",
+        "..ookkkPkkoo..",
+        ".okkPkkkkkkPo.",
+        ".okkkkkkPkkkko",
+        "..okkPkkkkPkko",
+        "...ookkkkkkoo.",
+        "....oobbo.....",
+        ".....obo......",
+        ".....obbo.....",
+        ".....obo......",
+        "....obbbo.....",
+        "...ooooooo....",
+    ]],
+    "waterfall": [waterfall_frame(0), waterfall_frame(1), waterfall_frame(2)],
+    "rock": [[
+        "..oooo..",
+        ".otttto.",
+        "otKtttto",
+        "otttttto",
+        "oooooooo",
+    ]],
+    "flowers": [[
+        ".n....g.",
+        "nGn..gGg",
+        ".n....g.",
+        ".l..l.l.",
+        ".l.l..l.",
+    ]],
+    "petal": [[                 # falls from the sakura trees
+        ".k.",
+        "kPk",
+        ".k.",
+    ]],
+    "leaf": [[                  # falls in the meadow and the pine forest
+        ".R.",
+        "RlR",
+        ".l.",
+    ]],
 }
 
 # A: every "icon-" sprite above is small (2 x 2 pixels), like the pin marks
 ICONS = [name for name in SPRITES if name.startswith("icon-")]
 
-FRAME_TIME_S = {"explorer": 0.6, "coin-spin": 0.8, "icon-flame": 0.5}  # one whole animation loop
+FRAME_TIME_S = {"explorer": 0.6, "coin-spin": 0.8, "icon-flame": 0.5,
+                # A: the scenery moves slowly, the creatures a bit faster
+                "butterfly": 0.4, "bird": 0.5, "cat": 2.4, "dog": 0.5, "pine": 2.0,
+                "sakura": 2.4, "waterfall": 0.45}  # one whole animation loop
 PIXEL_SIZE = {"mark-verified": SMALL_PIXEL, "mark-collectible": SMALL_PIXEL, "warning": SMALL_PIXEL}  # the rest use PIXEL
 PIXEL_SIZE.update({name: SMALL_PIXEL for name in ICONS})
 

@@ -4,31 +4,14 @@
   {% include "_head.html" %}
   <title>Log in · StepQuest</title>
 </head>
-<body>
+<body class="has-title-screen">
   {% set active = "account" %}
   {% include "_topbar.html" %}
 
   <!-- A: logged out, the page is a title screen: the same pixel world as the welcome page,
        with the form as a dialogue box over the sky -->
   <div class="title-screen" id="titleScreen" aria-hidden="true">
-    <div class="scene">
-      <span class="scene__sun"></span>
-      <span class="scene__sky">
-        <span class="sprite sprite--cloud scene__cloud scene__cloud--one"></span>
-        <span class="sprite sprite--cloud scene__cloud scene__cloud--two"></span>
-        <span class="sprite sprite--cloud scene__cloud scene__cloud--three"></span>
-      </span>
-      <span class="scene__hill scene__hill--back"></span>
-      <span class="scene__hill scene__hill--front"></span>
-      <span class="sprite sprite--tree scene__tree scene__tree--one"></span>
-      <span class="sprite sprite--tree scene__tree scene__tree--two"></span>
-      <span class="scene__ground"></span>
-      <span class="scene__path"></span>
-      <span class="scene__hero"><span class="sprite sprite--explorer"></span></span>
-      <span class="scene__chest"><span class="sprite sprite--chest"></span></span>
-      <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--one"></span>
-      <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--two"></span>
-    </div>
+    {% include "_scene.html" %}{# A: a new random landscape on every visit (scenery.py) #}
   </div>
 
   <!-- Logged out: log in or create an account -->

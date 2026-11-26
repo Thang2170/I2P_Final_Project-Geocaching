@@ -31,6 +31,8 @@
   --px-cloud-shade: #cfe3ea;
   --px-dirt: #d9b47a;
   --px-water: #4b9fc4;
+  --px-pink: #f4a6c0;         /* A: sakura blossom */
+  --px-pink-dark: #d9739a;
 
   /* The interface around the pictures stays calm */
   --px-bg: #f1ede0;           /* page background, like old paper */
@@ -675,7 +677,9 @@
 }
 
 /* Boxes "draw in" from the top, like an old screen loading line by line.
-   The -16px leaves room for the pixel edge and shadow outside the box. */
+   The -16px leaves room for the pixel edge and shadow outside the box.
+   A: use it with "backwards", never "both": a clip-path left on after the animation made
+   iPhone Safari cut off cards whose content grew after loading (the welcome page). */
 @keyframes px-boot {
   from { clip-path: inset(-16px -16px 100% -16px); }
   to { clip-path: inset(-16px); }
@@ -867,3 +871,39 @@
 @media (prefers-reduced-motion: reduce) {
   .scene__cloud, .scene__path, .scene__hero .sprite { animation: none; }
 }
+
+/* ---------- A: random landscapes (scenery.py picks them, templates/_scene.html draws them) ---------- */
+.scene { overflow: hidden; background: var(--scene-sky, var(--px-sky-bands)); }
+.scene-item > .sprite { transform: scale(var(--s, 1)); transform-origin: bottom left; }
+/* Each piece of scenery starts its own frames at a different moment, so they don't sway in step */
+.scene-item .sprite::before { animation-delay: var(--d, 0s); }
+/* Birds and butterflies drift in a loop across their patch of sky */
+.scene-item--flyer { animation: scene-fly 16s steps(64) infinite; animation-delay: var(--d, 0s); }
+@keyframes scene-fly {
+  25% { translate: 64px -16px; }
+  50% { translate: 128px 0; }
+  75% { translate: 64px 12px; }
+}
+/* Petals and leaves drift down from the top and sway on the way */
+.scene-item--fall { top: -16px; animation: scene-fall 11s steps(55) infinite; animation-delay: var(--d, 0s); }
+@keyframes scene-fall {
+  0% { translate: 0 0; opacity: 0; }
+  5% { opacity: 1; }
+  50% { translate: 32px 260px; }
+  90% { opacity: 1; }
+  100% { translate: -8px 520px; opacity: 0; }
+}
+/* The sleeping cat's "z" floats up */
+.scene-zz { position: absolute; left: 8px; top: -16px; color: var(--px-ink); font-family: var(--font-pixel);
+            font-size: 10px; animation: scene-zz 2.4s steps(4) infinite; }
+@keyframes scene-zz {
+  0% { opacity: 0; translate: 0 4px; }
+  30% { opacity: 1; }
+  100% { opacity: 0; translate: 8px -16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-item--flyer, .scene-item--fall, .scene-zz { animation: none; }
+  .scene-item--fall { display: none; }
+}
+/* On a phone the sun would sit behind the headline: tuck it into the corner */
+@media (max-width: 520px) { .scene__sun { top: 12px; right: 12px; transform: scale(.6); transform-origin: top right; } }

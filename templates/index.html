@@ -106,29 +106,7 @@
       <!-- WELCOME BANNER: a little 8-bit world, drawn in CSS -->
       <section class="welcome-banner">
 
-        <div class="scene" aria-hidden="true">
-          <span class="scene__sun"></span>
-          <span class="scene__sky">
-            <span class="sprite sprite--cloud scene__cloud scene__cloud--one"></span>
-            <span class="sprite sprite--cloud scene__cloud scene__cloud--two"></span>
-            <span class="sprite sprite--cloud scene__cloud scene__cloud--three"></span>
-          </span>
-
-          <span class="scene__hill scene__hill--back"></span>
-          <span class="scene__hill scene__hill--front"></span>
-          <span class="sprite sprite--tree scene__tree scene__tree--one"></span>
-          <span class="sprite sprite--tree scene__tree scene__tree--two"></span>
-          <span class="sprite sprite--tree scene__tree scene__tree--three"></span>
-
-          <span class="scene__ground"></span>
-          <span class="scene__path"></span>
-
-          <span class="scene__hero"><span class="sprite sprite--explorer"></span></span>
-          <span class="scene__chest"><span class="sprite sprite--chest"></span></span>
-          <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--one"></span>
-          <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--two"></span>
-          <span class="sprite sprite--sparkle scene__sparkle scene__sparkle--three"></span>
-        </div>
+        {% include "_scene.html" %}{# A: a new random landscape on every visit (scenery.py) #}
 
         <div class="welcome-banner__content">
           <h1>Hidden treasure,<br>a short walk away</h1>

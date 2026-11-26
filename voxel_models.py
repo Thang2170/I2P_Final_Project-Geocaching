@@ -32,7 +32,9 @@ DEPTH = 2        # blocks thick (front to back)
 
 # Which pictures become 3D trophies (name in pixel_art.SPRITES -> file name)
 TROPHIES = ["trophy", "coin-spin", "chest-open", "badge", "gold-pin", "explorer", "flag",
-            "bubble-tea", "coffee", "map"]
+            "bubble-tea", "coffee", "map",
+            # A: the creatures and trees from the random landscapes (scenery.py) can be collected too
+            "cat", "dog", "butterfly", "bird", "sakura", "pine"]
 
 # The six faces of a block: (normal, the 4 corners as offsets from the block's corner)
 FACES = [
