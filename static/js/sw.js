@@ -3,7 +3,7 @@
 // always go straight to Python, so nothing is ever out of date or paid twice.
 //
 // Change VERSION when the cached files change, so phones throw the old copies away.
-const VERSION = "stepquest-v1";
+const VERSION = "stepquest-v2";  // B: v2 throws away the old copies saved before the polish update
 const SHELL = [
   "/offline",
   "/static/css/pixel.css",
@@ -40,15 +40,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (url.pathname.startsWith("/static/")) {
-    // Styles, scripts and pictures: the saved copy straight away, refreshed in the background.
+    // B: styles and scripts always come fresh when there is internet, because a new page with an
+    // old stylesheet looks broken (that happened after an update). The saved copy is only for offline.
+    // Pictures rarely change: the saved copy straight away, refreshed in the background.
+    const code = /\.(css|js)$/.test(url.pathname);
     event.respondWith(
       caches.open(VERSION).then(async (cache) => {
         const saved = await cache.match(request);
         const fresh = fetch(request).then((response) => {
           if (response.ok) cache.put(request, response.clone());
           return response;
-        }).catch(() => saved);
-        return saved || fresh;
+        });
+        if (code) return fresh.catch(() => saved || Response.error());
+        return saved || fresh.catch(() => Response.error());
       })
     );
   }
