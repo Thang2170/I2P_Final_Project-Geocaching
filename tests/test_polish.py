@@ -154,3 +154,18 @@ class ServiceWorkerTest(unittest.TestCase):
         self.assertIn("/\\.(css|js)$/", sw)                                  # styles and scripts...
         self.assertIn("if (code) return fresh.catch(() => saved", sw)        # ...network first, saved copy offline
         self.assertNotIn('VERSION = "stepquest-v1"', sw)                     # old saved copies are thrown away
+
+
+class StickyTopBarTest(unittest.TestCase):
+    """B: the top bar stays at the top while you scroll; things that stick below it use its height."""
+
+    def test_the_top_bar_sticks(self):
+        with open("static/css/app.css", encoding="utf-8") as f:
+            css = f.read()
+        bar = css[css.index("\n.topbar {"):css.index("}", css.index("\n.topbar {"))]
+        self.assertIn("position: sticky", bar)
+        self.assertIn("top: 0", bar)
+        self.assertIn("--topbar-h: 64px", css)
+        self.assertIn("top: calc(var(--topbar-h) + 16px)", css)  # Community's side columns
+        with open("static/css/styles.css", encoding="utf-8") as f:
+            self.assertIn("top: var(--topbar-h)", f.read())      # the home sidebar

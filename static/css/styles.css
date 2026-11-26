@@ -1151,7 +1151,7 @@ h2 > .sprite, .btn > .sprite { margin-right: 6px; vertical-align: -2px; }
 /* ---------- B: the shared top bar on the home page ----------
    _topbar.html sits above the dashboard, so the sidebar starts below it.
    On tablets and phones the sidebar is hidden: the top bar's Menu has every page. */
-.home-page .sidebar { top: 60px; height: calc(100vh - 60px); }
+.home-page .sidebar { top: var(--topbar-h); height: calc(100vh - var(--topbar-h)); }
 @media (max-width: 900px) {
   .home-page .sidebar { display: none; }
   .home-page .home-head { display: none; }  /* the top bar already says where you are */
