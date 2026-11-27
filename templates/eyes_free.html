@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/play.css') }}">
+  <title>Eyes-free mode · StepQuest</title>
+  <style>
+    .eyes-words { font-size: 34px; line-height: 1.25; min-height: 3em; margin: 16px 0; }
+    .eyes-start { font-size: 18px; padding: 22px 28px; }
+  </style>
+</head>
+<body>
+  {% set active = "eyes-free" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Eyes-free mode</h1>
+    <p class="muted">Put the phone in your pocket. It beeps faster as you get closer, buzzes which way to
+      turn, and says where the treasure is every few steps. Safer than looking at a screen, and it works
+      without seeing it at all.</p>
+    <p class="play-meta">{{ buzz_help }}</p>
+    <p id="pretendNote" class="play-pretend" hidden>Pretend mode: use the step and turn buttons.</p>
+
+    <label for="pick">Treasure</label>
+    <select id="pick"></select>
+    <div class="play-bar">
+      <button type="button" id="start" class="btn eyes-start">Start guiding me</button>
+      <button type="button" id="stop" class="btn btn--ghost" hidden>Stop</button>
+    </div>
+    <div id="pretendBar" class="play-bar" hidden>
+      <button type="button" id="closer" class="btn btn--ghost">Step closer (10 m)</button>
+      <button type="button" id="away" class="btn btn--ghost">Step away (10 m)</button>
+      <button type="button" id="turnLeft" class="btn btn--ghost">Turn left</button>
+      <button type="button" id="turnRight" class="btn btn--ghost">Turn right</button>
+    </div>
+    <p id="words" class="eyes-words" role="status" aria-live="assertive"></p>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/where.js') }}"></script>
+  <script>
+    // B: guide.py decides how fast to beep, how to buzz and what to say. This page only plays it.
+    const $ = id => document.getElementById(id);
+    let audio = null, beepTimer = null, askTimer = null, latest = null, heading = null;
+    let lastSpoken = 0, lastDirection = null, target = null;
+    const SAY_EVERY_MS = 15000;
+
+    function beep(high) {
+      if (!audio) return;
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.frequency.value = high ? 1320 : 880;
+      gain.gain.setValueAtTime(0.25, audio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.09);
+      osc.connect(gain).connect(audio.destination);
+      osc.start();
+      osc.stop(audio.currentTime + 0.1);
+    }
+
+    function beepLoop() {
+      if (!latest) { beepTimer = setTimeout(beepLoop, 500); return; }
+      beep(latest.found);
+      beepTimer = setTimeout(beepLoop, latest.gap_ms);
+    }
+
+    function speak(text) {
+      $("words").textContent = text;
+      if ("speechSynthesis" in window) {
+        speechSynthesis.cancel();
+        speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+      }
+    }
+
+    async function ask() {
+      const p = Where.current();
+      if (!p || !target) return;
+      const params = new URLSearchParams({ lat: p.lat, lon: p.lon });
+      if (heading !== null) params.set("heading", String(Math.round(heading) % 360));
+      try {
+        const res = await fetch(`/api/guide/${target.id}?${params}`);
+        const data = await res.json();
+        if (!res.ok) { speak(data.error || "Something went wrong."); return; }
+        latest = data;
+        const now = Date.now();
+        if (data.found || data.direction !== lastDirection || now - lastSpoken > SAY_EVERY_MS) {
+          speak(data.words);
+          lastSpoken = now;
+          if (navigator.vibrate) navigator.vibrate(data.buzz);
+        }
+        lastDirection = data.direction;
+        if (data.found) stop(false);
+      } catch (err) {
+        $("words").textContent = "No connection. Still trying…";
+      }
+    }
+
+    function compass(event) {
+      if (typeof event.webkitCompassHeading === "number") heading = event.webkitCompassHeading;  // iPhone
+      else if (event.absolute && typeof event.alpha === "number") heading = (360 - event.alpha) % 360;
+    }
+
+    async function start() {
+      const option = $("pick").selectedOptions[0];
+      if (!option) return;
+      target = { id: option.value, lat: Number(option.dataset.lat), lon: Number(option.dataset.lon) };
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      await audio.resume();
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
+        try { await DeviceOrientationEvent.requestPermission(); } catch (err) { /* no compass: compass words instead */ }
+      }
+      window.addEventListener("deviceorientationabsolute", compass);
+      window.addEventListener("deviceorientation", compass);
+      if (Where.pretend) {
+        if (!Where.current()) Where.set(target.lat - 0.0012, target.lon);  // start about 130 m south
+        heading = heading === null ? 0 : heading;
+      }
+      Where.start(text => speak(text));
+      lastDirection = null; lastSpoken = 0;
+      $("start").hidden = true; $("stop").hidden = false;
+      speak("Guiding you. Keep the phone in your pocket.");
+      clearTimeout(beepTimer); beepLoop();
+      clearInterval(askTimer); askTimer = setInterval(ask, 2000);
+      ask();
+    }
+
+    function stop(sayIt = true) {
+      clearInterval(askTimer);
+      setTimeout(() => clearTimeout(beepTimer), latest && latest.found ? 3000 : 0);
+      $("start").hidden = false; $("stop").hidden = true;
+      if (sayIt) speak("Stopped.");
+    }
+
+    async function loadTreasures() {
+      const res = await fetch("/api/treasures");
+      const list = await res.json();
+      $("pick").replaceChildren(...list.map(t => {
+        const o = document.createElement("option");
+        o.value = String(t.id);
+        o.textContent = t.name;
+        o.dataset.lat = String(t.lat);
+        o.dataset.lon = String(t.lon);
+        return o;
+      }));
+      $("pick").dispatchEvent(new Event("options-changed"));
+    }
+
+    $("start").addEventListener("click", start);
+    $("stop").addEventListener("click", () => stop(true));
+    if (Where.pretend) {
+      $("pretendNote").hidden = false; $("pretendBar").hidden = false;
+      $("closer").addEventListener("click", () => { if (target) { Where.step(target.lat, target.lon, 10); ask(); } });
+      $("away").addEventListener("click", () => { if (target) { Where.step(target.lat, target.lon, -10); ask(); } });
+      $("turnLeft").addEventListener("click", () => { heading = ((heading ?? 0) + 270) % 360; ask(); });
+      $("turnRight").addEventListener("click", () => { heading = ((heading ?? 0) + 90) % 360; ask(); });
+    }
+    loadTreasures();
+  </script>
+</body>
+</html>

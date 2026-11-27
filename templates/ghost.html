@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/play.css') }}">
+  <title>Ghost race · StepQuest</title>
+  <style>
+    .ghost-clock { font-family: var(--font-pixel); font-size: 28px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  {% set active = "ghost" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Ghost race</h1>
+    <p class="muted">Race the fastest player who ever won a hunt to a treasure. Their ghost walks beside
+      you at the speed they really went, and you see who is ahead as you go.</p>
+    <p id="pretendNote" class="play-pretend" hidden>Pretend mode: tap the map, or use "Step closer".</p>
+
+    <label for="pick">Treasure to race to</label>
+    <select id="pick"></select>
+    <p id="noGhosts" class="muted" hidden>No ghosts yet: win a hunt race first, then race your own ghost here.</p>
+    <div class="play-bar">
+      <label class="play-check"><input type="checkbox" id="mine"> Race my own best time</label>
+    </div>
+    <div class="play-bar">
+      <button type="button" id="start" class="btn">Start the race</button>
+      <button type="button" id="stop" class="btn btn--ghost" hidden>Stop</button>
+      <button type="button" id="closer" class="btn btn--ghost" hidden>Step closer (10 m)</button>
+    </div>
+    <p id="clock" class="ghost-clock" aria-label="Race time">0:00</p>
+    <p id="say" class="play-say" role="status" aria-live="polite"></p>
+    <div id="ghostMap" class="play-map" role="img" aria-label="Map with you and the ghost"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="{{ url_for('static', filename='js/where.js') }}"></script>
+  <script>
+    // B: ghost.py says where the ghost is and who leads. This page only moves the dots.
+    const $ = id => document.getElementById(id);
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    const map = L.map("ghostMap").setView([24.7953, 120.995], 17);
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    const layer = L.layerGroup().addTo(map);
+    const say = (text, kind) => { $("say").textContent = text; $("say").className = "play-say" + (kind ? ` play-say--${kind}` : ""); };
+    const dot = kind => L.divIcon({ className: `play-dot play-dot--${kind}`, iconSize: [18, 18] });
+    let ghosts = [], race = null, meMarker = null, ghostMarker = null, timer = null;
+
+    async function loadList() {
+      const res = await fetch("/api/ghosts");
+      if (res.status === 401) { location.href = "/login?next=/ghost"; return; }
+      ghosts = (await res.json()).ghosts;
+      $("pick").replaceChildren(...ghosts.map(g => {
+        const option = document.createElement("option");
+        option.value = String(g.treasure_id);
+        option.textContent = `${g.treasure}: ${g.ghost}'s ghost, ${g.time}` + (g.my_best ? ` (your best ${g.my_best})` : "");
+        return option;
+      }));
+      $("pick").dispatchEvent(new Event("options-changed"));
+      $("noGhosts").hidden = ghosts.length > 0;
+      $("start").disabled = ghosts.length === 0;
+      if (ghosts.length) preview();
+    }
+
+    async function preview() {
+      const who = $("mine").checked ? "?who=me" : "";
+      const res = await fetch(`/api/ghosts/${$("pick").value}${who}`);
+      const data = await res.json();
+      layer.clearLayers();
+      if (!res.ok) { say(data.error, "bad"); return null; }
+      say(`${data.ghost}'s ghost reached ${data.treasure.name} in ${data.time}. Go to the start (the white dot), then press Start.`);
+      L.polyline(data.line, { color: "#ffffff", weight: 3, opacity: .6, dashArray: "4 8" }).addTo(layer);
+      L.circleMarker([data.treasure.lat, data.treasure.lon], { radius: 10, color: "#f0b429", weight: 4 }).addTo(layer);
+      ghostMarker = L.marker([data.start.lat, data.start.lon], { icon: dot("ghost"), title: `${data.ghost}'s ghost` }).addTo(layer);
+      map.fitBounds(L.latLngBounds(data.line).pad(0.3));
+      if (Where.pretend && !race) Where.set(data.start.lat, data.start.lon);
+      return data;
+    }
+
+    async function tick() {
+      const p = Where.current();
+      if (!race || !p) return;
+      const elapsed = (performance.now() - race.t0) / 1000;
+      const res = await fetch(`/api/ghosts/${race.id}/compare`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ elapsed_s: elapsed, lat: p.lat, lon: p.lon, who: race.who })
+      });
+      const data = await res.json();
+      if (!res.ok) { say(data.error || "Something went wrong.", "bad"); return; }
+      $("clock").textContent = data.clock;
+      ghostMarker.setLatLng([data.ghost.lat, data.ghost.lon]);
+      say(data.text, data.finished ? "good" : (data.lead_m < 0 ? "bad" : null));
+      if (data.finished) stop();
+    }
+
+    function stop() {
+      clearInterval(timer);
+      race = null;
+      $("start").hidden = false; $("stop").hidden = true; $("closer").hidden = true;
+    }
+
+    $("start").addEventListener("click", async () => {
+      const data = await preview();
+      if (!data) return;
+      race = { id: data.treasure.id, who: $("mine").checked ? "me" : "best", t0: performance.now(), goal: data.treasure };
+      $("start").hidden = true; $("stop").hidden = false; $("closer").hidden = !Where.pretend;
+      say("Go!");
+      timer = setInterval(tick, 2000);
+    });
+    $("stop").addEventListener("click", () => { stop(); say("Race stopped."); });
+    $("closer").addEventListener("click", () => { if (race) Where.step(race.goal.lat, race.goal.lon, 10); });
+    $("pick").addEventListener("change", () => { if (!race) preview(); });
+    $("mine").addEventListener("change", () => { if (!race) preview(); });
+
+    Where.onChange(p => {
+      if (!meMarker) meMarker = L.marker([p.lat, p.lon], { icon: dot("me"), title: "You" }).addTo(map);
+      else meMarker.setLatLng([p.lat, p.lon]);
+    });
+    if (Where.pretend) {
+      $("pretendNote").hidden = false;
+      map.on("click", e => Where.set(e.latlng.lat, e.latlng.lng));
+    }
+    Where.start(text => say(text, "bad"));
+    loadList();
+  </script>
+</body>
+</html>

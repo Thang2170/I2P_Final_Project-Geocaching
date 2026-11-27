@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/play.css') }}">
+  <title>Wandering treasure · StepQuest</title>
+</head>
+<body>
+  {% set active = "wanderer" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>The wandering treasure</h1>
+    <p class="muted">One treasure walks around campus by itself. Nobody can see where it is, only its
+      footprints: where it was yesterday, and 12, 6 and 3 hours ago. Guess where it is heading, go there,
+      and try to catch it. <span id="reward"></span></p>
+    <p id="pretendNote" class="play-pretend" hidden>Pretend mode: tap the map to move yourself.</p>
+
+    <div id="wanderMap" class="play-map" role="img" aria-label="Map of the wandering treasure's footprints"></div>
+    <ol id="prints" class="play-history" aria-label="Footprints, oldest first"></ol>
+
+    <div class="play-bar">
+      <button type="button" id="catchButton" class="btn">Catch it here</button>
+      <span id="walked" class="muted"></span>
+    </div>
+    <p id="say" class="play-say" role="status" aria-live="polite"></p>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="{{ url_for('static', filename='js/where.js') }}"></script>
+  <script>
+    // B: wanderer.py decides where it is and whether you caught it. This page only draws.
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    const map = L.map("wanderMap");
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    const layer = L.layerGroup().addTo(map);
+    const say = (text, kind) => {
+      const box = document.getElementById("say");
+      box.textContent = text;
+      box.className = "play-say" + (kind ? ` play-say--${kind}` : "");
+    };
+    let meMarker = null, first = true, timer = null;
+    const reveal = new URLSearchParams(location.search).get("reveal") === "1" ? "?reveal=1" : "";
+
+    function printIcon(label) {
+      const span = document.createElement("span");
+      span.className = "play-print";
+      span.textContent = label;
+      return L.divIcon({ className: "", html: span, iconSize: null });
+    }
+
+    async function load() {
+      const res = await fetch("/api/wanderer" + reveal);
+      if (res.status === 401) { location.href = "/login?next=/wanderer"; return; }
+      const data = await res.json();
+      document.getElementById("reward").textContent =
+        `Catching it is worth ${data.coins} coins, once a day.` + (data.caught_today ? " You caught it today already!" : "");
+      document.getElementById("walked").textContent = `It walked about ${data.walked_today_m} m in the last 24 hours.`;
+      layer.clearLayers();
+      L.circle([data.home.lat, data.home.lon], { radius: data.radius_m, color: "#f0b429", weight: 2, dashArray: "6 6", fill: false })
+        .addTo(layer);
+      const line = data.footprints.map(p => [p.lat, p.lon]);
+      L.polyline(line, { color: "#f0b429", weight: 3, dashArray: "2 8" }).addTo(layer);
+      const list = document.getElementById("prints");
+      list.replaceChildren();
+      for (const p of data.footprints) {
+        L.marker([p.lat, p.lon], { icon: printIcon(p.label), keyboard: false }).addTo(layer);
+        const li = document.createElement("li");
+        li.textContent = `${p.label}: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+        list.append(li);
+      }
+      if (data.now) L.marker([data.now.lat, data.now.lon], { icon: printIcon("NOW (admin)") }).addTo(layer);
+      if (first) { map.fitBounds(L.latLngBounds(line).pad(0.4)); first = false; }
+      if (Where.pretend && !Where.current()) Where.set(data.home.lat, data.home.lon);
+      if (!timer) timer = setInterval(load, data.refresh_s * 1000);  // the footprints move on every 10 minutes
+    }
+
+    Where.onChange(p => {
+      const icon = L.divIcon({ className: "play-dot play-dot--me", iconSize: [18, 18] });
+      if (!meMarker) meMarker = L.marker([p.lat, p.lon], { icon, title: "You" }).addTo(map);
+      else meMarker.setLatLng([p.lat, p.lon]);
+    });
+    if (Where.pretend) {
+      document.getElementById("pretendNote").hidden = false;
+      map.on("click", e => Where.set(e.latlng.lat, e.latlng.lng));
+    }
+    Where.start(text => say(text, "bad"));
+
+    document.getElementById("catchButton").addEventListener("click", async () => {
+      const p = Where.current();
+      if (!p) { say("Waiting for your position…", "bad"); return; }
+      try {
+        const res = await fetch("/api/wanderer/catch", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: p.lat, lon: p.lon })
+        });
+        const data = await res.json();
+        if (!res.ok) { say(data.error || "Something went wrong.", "bad"); return; }
+        say(data.text, data.result === "caught" ? "good" : null);
+        if (data.coins_earned) load();
+      } catch (err) {
+        say("No connection. Try again.", "bad");
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

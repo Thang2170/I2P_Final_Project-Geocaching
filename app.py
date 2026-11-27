@@ -52,6 +52,12 @@ from treasure_api import treasure_api
 from walk_api import walk_api
 from walk_proof import parse_mode
 from walk_proof_api import walk_proof_api
+from box_api import box_api  # B: six new ways to play (box_code, wanderer, ghost, team_lock, travelers, guide)
+from ghost_api import ghost_api
+from guide_api import guide_api
+from team_api import team_api
+from traveler_api import traveler_api
+from wanderer_api import wanderer_api
 
 
 def get_current_treasure(user=None):
@@ -151,6 +157,8 @@ def create_app(database_uri="sqlite:///geohunt.db"):
     app.register_blueprint(onboarding_api)
     app.register_blueprint(trail_api)  # B: Treasure Trail loops (trail_planner.py)
     app.register_blueprint(walk_proof_api)  # B: prove you walked (walk_proof.py)
+    for blueprint in (box_api, ghost_api, guide_api, team_api, traveler_api, wanderer_api):
+        app.register_blueprint(blueprint)  # B: six new ways to play
     app.register_blueprint(riddle_api)  # B: riddle chains (riddles.py)
     app.register_blueprint(challenge_api)  # B: streaks and weekly challenges (streaks.py)
     app.register_blueprint(pwa_api)  # B: install as an app (manifest, service worker)

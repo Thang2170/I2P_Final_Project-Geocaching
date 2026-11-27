@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/play.css') }}">
+  <title>Treasure boxes · StepQuest</title>
+  <style>
+    .code-input { font-family: var(--font-pixel); font-size: 22px; letter-spacing: 6px; max-width: 12ch; }
+  </style>
+</head>
+<body>
+  {% set active = "box" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Treasure boxes</h1>
+    <p class="muted">Some treasures have a real box next to them. Its screen shows 6 numbers that change
+      every 30 seconds. Type them here to prove you were really there; then you can find the treasure.
+      A faked GPS cannot get you the code, and each code works for one player only.</p>
+
+    <ul id="boxes" class="play-list" aria-live="polite"></ul>
+    <p id="none" class="muted" hidden>No treasure has a box yet.</p>
+
+    <section id="owner" class="play-owner" aria-labelledby="ownerTitle" hidden>
+      <h2 id="ownerTitle">Give one of your treasures a box</h2>
+      <form id="addForm">
+        <label for="addPick">Treasure</label>
+        <select id="addPick" required></select>
+        <div class="play-bar"><button type="submit" class="btn">Make a box</button></div>
+      </form>
+      <div id="secretBox" hidden>
+        <p><strong>Copy this secret now. It is shown only once.</strong></p>
+        <p id="secret" class="play-secret"></p>
+        <ol class="play-history">
+          <li>On the ESP32: put it in <code>config.py</code> as <code>BOX_SECRET = "..."</code>.</li>
+          <li>Upload <code>box_main.py</code> and <code>box_math.py</code> (rename box_main.py to main.py).</li>
+          <li>No ESP32 at hand? On your laptop: <code>python simulate_box.py</code> shows the same codes.</li>
+        </ol>
+      </div>
+      <p id="addSay" class="play-say" role="status"></p>
+    </section>
+  </main>
+
+  <script>
+    // B: box_code.py checks the code. This page only sends what you typed.
+    const $ = id => document.getElementById(id);
+    const say = (box, text, kind) => { box.textContent = text; box.className = "play-say" + (kind ? ` play-say--${kind}` : ""); };
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function boxEl(b, i) {
+      const li = el("li", undefined, "play-item");
+      const head = el("h2", b.treasure);
+      if (b.proved) head.append(" ", el("span", "Proved", "play-badge"));
+      li.append(head);
+      const msg = el("p", "", "play-say");
+      msg.setAttribute("role", "status");
+      if (b.proved) {
+        li.append(el("p", "You were really here. Find it on the map if you have not yet.", "play-meta"));
+      } else {
+        const form = el("form", undefined, "play-bar");
+        const label = el("label", "Code on the box", "visually-hidden");
+        const input = el("input", undefined, "code-input");
+        input.id = label.htmlFor = `code${i}`;
+        input.inputMode = "numeric";
+        input.autocomplete = "one-time-code";
+        input.maxLength = 7;
+        input.placeholder = "123456";
+        input.required = true;
+        const button = el("button", "Prove I'm here", "btn");
+        button.type = "submit";
+        form.append(label, input, button);
+        form.addEventListener("submit", async event => {
+          event.preventDefault();
+          button.disabled = true;
+          try {
+            const res = await fetch(`/api/treasures/${b.treasure_id}/box/proof`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ code: input.value })
+            });
+            const data = await res.json();
+            say(msg, res.ok ? data.text : data.error, res.ok ? "good" : "bad");
+            if (res.ok) setTimeout(load, 1500);
+          } catch (err) {
+            say(msg, "No connection. Try again.", "bad");
+          } finally {
+            button.disabled = false;
+          }
+        });
+        li.append(form);
+      }
+      li.append(msg);
+      if (b.mine) {
+        const del = el("button", "Take the box away", "link-button");
+        del.type = "button";
+        del.addEventListener("click", async () => {
+          if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "Sure? Tap again"; return; }
+          await fetch(`/api/treasures/${b.treasure_id}/box`, { method: "DELETE" });
+          load();
+        });
+        li.append(del);
+      }
+      return li;
+    }
+
+    async function load() {
+      const res = await fetch("/api/boxes");
+      if (res.status === 401) { location.href = "/login?next=/box"; return; }
+      const data = await res.json();
+      $("boxes").replaceChildren(...data.boxes.map(boxEl));
+      $("none").hidden = data.boxes.length > 0;
+      $("owner").hidden = data.can_add.length === 0 && $("secretBox").hidden;
+      $("addPick").replaceChildren(...data.can_add.map(t => { const o = el("option", t.name); o.value = String(t.id); return o; }));
+      $("addPick").dispatchEvent(new Event("options-changed"));
+    }
+
+    $("addForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const res = await fetch(`/api/treasures/${$("addPick").value}/box`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { say($("addSay"), data.error, "bad"); return; }
+      $("secret").textContent = data.secret;
+      $("secretBox").hidden = false;
+      say($("addSay"), `${data.treasure} has a box now. ${data.note}`, "good");
+      load();
+    });
+
+    load();
+  </script>
+</body>
+</html>

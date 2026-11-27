@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/play.css') }}">
+  <title>Team treasures · StepQuest</title>
+</head>
+<body>
+  {% set active = "team" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Team treasures</h1>
+    <p class="muted">These treasures cannot be opened alone. Bring friends: when enough players tap
+      "I'm here" at the treasure within one minute, it opens for all of them, with a bonus each.
+      Then find it on the map as usual.</p>
+    <p id="pretendNote" class="play-pretend" hidden>Pretend mode: "I'm here" uses the treasure's own spot.</p>
+
+    <ul id="locks" class="play-list" aria-live="polite"></ul>
+    <p id="none" class="muted" hidden>No team treasures yet.</p>
+    <p id="say" class="play-say" role="status" aria-live="polite"></p>
+
+    <section id="owner" class="play-owner" aria-labelledby="ownerTitle" hidden>
+      <h2 id="ownerTitle">Make one of your treasures a team treasure</h2>
+      <form id="addForm">
+        <label for="addPick">Treasure</label>
+        <select id="addPick" required></select>
+        <label for="addNeed">Players needed</label>
+        <select id="addNeed"><option value="2">2 players</option><option value="3">3 players</option></select>
+        <div class="play-bar"><button type="submit" class="btn">Make it a team treasure</button></div>
+        <p id="addSay" class="play-say" role="status"></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/where.js') }}"></script>
+  <script>
+    // B: team_lock.py decides who is here and when it opens. This page only shows it.
+    const $ = id => document.getElementById(id);
+    const say = (box, text, kind) => { box.textContent = text; box.className = "play-say" + (kind ? ` play-say--${kind}` : ""); };
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    async function here(lock, button) {
+      const p = Where.pretend ? { lat: lock.lat, lon: lock.lon } : Where.current();
+      if (!p) { say($("say"), "Waiting for your position…", "bad"); return; }
+      button.disabled = true;
+      try {
+        const res = await fetch(`/api/team-locks/${lock.id}/here`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: p.lat, lon: p.lon })
+        });
+        const data = await res.json();
+        if (!res.ok) { say($("say"), data.error || "Something went wrong.", "bad"); return; }
+        say($("say"), data.text, data.opened ? "good" : null);
+        load();
+      } catch (err) {
+        say($("say"), "No connection. Try again.", "bad");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function lockEl(lock) {
+      const li = el("li", undefined, "play-item");
+      const head = el("h2", lock.treasure);
+      if (lock.opened) head.append(" ", el("span", "Opened", "play-badge"));
+      li.append(head, el("p", `Needs ${lock.need} players together · +${lock.bonus} coins each · opened by ${lock.opened_by} so far`, "play-meta"));
+      li.append(el("p", lock.here.length ? `Here now: ${lock.here.join(", ")}` : "Nobody is here right now.", "play-meta"));
+      li.append(el("p", lock.text));
+      const bar = el("div", undefined, "play-bar");
+      if (!lock.opened) {
+        const button = el("button", "I'm here", "btn");
+        button.type = "button";
+        button.addEventListener("click", () => here(lock, button));
+        bar.append(button);
+      }
+      if (lock.mine) {
+        const del = el("button", "Stop being a team treasure", "link-button");
+        del.type = "button";
+        del.addEventListener("click", async () => {
+          if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "Sure? Tap again"; return; }
+          await fetch(`/api/treasures/${lock.treasure_id}/team-lock`, { method: "DELETE" });
+          load();
+        });
+        bar.append(del);
+      }
+      li.append(bar);
+      return li;
+    }
+
+    async function load() {
+      const res = await fetch("/api/team-locks");
+      if (res.status === 401) { location.href = "/login?next=/team"; return; }
+      const data = await res.json();
+      $("locks").replaceChildren(...data.locks.map(lockEl));
+      $("none").hidden = data.locks.length > 0;
+      $("owner").hidden = data.can_add.length === 0;
+      $("addPick").replaceChildren(...data.can_add.map(t => { const o = el("option", t.name); o.value = String(t.id); return o; }));
+      $("addPick").dispatchEvent(new Event("options-changed"));
+    }
+
+    $("addForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const res = await fetch(`/api/treasures/${$("addPick").value}/team-lock`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ need: Number($("addNeed").value) })
+      });
+      const data = await res.json();
+      say($("addSay"), res.ok ? `${data.treasure} now needs ${data.need} players together.` : data.error, res.ok ? "good" : "bad");
+      load();
+    });
+
+    if (Where.pretend) $("pretendNote").hidden = false;
+    Where.start(text => say($("say"), text, "bad"));
+    load();
+    setInterval(() => { if (!document.hidden) load(); }, 5000);  // see friends arrive
+  </script>
+</body>
+</html>

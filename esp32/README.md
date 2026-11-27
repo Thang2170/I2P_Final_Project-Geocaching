@@ -67,3 +67,18 @@ Settings: `OLLAMA_URL` (default `http://127.0.0.1:11434`) and `OLLAMA_MODEL` (de
 - The maths and both drivers are tested on the PC with simulated signals and a pretend I2C bus.
 - **It has not run on a real ESP32 yet** (no hardware tonight). Expect to tune `STEP_HIGH_G` /
   `STEP_LOW_G` (steps) and the LED current in `max30102.py` once it's on your wrist.
+
+## The treasure box (a second use for an ESP32, owner: B)
+
+The same ESP32 can be a **treasure box** instead of a band: it sits at a treasure and shows a
+6-number code that changes every 30 seconds. Players type it on StepQuest's Box page to prove
+they were really there (a faked GPS cannot get the code). It is the same maths as phone
+authenticator apps; `box_math.py` is checked against the server by `tests/test_play_rules.py`.
+
+1. On StepQuest, open **Menu > Treasure boxes** and make a box for one of your treasures.
+   Copy the secret it shows (it is shown only once).
+2. In `config.py`, set `BOX_SECRET`, `WIFI_SSID` and `WIFI_PASSWORD` (Wi-Fi is only used to set the clock).
+3. Upload `box_main.py` (renamed to `main.py`), `box_math.py` and `config.py`.
+   With a 128x64 SSD1306 OLED (about NT$100, on the I2C pins) also upload MicroPython's `ssd1306.py`;
+   without one, the code is printed in Thonny's Shell.
+4. No ESP32 at hand? `python simulate_box.py "Gate box"` on the laptop shows the same codes.

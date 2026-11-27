@@ -113,6 +113,14 @@ def claim_treasure(treasure_id):
     if hidden:
         return jsonify(error=hidden), 409
 
+    # B: a team treasure opens only for players who came together (team_lock.py), and a treasure
+    # with a box only for players who typed its code (box_code.py)
+    from box_api import claim_refusal as box_refusal
+    from team_api import claim_refusal as team_refusal
+    locked = team_refusal(treasure, user.id) or box_refusal(treasure, user.id)
+    if locked:
+        return jsonify(error=locked), 409
+
     # B: prove you walked (walk_proof.py). Does your GPS trail look like a real walk here?
     from walk_proof_api import check_find, flag_find  # here: walk_proof_api imports this file
     refusal, reasons = check_find(user, treasure, lat, lon)

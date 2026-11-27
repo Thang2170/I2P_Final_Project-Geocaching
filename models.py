@@ -817,3 +817,103 @@ class LoginFailure(db.Model):
     username = db.Column(db.String(50), nullable=False, index=True)  # as typed, in lower case
     place = db.Column(db.String(64), nullable=False)                   # the address the try came from
     at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+# ---------------------------------------------------------------- B: six new ways to play
+
+
+class TreasureBox(db.Model):
+    """B: a real box at a treasure that shows a code changing every 30 s (box_code.py).
+
+    The secret is shown once, when the box is made, to put in the ESP32's config.py.
+    While a treasure has a box, it can only be found after typing the box's code (a BoxProof).
+    """
+
+    __tablename__ = "treasure_boxes"
+    id = db.Column(db.Integer, primary_key=True)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False, unique=True)
+    secret = db.Column(db.String(64), nullable=False)  # hex
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class BoxProof(db.Model):
+    """B: a player typed the right code at a box. Each code (counter) works for one player only."""
+
+    __tablename__ = "box_proofs"
+    __table_args__ = (db.UniqueConstraint("box_id", "user_id", name="one_proof_per_player"),
+                      db.UniqueConstraint("box_id", "counter", name="one_player_per_code"))
+    id = db.Column(db.Integer, primary_key=True)
+    box_id = db.Column(db.Integer, db.ForeignKey("treasure_boxes.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    counter = db.Column(db.Integer, nullable=False)  # which 30-second code it was
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class WandererCatch(db.Model):
+    """B: a player caught the wandering treasure (wanderer.py). Once per player per Taiwan day."""
+
+    __tablename__ = "wanderer_catches"
+    __table_args__ = (db.UniqueConstraint("user_id", "day", name="one_catch_per_day"),)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    day = db.Column(db.Date, nullable=False)
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class TeamLock(db.Model):
+    """B: a treasure that opens only when `need` players are at it together (team_lock.py)."""
+
+    __tablename__ = "team_locks"
+    id = db.Column(db.Integer, primary_key=True)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False, unique=True)
+    need = db.Column(db.Integer, nullable=False)  # 2 or 3
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class TeamCheckin(db.Model):
+    """B: a player tapped "I'm here" at a team treasure. Old ones are deleted."""
+
+    __tablename__ = "team_checkins"
+    id = db.Column(db.Integer, primary_key=True)
+    lock_id = db.Column(db.Integer, db.ForeignKey("team_locks.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class TeamOpen(db.Model):
+    """B: the team lock opened for this player (so they may find the treasure, and got the team bonus)."""
+
+    __tablename__ = "team_opens"
+    __table_args__ = (db.UniqueConstraint("lock_id", "user_id", name="one_open_per_player"),)
+    id = db.Column(db.Integer, primary_key=True)
+    lock_id = db.Column(db.Integer, db.ForeignKey("team_locks.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class Traveler(db.Model):
+    """B: a traveling treasure that players carry from treasure to treasure (travelers.py).
+
+    Where it is now is not stored here: it comes from its moves (the last one wins).
+    """
+
+    __tablename__ = "travelers"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(30), nullable=False)
+    goal_treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
+class TravelerMove(db.Model):
+    """B: one move of a traveler: released or dropped at a treasure, or picked up by a player."""
+
+    __tablename__ = "traveler_moves"
+    id = db.Column(db.Integer, primary_key=True)
+    traveler_id = db.Column(db.Integer, db.ForeignKey("travelers.id"), nullable=False, index=True)
+    action = db.Column(db.String(10), nullable=False)  # travelers.RELEASE, PICK or DROP
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    treasure_id = db.Column(db.Integer, db.ForeignKey("treasures.id"), nullable=False)  # where (picked from, or left at)
+    at = db.Column(db.DateTime, default=_utcnow, nullable=False)
