@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "_head.html" %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/play.css') }}">
+  <title>Travelers · StepQuest</title>
+</head>
+<body>
+  {% set active = "travelers" %}
+  {% include "_topbar.html" %}
+
+  <main class="card">
+    <h1>Traveling treasures</h1>
+    <p class="muted">Travelers are things players carry from one treasure to the next. Pick one up where it
+      is waiting, carry it, and drop it at another treasure. Some want to reach a goal: whoever brings them
+      there gets <span id="bonus"></span> coins. You can carry one at a time.</p>
+    <p id="pretendNote" class="play-pretend" hidden>Pretend mode: choose which treasure you are standing at.</p>
+    <div id="pretendBox" hidden>
+      <label for="pretendAt">I am standing at</label>
+      <select id="pretendAt"></select>
+    </div>
+
+    <div id="travelMap" class="play-map" role="img" aria-label="Map of the chosen traveler's journey"></div>
+    <p id="say" class="play-say" role="status" aria-live="polite"></p>
+    <ul id="list" class="play-list"></ul>
+    <p id="none" class="muted" hidden>No travelers yet. Release the first one below.</p>
+
+    <section class="play-owner" aria-labelledby="newTitle">
+      <h2 id="newTitle">Release a traveler</h2>
+      <p class="muted">Stand at a treasure. Your traveler starts its journey there.</p>
+      <form id="newForm">
+        <label for="newName">Its name</label>
+        <input id="newName" maxlength="30" required placeholder="e.g. The Golden Duck">
+        <label for="newGoal">Goal (optional)</label>
+        <select id="newGoal"></select>
+        <div class="play-bar"><button type="submit" class="btn">Release it here</button></div>
+      </form>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="{{ url_for('static', filename='js/where.js') }}"></script>
+  <script>
+    // B: travelers.py decides who may pick up or drop what, and where. This page only shows it.
+    const $ = id => document.getElementById(id);
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+    const map = L.map("travelMap").setView([24.7953, 120.995], 17);
+    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+      maxZoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics"
+    }).addTo(map);
+    const layer = L.layerGroup().addTo(map);
+    const say = (text, kind) => { $("say").textContent = text; $("say").className = "play-say" + (kind ? ` play-say--${kind}` : ""); };
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+    let treasureSpots = {}, shownId = null;
+
+    function position() {
+      if (Where.pretend) return treasureSpots[$("pretendAt").value] || null;
+      return Where.current();
+    }
+
+    function show(t) {
+      shownId = t.id;
+      layer.clearLayers();
+      if (!t.line.length) return;
+      L.polyline(t.line, { color: "#f0b429", weight: 4 }).addTo(layer);
+      t.line.forEach((p, i) => L.circleMarker(p, { radius: 7, color: "#14231f", weight: 3,
+        fillColor: i === t.line.length - 1 ? "#f0b429" : "#ffffff", fillOpacity: 1 }).addTo(layer));
+      map.fitBounds(L.latLngBounds(t.line).pad(0.4), { maxZoom: 18 });
+    }
+
+    async function move(t, action) {
+      const p = position();
+      if (!p) { say("Waiting for your position…", "bad"); return; }
+      try {
+        const res = await fetch(`/api/travelers/${t.id}/${action}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: p.lat, lon: p.lon })
+        });
+        const data = await res.json();
+        if (!res.ok) { say(data.error || "Something went wrong.", "bad"); return; }
+        say(data.text, data.coins_earned ? "good" : null);
+        shownId = data.id;
+        load();
+      } catch (err) {
+        say("No connection. Try again.", "bad");
+      }
+    }
+
+    function travelerEl(t) {
+      const li = el("li", undefined, "play-item");
+      const head = el("h2", t.name);
+      if (t.goal_reached) head.append(" ", el("span", "Goal reached", "play-badge"));
+      li.append(head, el("p", `${t.where} · travelled ${t.travelled} over ${t.stops} stops · released by ${t.creator}`, "play-meta"));
+      li.append(el("p", t.goal));
+      const bar = el("div", undefined, "play-bar");
+      const action = el("button", t.in_my_bag ? "Drop it here" : "Pick it up", "btn");
+      action.type = "button";
+      action.addEventListener("click", () => move(t, t.in_my_bag ? "drop" : "pick"));
+      const showButton = el("button", "Show its journey", "btn btn--ghost");
+      showButton.type = "button";
+      showButton.addEventListener("click", () => show(t));
+      bar.append(action, showButton);
+      li.append(bar);
+      if (t.history.length) {
+        const list = el("ul", undefined, "play-history");
+        for (const h of t.history) list.append(el("li", `${h.text} (${new Date(h.at).toLocaleString()})`));
+        li.append(list);
+      }
+      return li;
+    }
+
+    function fill(select, items, emptyLabel) {
+      const keep = select.value;
+      const options = items.map(t => { const o = el("option", t.name); o.value = String(t.id); return o; });
+      if (emptyLabel) { const o = el("option", emptyLabel); o.value = ""; options.unshift(o); }
+      select.replaceChildren(...options);
+      if (keep && [...select.options].some(o => o.value === keep)) select.value = keep;
+      select.dispatchEvent(new Event("options-changed"));
+    }
+
+    async function load() {
+      const res = await fetch("/api/travelers");
+      if (res.status === 401) { location.href = "/login?next=/travelers"; return; }
+      const data = await res.json();
+      $("bonus").textContent = String(data.bonus);
+      $("list").replaceChildren(...data.travelers.map(travelerEl));
+      $("none").hidden = data.travelers.length > 0;
+      fill($("newGoal"), data.treasures, "No goal");
+      const spots = await (await fetch("/api/treasures")).json();
+      treasureSpots = Object.fromEntries(spots.map(t => [String(t.id), { lat: t.lat, lon: t.lon }]));
+      fill($("pretendAt"), spots);
+      const chosen = data.travelers.find(t => t.id === shownId) || data.travelers[0];
+      if (chosen) show(chosen);
+    }
+
+    $("newForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const p = position();
+      if (!p) { say("Waiting for your position…", "bad"); return; }
+      const goal = $("newGoal").value;
+      const body = { name: $("newName").value, lat: p.lat, lon: p.lon };
+      if (goal) body.goal_treasure_id = Number(goal);
+      const res = await fetch("/api/travelers", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) { say(data.error || "Something went wrong.", "bad"); return; }
+      say(`${data.name} starts its journey ${data.where.toLowerCase()}.`, "good");
+      event.target.reset();
+      shownId = data.id;
+      load();
+    });
+
+    if (Where.pretend) { $("pretendNote").hidden = false; $("pretendBox").hidden = false; }
+    Where.start(text => say(text, "bad"));
+    load();
+  </script>
+</body>
+</html>

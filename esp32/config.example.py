@@ -13,3 +13,6 @@ DEVICE_TOKEN = "paste-the-token-here"
 # Wiring (ESP32 pin numbers): both sensors share the same two I2C wires
 I2C_SDA = 21
 I2C_SCL = 22
+
+# Only for the treasure box (box_main.py): shown ONCE on the Box page when you make the box
+BOX_SECRET = "paste-the-box-secret-here"

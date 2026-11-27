@@ -33,6 +33,25 @@ To show it on purpose, open `/?tour`.
 
 `python -m unittest tests.test_demo_story` plays steps 1 to 5 automatically.
 
+## New ways to play (about 2 minutes; Menu > "New ways to play")
+Indoors, add `?drag` to any of these addresses: the page then uses a pretend position instead of GPS.
+1. **Wandering treasure** (`/wanderer`): show the footprints (yesterday, 12, 6 and 3 hours ago) and ask
+   where it is heading. Logged in as an admin, `/wanderer?reveal=1&drag` shows where it really is:
+   tap there on the map, then "Catch it here" (+30 coins, once a day).
+2. **Ghost race** (`/ghost?drag`): race ben's ghost to the demo treasure. Press Start, then tap
+   "Step closer" faster than the ghost walks: "You beat ben's ghost by ...".
+3. **Team treasure** (`/team?drag`): "Twin benches" needs 2 players. Tap "I'm here" as demo_player,
+   then within a minute on a second phone (or a private window) as alice: it opens for both (+15 each).
+4. **Travelers** (`/travelers?drag`): the Golden Duck waits at Cafe corner and wants to reach Library steps.
+   Choose "Cafe corner", pick it up, choose "Library steps", drop it: goal reached, +25 coins.
+5. **Treasure box** (`/box`): in a second terminal run `python simulate_box.py "Gate box"` (or use the
+   ESP32 with `esp32/box_main.py`). Type the code shown: "Proved!". Try the same code as another player:
+   refused, each code works once. Finding "Gate box" on the map is refused until the code is typed.
+6. **Eyes-free mode** (`/eyes-free?drag`): pick a treasure, tap Start, and turn the sound up. Tap
+   "Step closer": the beeps speed up, and the phone says how far and which way.
+
+`python -m unittest tests.test_demo_play` plays steps 3 to 5 automatically.
+
 ## Show the band's live features without the band
 `simulate_band.py` pretends to be the band, sending one reading every 5 seconds while you demo.
 (A's `esp32/simulate_walk.py` sends a finished walk instead: use that for the Health page.)

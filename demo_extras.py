@@ -161,5 +161,7 @@ def seed_demo_extras(now=None):
     visits = _seed_heat(now)
     if visits:
         added.append(f"{visits} heat map visits")
+    from demo_play import seed_demo_play  # B: the six new ways to play (here: demo_play imports models)
+    added += seed_demo_play(now.astimezone(timezone.utc).replace(tzinfo=None) if now.tzinfo else now)
     db.session.commit()
     return added

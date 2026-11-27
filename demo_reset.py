@@ -78,5 +78,8 @@ def reset_demo(extra_usernames=()):
         Hunt.name.in_([DEMO_FULL_HUNT["name"], DEMO_RACE["name"]]))).scalars())  # B: and the demo race
     deleted = wipe_players([uid for uid, _ in users], hunts)
     db.session.commit()
+    # The rows were deleted straight in the database, so forget any objects the session still
+    # remembers for them: the seed may reuse their ids (SQLAlchemy would warn about the clash).
+    db.session.expunge_all()
     added = seed_demo_story()
     return {"removed": [name for _, name in users], "deleted": deleted, "added": added}
